@@ -24,6 +24,7 @@ namespace dxvk {
 
   VrInstance:: VrInstance() {
     m_no_vr = env::getEnvVar("DXVK_NO_VR") == "1";
+    m_vr_enabled = env::getEnvVar("DXVK_ENABLE_VR") == "1";
   }
   VrInstance::~VrInstance() { }
 
@@ -294,7 +295,7 @@ namespace dxvk {
       return false;
     }
 
-    if (m_no_vr)
+    if (m_no_vr || !m_vr_enabled)
       return false;
 
     if (m_sceneSessionActive && m_compositor && m_system) {

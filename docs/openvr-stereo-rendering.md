@@ -306,3 +306,10 @@ The frame snapshot now also carries:
 These matrices are row-major and remain entirely in OpenVR tracking coordinates. They do not apply an RBR world origin, meters-to-world scale, or DXVK/GLM clip-space conversion. Those are deliberately separate integration steps; the raw projection bounds remain available for constructing the renderer-specific asymmetric projection matrix.
 
 The session API now requires an explicit owner token. Only the same owner may re-enter an active session or release it; a second DXVK device is rejected instead of accidentally sharing a process-global runtime session or shutting it down prematurely. The token is expected to be the address of the selected owning `DxvkDevice`. Runtime ownership remains separate: a host-owned OpenVR runtime is reused and is never globally shut down by DXVK.
+
+
+## DXVK device lifecycle hookup
+
+The selected DXVK device now attempts to claim the OpenVR scene session after its Vulkan queues and device-owned infrastructure are initialized. The claim is opt-in through `DXVK_ENABLE_VR=1`; `DXVK_NO_VR=1` remains a hard disable. If the runtime is unavailable, the claim fails and the existing mono path continues unchanged. A second DXVK device cannot claim the same process-global scene session.
+
+On teardown, the device first drains its DXVK work with the existing `waitForIdle()` path, then releases its own OpenVR claim before device-owned Vulkan state is destroyed. The session owner token prevents a non-owner device from shutting down the active session. This is lifecycle plumbing only: no frame acquisition or eye-image submission is wired into the game frame loop yet.

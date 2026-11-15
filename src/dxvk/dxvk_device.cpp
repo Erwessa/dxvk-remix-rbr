@@ -21,6 +21,7 @@
 */
 #include "dxvk_device.h"
 #include "dxvk_instance.h"
+#include "dxvk_openvr.h"
 #include "rtx_render/rtx_context.h"
 #include "dxvk_scoped_annotation.h"
 #include "rtx_render/rtx_ray_reconstruction.h"
@@ -148,6 +149,10 @@ namespace dxvk {
 #endif
 
     m_gpuBreadcrumbs = GpuBreadcrumbs::create(this);
+
+    // OpenVR is opt-in. Keep the normal mono path untouched unless the host
+    // explicitly enables VR through DXVK_ENABLE_VR=1.
+    m_openVrSessionOwned = VrInstance::s_instance.initializeSceneSession(this);
   }
 
   
@@ -156,6 +161,13 @@ namespace dxvk {
     // Wait for all pending Vulkan commands to be
     // executed before we destroy any resources.
     this->waitForIdle();
+
+    // Release the process-wide OpenVR scene claim before device-owned Vulkan
+    // state is destroyed. A host-owned OpenVR runtime is not shut down here.
+    if (m_openVrSessionOwned) {
+      VrInstance::s_instance.shutdownSceneSession(this);
+      m_openVrSessionOwned = false;
+    }
 
     // NV-DXVK start: RTX initializer
     m_objects.getRtxInitializer().release();
