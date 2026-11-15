@@ -272,3 +272,17 @@ Do not move a pass until its reads/writes, manager state, history ownership, and
 ## Current implementation note
 
 The existing OpenVR bootstrap typedef for `VR_InitInternal` must match its exported ABI. This branch corrects its return type to `uint32_t`; the function's return value is the OpenVR token, while initialization success is reported through `EVRInitError`.
+
+
+## Atomic OpenVR frame snapshot
+
+`VrInstance::acquireFrame(OpenVrFrameState&)` now gathers one frame as a single operation under the OpenVR instance mutex:
+- Calls `IVRCompositor::WaitGetPoses` exactly once.
+- Copies the full render-pose array, including the HMD pose.
+- Captures both eye-to-head transforms and each eye's raw projection bounds.
+- Increments a monotonically increasing DXVK-side frame index after a successful compositor wait.
+- Publishes the snapshot only after all fields have been gathered; returns false when the HMD pose is invalid.
+
+The eye transforms are intentionally documented as eye-to-head transforms. The eventual camera integration must invert them when composing world-to-eye view transforms. This snapshot layer does not yet convert OpenVR matrices to DXVK/GLM conventions, choose a tracking origin, render either eye, or submit textures. Those steps require the camera and RTX view-matrix conventions to be audited first.
+
+The caller must still hold DXVK's submission queue gate around `acquireFrame`, because OpenVR's compositor wait may access the Vulkan queue. That synchronization belongs at the future frame-loop call site, not inside the global runtime singleton.
