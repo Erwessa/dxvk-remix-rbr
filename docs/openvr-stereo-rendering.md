@@ -133,7 +133,35 @@ A number of these passes use shared managers or resource queues today. They cann
 - `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
 - The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
 
-### OpenVR submission-image compatibility audit
+### Vulkan texture descriptor mapping
+
+The checked-in OpenVR SDK header `include/openvr/openvr.hpp` defines `vr::VRVulkanTextureData_t` with these fields:
+- `m_nImage`: Vulkan image handle encoded as `uint64_t`.
+- `m_pDevice`: logical device.
+- `m_pPhysicalDevice`: physical device.
+- `m_pInstance`: Vulkan instance.
+- `m_pQueue` and `m_nQueueFamilyIndex`: queue and its family.
+- `m_nWidth`, `m_nHeight`, `m_nFormat`, `m_nSampleCount`: image metadata.
+
+The current DXVK object graph already exposes the matching values:
+- `DxvkDevice::handle()` and `DxvkDevice::vkd()` expose the logical device / dispatch table.
+- `DxvkDevice::adapter()->handle()` exposes the physical device.
+- `DxvkDevice::instance()->handle()` exposes the Vulkan instance.
+- `DxvkDevice::queues().graphics.queueHandle` and `queueFamily` expose the graphics queue and family.
+- The exact eye image provides the remaining image handle, dimensions, format, and sample count.
+
+This is a strong indication that OpenVR Vulkan submission can use the existing DXVK device and graphics queue; no second Vulkan device or instance is needed. The mapping must still be implemented at a point where the image and device are guaranteed to outlive the compositor's use.
+
+### Ownership and lifetime warning
+
+The SDK header explicitly says to call OpenVR shutdown before destroying Vulkan resources passed through this structure. Therefore:
+- Eye images must be destroyed only after compositor use is complete.
+- Scene-session shutdown must precede destruction of any submitted eye images and the Vulkan device.
+- If the scene session is host-owned, DXVK must not call global OpenVR shutdown; it still must stop submitting its own images and wait for compositor use to finish before releasing those images.
+- The current singleton `VrInstance::s_instance` means session ownership is process-wide, whereas `DxvkDevice` is device-scoped. A future integration must handle multiple DXVK devices or repeated device creation explicitly rather than blindly shutting down the singleton from every device destructor.
+
+
+## OpenVR submission-image compatibility audit
 
 There is a useful positive finding in the existing allocator:
 - `Resources::createImageResource()` adds `VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT` to every image it creates, plus any requested extra usage flags.
