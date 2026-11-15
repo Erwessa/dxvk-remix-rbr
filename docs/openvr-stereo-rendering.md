@@ -344,3 +344,68 @@ and converted explicitly at the boundary before it is passed to `RtCamera`.
 The helper does not update a camera, modify a game camera, or imply that
 calibration has been discovered automatically. This keeps the tracking-space
 math testable and prevents an uncalibrated headset pose from moving the scene.
+
+
+## RBR/D3D9 camera-source audit
+
+The target game's ordinary camera reaches Remix through the D3D9 transform state,
+not through a game-specific physics-camera API:
+
+1. `D3D9DeviceEx::SetTransform(D3DTS_VIEW, ...)` validates the transform and
+   routes it to `SetStateTransform`.
+2. `SetStateTransform` converts and stores the matrix in
+   `m_state.transforms[GetTransformIndex(D3DTS_VIEW)]`, then marks the
+   fixed-function vertex data dirty.
+3. The D3D9 draw/frontend path builds its camera data from that stored View and
+   Projection state. `CameraManager::processCameraData()` ultimately calls
+   `applyFrameCamera(Main, worldToView, viewToProjection)`.
+4. `RtCamera::update()` stores the supplied world-to-view matrix and its
+   inverse. `CameraManager::getMainCamera()` therefore exposes the renderer's
+   already accepted main camera, including the current `getViewToWorld()`
+   transform when the camera is valid for the current frame.
+
+This gives the VR path a stable integration source: use the current Remix Main
+camera as the game-world reference, rather than reconstructing the car or camera
+from RBR gameplay/physics state. The two eye cameras can be derived from this
+reference and one predicted OpenVR tracking snapshot.
+
+### World origin and units are not yet established
+
+The existing `rtx.worldOrigin` support is an opt-in host-published render-origin
+mechanism. It reads `__mcrtx.world_origin.x/y/z` game values and documents the
+convention `render position + world origin = world position`. This is not
+evidence that RBR currently publishes those values, and it is not an automatic
+game-unit conversion.
+
+The D3D9 transform path proves where the view matrix comes from, but it does not
+prove what one RBR world unit represents in metres. Nor does it establish a
+fixed world-axis mapping independently of the actual camera matrices. The
+current source audit therefore confirms the camera source and renderer matrix
+convention, but intentionally leaves the metres-per-game-unit value and
+tracking-to-game axis calibration unset.
+
+### Camera validity and frame timing
+
+`CameraManager::getMainCamera()` is the relevant camera accessor, and
+`RtCamera::isValid(frameId)` / `getLastUpdateFrame()` expose whether it has
+been updated for the current DXVK frame. The camera manager also has dedicated
+left/right camera objects, but they are not currently populated from the main
+camera or the HMD.
+
+A future frame coordinator must not sample the main camera too early: D3D9
+updates it while processing draws, and a frame may contain menu, sky,
+view-model, and render-to-texture cameras before or after the main camera.
+Use the Main camera only after its current-frame validity has been established;
+do not mistake `getLastSetCameraType()` for a persistent camera identity or
+assume the last draw camera is always Main.
+
+The first safe integration should therefore have two explicit phases:
+- Capture/retain the accepted Main camera snapshot for the game frame.
+- Once the frame's camera and OpenVR predicted pose are both available, derive
+  left/right view matrices from the same base camera and the same tracking
+  sample, then update each eye camera exactly once.
+
+The D3D9 Main camera is a view/projection input to Remix, not a declaration of
+the physical HMD tracking origin. A recenter/anchor policy and a calibrated
+uniform scale must still be supplied before any headset translation is applied
+to the game world.
