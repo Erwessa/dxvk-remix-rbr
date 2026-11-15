@@ -123,16 +123,12 @@ d3d9_dll = shared_library('d3d9', unified_src, dxvk_version, unified_shaders, d3
   install: true
   )
 
-# Copy FSR3 DLL to d3d9 output directory for runtime loading
+# Install the prebuilt FSR3 runtime DLL directly. The project-level
+# install_data() also stages this DLL for the Remix runtime output. Creating
+# a build-time custom_target here only adds a redundant Python file-copy job
+# to every Ninja build and is unnecessary because no target links against it.
 fsr3_dll_src = join_paths(global_src_root_norm, 'submodules/FidelityFX-SDK/PrebuiltSignedDLL/amd_fidelityfx_vk.dll')
-fsr3_dll_build = custom_target('copy_fsr3_dll',
-  output: 'amd_fidelityfx_vk.dll',
-  input: fsr3_dll_src,
-  command: [python_interpreter, '-c', 'import shutil; import sys; shutil.copy(sys.argv[1], sys.argv[2])', '@INPUT@', '@OUTPUT@'],
-  build_by_default: true,
-  install: true,
-  install_dir: get_option('bindir')
-)
+install_data(fsr3_dll_src, install_dir: get_option('bindir'))
 
 d3d9_dep = declare_dependency(
   link_with           : [ d3d9_dll ],
