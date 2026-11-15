@@ -303,12 +303,22 @@ namespace dxvk {
       return false;
     }
 
+    auto releaseFailedInitialization = [this](bool shutdownRuntime) {
+      if (shutdownRuntime && g_vrFunctions.shutdownInternal)
+        g_vrFunctions.shutdownInternal();
+      if (m_loadedOvrApi)
+        this->freeLibrary();
+      m_loadedOvrApi = false;
+      m_ovrApi = nullptr;
+    };
+
     g_vrFunctions.initInternal        = reinterpret_cast<VR_InitInternalProc>       (this->getSym("VR_InitInternal"));
     g_vrFunctions.shutdownInternal    = reinterpret_cast<VR_ShutdownInternalProc>   (this->getSym("VR_ShutdownInternal"));
     g_vrFunctions.getGenericInterface = reinterpret_cast<VR_GetGenericInterfaceProc>(this->getSym("VR_GetGenericInterface"));
 
     if (!g_vrFunctions.getGenericInterface) {
       Logger::warn("OpenVR: VR_GetGenericInterface not found");
+      releaseFailedInitialization(false);
       return false;
     }
 
@@ -322,12 +332,14 @@ namespace dxvk {
     if (error != vr::VRInitError_None || !compositor) {
       if (!g_vrFunctions.initInternal || !g_vrFunctions.shutdownInternal) {
         Logger::warn("OpenVR: initialization entry points are unavailable");
+        releaseFailedInitialization(false);
         return false;
       }
 
       g_vrFunctions.initInternal(&error, vr::VRApplication_Scene);
       if (error != vr::VRInitError_None) {
         Logger::warn(str::format("OpenVR: scene initialization failed: ", static_cast<int>(error)));
+        releaseFailedInitialization(false);
         return false;
       }
 
@@ -338,8 +350,7 @@ namespace dxvk {
 
     if (error != vr::VRInitError_None || !compositor) {
       Logger::warn("OpenVR: failed to acquire compositor for scene session");
-      if (initializedHere)
-        g_vrFunctions.shutdownInternal();
+      releaseFailedInitialization(initializedHere);
       return false;
     }
 
@@ -347,8 +358,7 @@ namespace dxvk {
       g_vrFunctions.getGenericInterface(vr::IVRSystem_Version, &error));
     if (error != vr::VRInitError_None || !system) {
       Logger::warn("OpenVR: failed to acquire IVRSystem");
-      if (initializedHere)
-        g_vrFunctions.shutdownInternal();
+      releaseFailedInitialization(initializedHere);
       return false;
     }
 
