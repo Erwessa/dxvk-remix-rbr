@@ -98,6 +98,52 @@ The current `RtxContext::injectRTX()` is a frame-level transaction, not a reusab
 
 Do not implement this by calling `injectRTX()` twice or by changing `m_frameLastInjected` to permit duplicate injection. The correct extraction point is after the shared scene preparation and before the view-dependent render graph is recorded. The exact boundary must be confirmed against the remainder of `injectRTX()` and the resources it mutates before code is moved.
 
+## Detailed `injectRTX()` pass classification
+
+The full current implementation was reviewed from the entry point through `onInjectRtxFrameEnd()`. The following is the proposed split, not a claim that these operations are already stereo-safe.
+
+### Frame-scoped work (one execution per game frame)
+
+- Drain scene commands, imported-image barriers, and commit pending graphics state.
+- Refresh shader prewarming, evaluate ray-tracing support/options, set present throttle, and perform the duplicate-injection guard.
+- Process hot reloads, global performance/session logging, screenshot/capture triggers, and deferred retained-geometry replay.
+- Submit particle draw state and texture uploads; signal Reflex frame bookkeeping.
+- Begin pre-exposure, latch frame lighting conditions, update pipeline cache/initializer state.
+- `SceneManager::prepareSceneData()`, including the scene GPU buffers and acceleration structures.
+- Cone-map generation for materials registered during this frame.
+- Frame-level feature mask / counters / metrics, capture state, settings sweep, option application, and frame-end bookkeeping.
+
+These operations must not be repeated for the second eye. Some may later need explicit per-view inputs (for example, camera-dependent scene data), but their lifetime and mutation must remain frame-scoped.
+
+### View-scoped work (one execution per eye, after refactor)
+
+- `onInjectRtxFrameBegin()` and render extent selection, once its global/resource side effects are separated from view-specific sizing.
+- Ray-tracing arguments that encode view/projection dimensions and camera data.
+- Camera-dependent passes: path tracing/G-buffer, screen-space cloud post-depth, view-dependent RTXDI/ReSTIR queries, demodulation, denoising, composition, and debug replacement.
+- Per-view upscaling/reconstruction and post-processing where the algorithm consumes view history or camera motion.
+- Final per-eye output image generation.
+
+A number of these passes use shared managers or resource queues today. They cannot simply be called twice: each such manager/resource must either be proven frame-global and read-only during view execution, or receive an explicit per-eye state/resource set.
+
+### Special handling required before stereo
+
+- `Resources::RaytracingOutput` currently exposes a single primary output set and advances depth/motion-vector queues at frame start. Stereo needs per-eye output/history resources or a deliberate sequential reuse strategy with fully isolated history.
+- `m_currentUpscaler`, `m_previousUpscaler`, and DLSS/RR/XeSS/FSR/TAA state are currently context-level. Their temporal state must be separated by eye, and vendor SDK integration must be checked for multi-view support and correct motion/depth inputs.
+- `PreExposure::beginFrame()`, `LightBvh::latchFrame()`, Reflex, dust simulation, particle submission, sampler feedback, object picking, thumbnails, captures, performance windows, and settings sweeps are not automatically safe to execute twice.
+- `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
+- The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
+
+### Recommended extraction sequence
+
+1. Extract a single-shot `beginRtxFrame()` / `prepareRtxFrame()` boundary while preserving the existing mono behavior exactly.
+2. Introduce an explicit `RtxView` description (eye index, predicted pose, eye-to-head transform, view/projection matrices, output extent).
+3. Extract `renderRtxView(view, viewResources)` from the camera-dependent section. Keep the mono caller using one view so regressions can be bisected.
+4. Move camera history and view-dependent resource queues into per-eye state.
+5. Add two OpenVR output images and submit them only after their rendering commands and image-layout transitions are complete.
+6. Validate mono output equivalence, then stereo geometry, then temporal stability and performance.
+
+Do not move a pass until its reads/writes, manager state, history ownership, and synchronization have been traced. The mono path remains the reference and must remain unchanged when VR is disabled.
+
 ## Current implementation note
 
 The existing OpenVR bootstrap typedef for `VR_InitInternal` must match its exported ABI. This branch corrects its return type to `uint32_t`; the function's return value is the OpenVR token, while initialization success is reported through `EVRInitError`.
