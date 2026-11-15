@@ -137,10 +137,13 @@ A number of these passes use shared managers or resource queues today. They cann
 
 The repository already has the synchronization primitive needed for external Vulkan queue users; a new ad-hoc mutex must not be introduced.
 
-- `DxvkDevice::lockSubmission()` first calls `m_submissionQueue.synchronize()` and then locks the queue mutex.
-- `DxvkDevice::lockSubmissionUnsynchronized()` locks the same queue mutex without draining queued submissions. Its header explicitly warns that mixing queued DXVK work and direct Vulkan submissions this way can break ordering.
+- `DxvkDevice::lockSubmission()` first calls `m_submissionQueue.synchronize()` and then locks the queue mutex. The current `synchronize()` implementation waits until the CPU-side submit queue is empty and synchronizes the last presenter when present; it is not a general `vkDeviceWaitIdle` and must not be described as such.
+- `DxvkDevice::lockSubmissionUnsynchronized()` locks the same queue mutex without first draining queued submissions. Its header explicitly warns that mixing queued DXVK work and direct Vulkan submissions this way can break ordering.
 - `DxvkDevice::unlockSubmission()` releases the queue mutex.
 - The submission thread holds that same mutex while it submits command lists. A command list can submit both the dedicated transfer queue and graphics queue while under this gate.
+
+
+The device exposes these methods publicly in `dxvk_device.h`, so the intended integration point exists without exposing `m_mutexQueue` or adding a second lock. The queue mutex is held by the submission thread around `DxvkCommandList::submit()`; that submit can target the dedicated transfer queue and then the graphics queue. Keep the OpenVR Vulkan queue description aligned with the queue actually passed to DXVK's graphics submission path, and verify that the chosen queue family supports the required operations.
 
 The Valve OpenVR Vulkan contract adds several constraints (see the official [OpenVR Vulkan documentation](https://github.com/ValveSoftware/openvr/wiki/Vulkan)):
 - The runtime can access the queue described by `VRVulkanTextureData_t` during `IVRCompositor::Submit`; the application must not access that queue concurrently until the call returns.
