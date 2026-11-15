@@ -31,6 +31,7 @@ parser.add_argument('-I', '-include', action='append', type=str, dest='includes'
 parser.add_argument('-output', required=True, type=str, dest='output')
 parser.add_argument('-force', action='store_true', dest='force')
 parser.add_argument('-parallel', action='store_true', dest='parallel')
+parser.add_argument('-jobs', required=False, type=int, dest='jobs', default=None)
 parser.add_argument('-binary', action='store_true', dest='binary')
 parser.add_argument('-debug', action='store_true', dest='debug')
 parser.add_argument('-spirvopt', required=False, type=str, dest='spirvopt', default=None)
@@ -665,7 +666,9 @@ for root, dirs, files in os.walk(args.input):
 
 if len(tasks):
     threads = []
-    threadCount = multiprocessing.cpu_count() if args.parallel else 1
+    if args.jobs is not None and args.jobs < 1:
+        parser.error('-jobs must be at least 1')
+    threadCount = args.jobs if args.jobs is not None else (multiprocessing.cpu_count() if args.parallel else 1)
     for i in range(threadCount):
         thread = threading.Thread(target = runTasks, args = (tasks,))
         thread.start()

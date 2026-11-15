@@ -402,7 +402,9 @@ rtx_shaders_command_arguments = [
   '-include', join_paths(numos_root, 'shaders'),
   # NV-DXVK end
   '-output', rtx_shader_output_directory,
-  # CI builds serialize Slang variants to avoid spawning one compiler per CPU core.
+  # Bound internal Slang workers: one Ninja shader target expands into many variants.
+  # Two workers avoid the single-worker bottleneck without unbounded compiler fan-out.
+  '-jobs', '2',
 ]
 
 if get_option('buildtype').startswith('debug')
