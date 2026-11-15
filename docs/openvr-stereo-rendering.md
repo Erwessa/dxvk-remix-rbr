@@ -133,7 +133,31 @@ A number of these passes use shared managers or resource queues today. They cann
 - `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
 - The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
 
-### Runtime lifecycle integration status
+### Vulkan queue synchronization contract
+
+The repository already has the synchronization primitive needed for external Vulkan queue users; a new ad-hoc mutex must not be introduced.
+
+- `DxvkDevice::lockSubmission()` first calls `m_submissionQueue.synchronize()` and then locks the queue mutex.
+- `DxvkDevice::lockSubmissionUnsynchronized()` locks the same queue mutex without draining queued submissions. Its header explicitly warns that mixing queued DXVK work and direct Vulkan submissions this way can break ordering.
+- `DxvkDevice::unlockSubmission()` releases the queue mutex.
+- The submission thread holds that same mutex while it submits command lists. A command list can submit both the dedicated transfer queue and graphics queue while under this gate.
+
+The Valve OpenVR Vulkan contract adds several constraints (see the official [OpenVR Vulkan documentation](https://github.com/ValveSoftware/openvr/wiki/Vulkan)):
+- The runtime can access the queue described by `VRVulkanTextureData_t` during `IVRCompositor::Submit`; the application must not access that queue concurrently until the call returns.
+- `WaitGetPoses` may also access the queue in the default timing mode. `PostPresentHandoff` and `SubmitExplicitTimingData` access it as well.
+- Submitted images must be in `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`, and require at least `VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT`.
+
+Proposed initial synchronization policy:
+1. Route every OpenVR call that may touch the Vulkan queue through the existing `DxvkDevice` submission gate.
+2. Use `lockSubmission()` for the first conservative implementation where ordering against already queued DXVK work matters; pair it with `unlockSubmission()` using an exception-/early-return-safe scope guard.
+3. Submit both eyes under one queue-lock interval if the render path has already transitioned both images and established their producer dependencies. Do not release the lock between calls if doing so would permit another thread to enter the queue between the two compositor submissions.
+4. Do not use `lockSubmissionUnsynchronized()` until the frame scheduler explicitly proves the required order between queued DXVK command lists and runtime queue work.
+5. Never call `WaitGetPoses`, `Submit`, `PostPresentHandoff`, or `SubmitExplicitTimingData` while another thread may concurrently submit/present on the same Vulkan queue.
+6. Verify whether the selected OpenVR timing mode makes `WaitGetPoses` queue access avoidable before attempting to overlap pose wait and GPU submission. Explicit timing is not a free optimization: `SubmitExplicitTimingData` itself accesses the queue and must be serialized.
+
+This audit identifies an existing safe locking boundary, but it does not yet prove that the current `DxvkDevice` API exposes all Vulkan handles required by `VRVulkanTextureData_t`, nor that the OpenVR runtime's returned queue work is represented by DXVK's own completion tracking. Those must be addressed before implementing image submission or resource destruction.
+
+## Runtime lifecycle integration status
 
 The OpenVR primitives are currently not connected to a device/frame lifecycle:
 - `DxvkInstance::DxvkInstance()` registers `VrInstance::s_instance` as an extension provider.
