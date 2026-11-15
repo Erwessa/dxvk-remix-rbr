@@ -63,10 +63,12 @@ namespace dxvk {
     vr::IVRCompositor* getActiveCompositor() const { return m_sceneSessionActive ? m_compositor : nullptr; }
     bool isSceneSessionActive() const { return m_sceneSessionActive; }
 
-    // OpenVR frame primitives. Call waitGetPoses once per rendered HMD frame on
-    // the render thread; eye transforms and raw projection bounds are queried
-    // from the same active scene session.
+    // Acquires poses and both eyes' optical parameters as one synchronized
+    // frame snapshot. The caller must hold DxvkDevice's submission queue gate
+    // around this call because WaitGetPoses may access the Vulkan queue.
     bool acquireFrame(OpenVrFrameState& frame);
+
+    // Lower-level accessors retained for diagnostics and staged integration.
     bool waitGetPoses(std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses);
     bool getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height);
     bool getEyeToHeadTransform(vr::EVREye eye, vr::HmdMatrix34_t& transform);
