@@ -18,8 +18,8 @@ namespace dxvk {
     float bottom = 0.0f;
   };
 
-  // Row-major rigid transform in OpenVR tracking coordinates. This deliberately
-  // does not apply RBR's world origin, scale, or renderer-specific handedness.
+  // Row-major affine transform using OpenVR's column-vector composition convention.
+  // This deliberately does not apply RBR's world origin, scale, or renderer-specific handedness.
   struct OpenVrMatrix4 {
     std::array<float, 16> elements = {
       1.0f, 0.0f, 0.0f, 0.0f,
@@ -64,6 +64,14 @@ namespace dxvk {
     }
   };
 
+  // Explicit calibration from RBR game-world coordinates into OpenVR tracking
+  // coordinates. The affine matrix must include the chosen tracking origin,
+  // axis/handedness mapping, and game-units-to-metres scale. It is never inferred.
+  struct OpenVrWorldCalibration {
+    OpenVrMatrix4 trackingFromGameWorld = {};
+    bool valid = false;
+  };
+
   // One compositor-synchronized HMD frame. eyeToHead maps eye space to head
   // space; eyeFromTracking maps OpenVR tracking space to each eye's view space.
   struct OpenVrFrameState {
@@ -76,6 +84,22 @@ namespace dxvk {
     uint32_t recommendedHeight = 0;
     uint64_t frameIndex = 0;
     bool hmdPoseValid = false;
+
+    // Compose a calibrated game-world transform with this frame's eye pose.
+    // Result maps game-world positions directly into the requested eye's view
+    // space. OpenVrMatrix4 uses column vectors: eyeFromTracking * trackingFromGameWorld.
+    // The caller remains responsible for converting the result to DXVK's row-vector
+    // Matrix4 convention before passing it to RtCamera.
+    bool getEyeFromGameWorld(
+      std::size_t eye,
+      const OpenVrWorldCalibration& calibration,
+      OpenVrMatrix4& eyeFromGameWorld) const {
+      if (!hmdPoseValid || !calibration.valid || eye >= eyeFromTracking.size())
+        return false;
+
+      eyeFromGameWorld = eyeFromTracking[eye].multipliedBy(calibration.trackingFromGameWorld);
+      return true;
+    }
   };
 
   class DxvkInstance;

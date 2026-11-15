@@ -320,3 +320,27 @@ On teardown, the device first drains its DXVK work with the existing `waitForIdl
 `CameraManager` now owns two independent `RtCamera` instances exposed through `getVrEyeCamera(RtxEye::Left/Right)`. They are deliberately separate from `CameraType`: Main/ViewModel/Sky/Portal/RenderToTexture remain scene roles, while left/right are render views. Each eye therefore has its own frame-id guard, current/previous matrices, jitter sequence, and view-history invalidation state. The ordinary mono camera array and its classification logic are unchanged.
 
 These camera slots are storage and access infrastructure only. The frame loop does not yet update them or feed them into the RTX passes; that requires the RBR-to-OpenVR tracking calibration and the view-scoped RTX pipeline split described above.
+
+
+## Explicit game-world calibration contract
+
+The runtime now exposes an explicit `OpenVrWorldCalibration` input and a pure
+`OpenVrFrameState::getEyeFromGameWorld()` composition helper. The calibration
+matrix is named by its mapping direction: `trackingFromGameWorld` maps an RBR
+game-world position into OpenVR tracking coordinates. Its affine transform must
+encode the selected recenter/tracking origin, axis and handedness conversion,
+and game-units-to-metres scale. It is invalid until the RBR integration supplies
+all of those values; there is no guessed identity/default calibration.
+
+For a valid HMD frame, the helper computes:
+
+```
+eyeFromGameWorld = eyeFromTracking[eye] * trackingFromGameWorld
+```
+
+This helper deliberately uses OpenVR's column-vector composition convention.
+DXVK's `Matrix4` uses row vectors, so the completed matrix must be transposed
+and converted explicitly at the boundary before it is passed to `RtCamera`.
+The helper does not update a camera, modify a game camera, or imply that
+calibration has been discovered automatically. This keeps the tracking-space
+math testable and prevents an uncalibrated headset pose from moving the scene.
