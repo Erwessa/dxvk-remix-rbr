@@ -133,7 +133,35 @@ A number of these passes use shared managers or resource queues today. They cann
 - `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
 - The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
 
-### Recommended extraction sequence
+### Camera and resource ownership audit
+
+### Camera update is frame-idempotent
+
+`RtCamera::update()` returns immediately when `m_frameLastTouched == frameIdx`. A second update of the same camera for the other eye in the same game frame is therefore ignored. The object also owns mutable previous/current matrix caches, jitter sequence state, resolution state, and camera-history invalidation metadata.
+
+`CameraManager` stores a fixed `std::array<RtCamera, CameraType::Count>`. Its constructor initializes every entry by iterating the enum, while `accessCamera()` asserts that the enum value is below `CameraType::Count`; `Unknown` aliases `Main`. The manager additionally owns frame-global last-camera tracking, projection decomposition cache, fallback-camera state, external world origins, and camera-cut/history invalidation markers.
+
+Consequences:
+- Never update `Main` twice to represent left and right eyes in one frame.
+- Do not append eye values to `CameraType` until all enum consumers, loops, serialization/debug paths, and special-case `Main` behavior have been audited.
+- Each eye needs an independently updated camera object and independent temporal/jitter history. A dedicated VR view-camera owner is a safer initial boundary than overloading `m_lastSetCameraType` or `Unknown`.
+- Shared scene cameras (sky, portals, view model, render-to-texture) must retain their current semantics; an HMD eye is a render view, not another game draw camera category.
+
+### Resource ownership is broader than depth and motion vectors
+
+`Resources::RaytracingOutput` contains many single-instance primary-view resources beyond the two queued images: normals, albedo, linear view-Z, virtual motion vectors, hit distance, view direction, surface flags, RTXDI resources, radiance, denoising intermediates, composite/final outputs, and post-FX intermediates. It also contains shared resources explicitly written by both primary and secondary (PSR) passes.
+
+`Resources::createRaytracingOutput()` tracks one downscaled extent and one target extent. A resize waits for device idle and rebuilds that single resource set. `createDlfgResourceQueues()` allocates one depth/motion queue, with additional entries only when DLFG/FSR frame generation is enabled; the queue is advanced once in the current injection path.
+
+This means stereo cannot be made correct by duplicating only the depth and motion-vector queues. A resource-by-resource read/write audit is required to classify:
+1. frame-shared resources (written once and safely read by both eyes),
+2. per-eye render targets and temporal histories,
+3. resources that can be reused sequentially only after the first eye has completed all consumers,
+4. resources requiring SDK-specific multi-view handling.
+
+The initial stereo implementation should prefer explicit per-eye resource bundles for all view-dependent render targets and histories. Sharing should be opt-in and justified by pass access analysis, not assumed from a resource's current name or allocation site.
+
+## Recommended extraction sequence
 
 1. Extract a single-shot `beginRtxFrame()` / `prepareRtxFrame()` boundary while preserving the existing mono behavior exactly.
 2. Introduce an explicit `RtxView` description (eye index, predicted pose, eye-to-head transform, view/projection matrices, output extent).
