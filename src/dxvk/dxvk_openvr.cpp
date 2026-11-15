@@ -371,6 +371,44 @@ namespace dxvk {
   }
 
 
+  bool VrInstance::acquireFrame(OpenVrFrameState& frame) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_compositor || !m_system)
+      return false;
+
+    OpenVrFrameState next = {};
+    const auto error = m_compositor->WaitGetPoses(
+      next.renderPoses.data(), static_cast<uint32_t>(next.renderPoses.size()), nullptr, 0);
+    if (error != vr::VRCompositorError_None) {
+      Logger::warn(str::format("OpenVR: WaitGetPoses failed: ", static_cast<int>(error)));
+      return false;
+    }
+
+    next.frameIndex = ++m_frameIndex;
+    next.hmdPoseValid = next.renderPoses[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid;
+
+    constexpr std::array<vr::EVREye, 2> eyes = {
+      vr::Eye_Left,
+      vr::Eye_Right,
+    };
+
+    for (size_t i = 0; i < eyes.size(); i++) {
+      next.eyeToHead[i] = m_system->GetEyeToHeadTransform(eyes[i]);
+      m_system->GetProjectionRaw(
+        eyes[i],
+        &next.projection[i].left,
+        &next.projection[i].right,
+        &next.projection[i].top,
+        &next.projection[i].bottom);
+    }
+
+    // Publish only a complete snapshot. A caller never observes a mixture of
+    // poses from one frame and eye parameters from another.
+    frame = next;
+    return next.hmdPoseValid;
+  }
+
+
   bool VrInstance::waitGetPoses(
       std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
