@@ -30,7 +30,7 @@ jobs:
           . .\build_common.ps1
           PerformBuild -BuildFlavour debugoptimized -BuildSubDir _Comp64DebugOptimized -Backend ninja -EnableTracy false -ConfigureOnly $true
 
-      - name: Diagnose FidelityFX runtime DLL copy
+      - name: Verify FidelityFX runtime DLL source
         shell: pwsh
         run: |
           $source = Join-Path $PWD "submodules\FidelityFX-SDK\PrebuiltSignedDLL\amd_fidelityfx_vk.dll"
@@ -38,15 +38,7 @@ jobs:
             throw "FidelityFX source DLL is missing: $source"
           }
           $item = Get-Item -LiteralPath $source
-          Write-Host ("FidelityFX DLL: {0} bytes; modified {1:o}" -f $item.Length, $item.LastWriteTimeUtc)
-          $probe = Join-Path $env:RUNNER_TEMP "amd_fidelityfx_vk.probe.dll"
-          $timer = [System.Diagnostics.Stopwatch]::StartNew()
-          [System.IO.File]::Copy($source, $probe, $true)
-          $timer.Stop()
-          $probeItem = Get-Item -LiteralPath $probe
-          if ($probeItem.Length -ne $item.Length) { throw "FidelityFX DLL copy size mismatch" }
-          Write-Host ("Preflight copy succeeded in {0} ms" -f $timer.ElapsedMilliseconds)
-          Remove-Item -LiteralPath $probe -Force
+          Write-Host ("FidelityFX DLL present: {0} bytes; modified {1:o}" -f $item.Length, $item.LastWriteTimeUtc)
 
       - name: Compile (limited parallelism, monitored)
         shell: pwsh
