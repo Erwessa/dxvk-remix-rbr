@@ -37,6 +37,14 @@ Calling `injectRTX` twice for one game frame is not a valid stereo implementatio
 - Serialize access to the Vulkan queue shared with OpenVR. Respect the runtime's queue-family and device requirements; do not assume the game's present queue is automatically valid.
 - Keep resource lifetime, semaphores/fences, image layout tracking, and queue ownership explicit. A CPU-side `WaitGetPoses` call is not a substitute for GPU completion synchronization.
 
+## Matrix convention audit
+
+The checked-in DXVK math type `Matrix4Base` stores four row vectors and multiplies vectors as row vectors (`v * M)); its translation is stored in row 3. The OpenVR SDK defines `HmdMatrix34_t` as a 3-by-4 array, with the rigid-transform translation in column 3. A direct element-for-element copy is therefore not a valid conversion: the affine transform must first be represented in the DXVK row-vector convention (transpose the 3-by-3 rotation and place the OpenVR translation in row 3).
+
+OpenVR's documented tracking basis is +X right, +Y up, -Z forward, with positions in metres. This establishes the source convention, but not the final game-world mapping. Before constructing an HMD camera, the implementation must still define the tracking origin/recenter policy, map metres to the RBR world-unit scale, and compose the head pose with the game's base camera without double-applying its orientation. Projection conversion is a separate operation: raw asymmetric bounds must be converted to the exact clip-space/depth convention expected by Remix's RTX passes.
+
+No OpenVR-to-DXVK conversion helper is implemented yet. The above is the matrix-layout finding only; it is not a claim that the camera transform is already correct.
+
 ## Camera and temporal-history requirements
 
 The existing `CameraType` values describe scene roles such as Main, ViewModel, Sky, Portal and RenderToTexture; they are not left/right eye slots. Stereo eye state should be represented explicitly rather than overloading those scene camera roles.
