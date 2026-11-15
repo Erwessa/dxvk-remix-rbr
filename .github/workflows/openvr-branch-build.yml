@@ -18,10 +18,6 @@ jobs:
       - name: Setup Meson
         run: pip install meson==1.1.0
 
-      - name: Fetch pinned DLSS / NGX DLL bundle
-        shell: pwsh
-        run: .\scripts\update-dlss-dlls.ps1
-
       - name: Build debugoptimized
         shell: pwsh
         run: |
