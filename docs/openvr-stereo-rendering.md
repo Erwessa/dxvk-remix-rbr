@@ -133,7 +133,18 @@ A number of these passes use shared managers or resource queues today. They cann
 - `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
 - The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
 
-### Vulkan queue synchronization contract
+### OpenVR submission-image compatibility audit
+
+There is a useful positive finding in the existing allocator:
+- `Resources::createImageResource()` adds `VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT` to every image it creates, plus any requested extra usage flags.
+- The current final RTX output is an `AliasedResource` with `VK_FORMAT_R16G16B16A16_SFLOAT`; the allocator's default usage flags therefore include the two usage bits required by OpenVR, and this format is in Valve's documented Vulkan compositor format list.
+- This makes the existing image allocator a plausible basis for compositor-compatible eye targets, subject to confirming the actual image/view passed to OpenVR and its final layout.
+
+Important remaining mismatch: `createTargetResources()` sizes `m_finalOutput` from the single `m_targetExtent`, which is currently driven by the game's target resolution. OpenVR's recommended eye render size is queried by the new wrapper but is not yet connected to resource allocation. Do not assume the game backbuffer extent is the HMD's recommended per-eye extent. A future VR target path must explicitly choose and track the per-eye extent, preserve the desktop target separately if needed, and recreate per-eye resources when either extent changes.
+
+The usage flags alone are insufficient: before `IVRCompositor::Submit`, the exact image must have completed rendering, be transitioned to `VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL`, and have correct queue-family ownership and synchronization. The image must remain alive until the compositor is finished with it.
+
+## Vulkan queue synchronization contract
 
 The repository already has the synchronization primitive needed for external Vulkan queue users; a new ad-hoc mutex must not be introduced.
 
