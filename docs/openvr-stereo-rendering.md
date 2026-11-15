@@ -133,7 +133,25 @@ A number of these passes use shared managers or resource queues today. They cann
 - `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
 - The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
 
-### Camera and resource ownership audit
+### Runtime lifecycle integration status
+
+The OpenVR primitives are currently not connected to a device/frame lifecycle:
+- `DxvkInstance::DxvkInstance()` registers `VrInstance::s_instance` as an extension provider.
+- Extension discovery can acquire the compositor using a background application session, then `initDeviceExtensions()` calls `shutdown()` after querying the Vulkan device extensions.
+- `initializeSceneSession()`, `waitGetPoses()`, the recommended-size query, eye transforms, and projection queries currently have no call sites outside their declarations/definitions.
+- `DxvkDevice` construction obtains Vulkan queues and initializes device-owned objects; its destructor waits for device idle before teardown. No OpenVR scene-session start/stop is currently tied to that device lifecycle.
+
+Therefore the existing code provides OpenVR extension discovery and callable primitives, but does not yet start a persistent scene session or drive an HMD frame. The next integration step must define an explicit ownership/lifecycle policy:
+1. Start the scene session only after the Vulkan device and its queue handles exist.
+2. Decide whether the feature is opt-in (recommended initially) and how the RBR host requests VR mode.
+3. Ensure only the code that initialized the OpenVR runtime calls `VR_ShutdownInternal`; a reused host-owned session must remain host-owned.
+4. Stop the scene session before device teardown, after any outstanding compositor submissions have completed.
+5. Keep `WaitGetPoses` on the designated render thread and call it once per HMD frame, not once per eye.
+6. Do not assume the current queue mutex protects OpenVR compositor access to the Vulkan queue; queue serialization must be coordinated with DXVK's actual queue synchronization.
+
+The extension-provider initialization path is not itself the VR runtime frame loop and must not be used as a substitute for scene-session ownership.
+
+## Camera and resource ownership audit
 
 ### Camera update is frame-idempotent
 
