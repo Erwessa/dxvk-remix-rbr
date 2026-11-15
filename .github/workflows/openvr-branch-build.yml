@@ -20,13 +20,13 @@ jobs:
 
       - name: Fetch pinned DLSS / NGX DLL bundle
         shell: pwsh
-        run: .\\scripts\\update-dlss-dlls.ps1
+        run: .\scripts\update-dlss-dlls.ps1
 
       - name: Build debugoptimized
         shell: pwsh
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-          . .\\build_common.ps1
+          . .\build_common.ps1
           PerformBuild -BuildFlavour debugoptimized -BuildSubDir _Comp64DebugOptimized -Backend ninja -EnableTracy false copy_output
 
       - name: Upload build logs
@@ -35,8 +35,8 @@ jobs:
         with:
           name: openvr-build-logs-${{ github.sha }}
           path: |
-            _Comp64DebugOptimized\\meson-logs\\meson-log.txt
-            _Comp64DebugOptimized\\update-deps.log
+            _Comp64DebugOptimized\meson-logs\meson-log.txt
+            _Comp64DebugOptimized\update-deps.log
             update-deps.log
           if-no-files-found: ignore
           retention-days: 14
@@ -47,13 +47,13 @@ jobs:
         with:
           name: openvr-dxvk-remix-debugoptimized-${{ github.sha }}
           path: |
-            _output\\*.dll
-            _output\\*.pdb
-            _output\\*.txt
-            _output\\LICENSE
-            _output\\LICENSE-MIT
-            _output\\CREDITS.md
-            _output\\usd\\*
+            _output\*.dll
+            _output\*.pdb
+            _output\*.txt
+            _output\LICENSE
+            _output\LICENSE-MIT
+            _output\CREDITS.md
+            _output\usd\*
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
