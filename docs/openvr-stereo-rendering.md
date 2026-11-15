@@ -82,6 +82,22 @@ The pose and calibration methods are currently runtime primitives only. No frame
 - Check eye alignment, scale, world stability during head rotation/translation, frame pacing, GPU synchronization, and repeated enable/disable cycles.
 - Test with Vulkan validation enabled and inspect logs for layout, lifetime and queue-synchronization errors.
 
+## RTX frame and camera findings
+
+The current `RtxContext::injectRTX()` is a frame-level transaction, not a reusable eye-render function. It drains scene commands, commits graphics state, refreshes shader prewarming, applies the fallback Main camera, sets present throttling, gates duplicate injection with `m_frameLastInjected`, submits particle and texture work, and then records the RTX frame graph. Calling it twice in one device frame returns at the duplicate-injection guard and, even without that guard, would repeat frame-scoped work.
+
+`CameraManager` owns a fixed array of `RtCamera` objects. Each `RtCamera` contains current and previous matrix caches, Halton jitter state, camera-cut/history invalidation state, and frame-touch metadata. `CameraManager::onFrameEnd()` resets the last-set camera marker and the projection decomposition cache. This state cannot be shared between eyes without defining which temporal quantities are frame-scoped and which are view-scoped.
+
+### Required refactor boundary
+
+1. Keep scene command draining, resource uploads, shader readiness checks, acceleration-structure updates, and other scene preparation once per game frame.
+2. Introduce an explicit view description for each eye: predicted HMD pose composed with eye-to-head transform, asymmetric projection, render extent, and eye identity.
+3. Run the view-dependent RTX passes for each eye with separate camera matrices and temporal state. The left eye's history must never become the right eye's previous-frame history.
+4. Keep frame-level counters, Reflex bookkeeping, particle submission, capture triggers, and presentation bookkeeping single-shot unless a subsystem is explicitly made view-aware.
+5. Submit both eye images only after their Vulkan work is complete and the images are in the layout required by OpenVR. Serialize access to the Vulkan queue across OpenVR calls that may use it.
+
+Do not implement this by calling `injectRTX()` twice or by changing `m_frameLastInjected` to permit duplicate injection. The correct extraction point is after the shared scene preparation and before the view-dependent render graph is recorded. The exact boundary must be confirmed against the remainder of `injectRTX()` and the resources it mutates before code is moved.
+
 ## Current implementation note
 
 The existing OpenVR bootstrap typedef for `VR_InitInternal` must match its exported ABI. This branch corrects its return type to `uint32_t`; the function's return value is the OpenVR token, while initialization success is reported through `EVRInitError`.
