@@ -403,8 +403,8 @@ rtx_shaders_command_arguments = [
   # NV-DXVK end
   '-output', rtx_shader_output_directory,
   # Bound internal Slang workers: one Ninja shader target expands into many variants.
-  # Two workers avoid the single-worker bottleneck without unbounded compiler fan-out.
-  '-jobs', '2',
+  # Four workers keep the large shader-variant batch moving on hosted Windows runners.
+  '-jobs', '4',
 ]
 
 if get_option('buildtype').startswith('debug')

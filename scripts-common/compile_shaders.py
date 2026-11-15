@@ -83,7 +83,7 @@ os.makedirs(args.output, exist_ok = True)
 
 def printFromThread(what):
     report_lock.acquire()
-    print(what)
+    print(what, flush=True)
     report_lock.release()
 
 
@@ -167,7 +167,7 @@ class Task:
         return "<UnknownTask>"
 
 def runTasks(tasks):
-    global terminate
+    global terminate, completedTasks
     while True:
         if terminate:
             break
@@ -203,6 +203,10 @@ def runTasks(tasks):
                 if (exitCode == 1) and (attempt < maxAttempts - 1):
                     continue
             break
+
+        with progress_lock:
+            completedTasks += 1
+            print(f'[shader progress {completedTasks}/{totalTasks}] {task.getName()}', flush=True)
 
         if exitCode != 0:
             terminate = True
@@ -665,6 +669,10 @@ for root, dirs, files in os.walk(args.input):
                     tasks.append(task)
 
 if len(tasks):
+    totalTasks = len(tasks)
+    completedTasks = 0
+    progress_lock = threading.Lock()
+    print(f'[shader progress 0/{totalTasks}] starting workers', flush=True)
     threads = []
     if args.jobs is not None and args.jobs < 1:
         parser.error('-jobs must be at least 1')
