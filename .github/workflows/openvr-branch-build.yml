@@ -51,6 +51,9 @@ jobs:
             $stdout = Join-Path $env:RUNNER_TEMP "openvr-compile.stdout.log"
             $stderr = Join-Path $env:RUNNER_TEMP "openvr-compile.stderr.log"
             Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
+            $shaderProgress = Join-Path $env:RUNNER_TEMP "openvr-shader-progress.log"
+            Remove-Item $shaderProgress -Force -ErrorAction SilentlyContinue
+            $env:REMIX_SHADER_PROGRESS_FILE = $shaderProgress
             $meson = (Get-Command meson -ErrorAction Stop).Source
             $build = Start-Process -FilePath $meson -ArgumentList @("compile","-v","-j","2") -WorkingDirectory (Get-Location).Path -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
             $stdoutOffset = 0L
@@ -75,6 +78,9 @@ jobs:
               Get-Process ninja,cl,python,slangc,dxc -ErrorAction SilentlyContinue |
                 Select-Object ProcessName,Id,@{Name="CPU_s";Expression={[math]::Round($_.CPU,1)}},WorkingSet64 |
                 Format-Table -AutoSize | Out-String | Write-Host
+              if (Test-Path -LiteralPath $shaderProgress) {
+                Write-Host ("Shader progress: " + (Get-Content -LiteralPath $shaderProgress -Tail 1))
+              }
               Write-NewLogBytes $stdout ([ref]$stdoutOffset)
               Write-NewLogBytes $stderr ([ref]$stderrOffset)
               if ($build.HasExited) { break }
@@ -120,6 +126,7 @@ jobs:
             update-deps.log
             D:\a\_temp\openvr-compile.stdout.log
             D:\a\_temp\openvr-compile.stderr.log
+            D:\a\_temp\openvr-shader-progress.log
           if-no-files-found: ignore
           retention-days: 14
 

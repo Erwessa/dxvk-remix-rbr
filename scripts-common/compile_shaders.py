@@ -81,9 +81,22 @@ spirvValFlags = '--target-env vulkan1.2 --scalar-block-layout'
 os.makedirs(args.output, exist_ok = True)
 
 
+# A single shader command that runs longer than this is treated as stuck and fails the build.
+kCommandTimeoutSeconds = 20 * 60
+
+# Ninja holds the output of this script until it exits. When this variable names a file, progress lines are appended
+# there as well, so that a CI job can show them while the build runs.
+progressFile = os.environ.get('REMIX_SHADER_PROGRESS_FILE')
+
 def printFromThread(what):
     with report_lock:
         print(what, flush=True)
+        writeProgressFile(what)
+
+def writeProgressFile(what):
+    if progressFile:
+        with open(progressFile, 'a', encoding='utf-8') as file:
+            file.write(what + '\n')
 
 
 class Task:
@@ -135,7 +148,15 @@ class Task:
             timeStart = time.time()
 
             process = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-            out, err = process.communicate()
+            try:
+                out, err = process.communicate(timeout = kCommandTimeoutSeconds)
+            except subprocess.TimeoutExpired:
+                if os.name == 'nt':
+                    subprocess.run(f'taskkill /F /T /PID {process.pid}', shell = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+                process.kill()
+                process.communicate()
+                printFromThread(f'Timed out after {kCommandTimeoutSeconds}s: {self.getName()}')
+                return (1, f'Command timed out after {kCommandTimeoutSeconds} seconds.', os.path.basename(command.split(' ')[0]))
 
             duration = time.time() - timeStart
 
@@ -202,7 +223,9 @@ def runTasks(tasks):
 
         with progress_lock:
             completedTasks += 1
-            print(f'[shader progress {completedTasks}/{totalTasks}] {task.getName()}', flush=True)
+            progressLine = f'[shader progress {completedTasks}/{totalTasks}] {task.getName()}'
+            print(progressLine, flush=True)
+            writeProgressFile(progressLine)
 
         if exitCode != 0:
             terminate = True
@@ -669,6 +692,7 @@ if len(tasks):
     completedTasks = 0
     progress_lock = threading.Lock()
     print(f'[shader progress 0/{totalTasks}] starting workers', flush=True)
+    writeProgressFile(f'[shader progress 0/{totalTasks}] starting workers')
     threads = []
     if args.jobs is not None and args.jobs < 1:
         parser.error('-jobs must be at least 1')
