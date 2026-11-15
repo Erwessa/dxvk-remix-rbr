@@ -1,14 +1,11 @@
 #pragma once
 
+#include <array>
 #include <mutex>
 #include <vector>
 
+#include <openvr/openvr.hpp>
 #include "dxvk_extension_provider.h"
-
-namespace vr {
-  class IVRCompositor;
-  class IVRSystem;
-}
 
 namespace dxvk {
 
@@ -47,6 +44,14 @@ namespace dxvk {
     vr::IVRSystem* getSystem() const { return m_system; }
     vr::IVRCompositor* getActiveCompositor() const { return m_sceneSessionActive ? m_compositor : nullptr; }
     bool isSceneSessionActive() const { return m_sceneSessionActive; }
+
+    // OpenVR frame primitives. Call waitGetPoses once per rendered HMD frame on
+    // the render thread; eye transforms and raw projection bounds are queried
+    // from the same active scene session.
+    bool waitGetPoses(std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses);
+    bool getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height);
+    bool getEyeToHeadTransform(vr::EVREye eye, vr::HmdMatrix34_t& transform);
+    bool getProjectionRaw(vr::EVREye eye, float& left, float& right, float& top, float& bottom);
 
     static VrInstance s_instance;
 
