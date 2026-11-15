@@ -39,6 +39,15 @@ namespace dxvk {
     void initDeviceExtensions(
       const DxvkInstance* instance);
 
+    // Starts a long-lived OpenVR scene session after Vulkan device creation.
+    // If the host already owns a scene session, it is reused and never shut down here.
+    bool initializeSceneSession();
+    void shutdownSceneSession();
+
+    vr::IVRSystem* getSystem() const { return m_system; }
+    vr::IVRCompositor* getActiveCompositor() const { return m_sceneSessionActive ? m_compositor : nullptr; }
+    bool isSceneSessionActive() const { return m_sceneSessionActive; }
+
     static VrInstance s_instance;
 
   private:
@@ -46,11 +55,13 @@ namespace dxvk {
     dxvk::mutex           m_mutex;
     HKEY                  m_vr_key     = nullptr;
     vr::IVRCompositor*    m_compositor = nullptr;
+    vr::IVRSystem*        m_system = nullptr;
     HMODULE               m_ovrApi     = nullptr;
 
     bool m_no_vr;
     bool m_loadedOvrApi      = false;
     bool m_initializedOpenVr = false;
+    bool m_sceneSessionActive = false;
     bool m_initializedInsExt = false;
     bool m_initializedDevExt = false;
 
