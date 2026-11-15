@@ -7,7 +7,7 @@
 
 #include <openvr/openvr.hpp>
 
-using VR_InitInternalProc        = vr::IVRSystem* (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
+using VR_InitInternalProc        = uint32_t (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
 using VR_ShutdownInternalProc    = void  (VR_CALLTYPE *)();
 using VR_GetGenericInterfaceProc = void* (VR_CALLTYPE *)(const char*, vr::EVRInitError*);
 
