@@ -82,9 +82,8 @@ os.makedirs(args.output, exist_ok = True)
 
 
 def printFromThread(what):
-    report_lock.acquire()
-    print(what, flush=True)
-    report_lock.release()
+    with report_lock:
+        print(what, flush=True)
 
 
 class Task:
@@ -174,12 +173,9 @@ def runTasks(tasks):
 
         task = None
 
-        task_lock.acquire()
-        tasksLeft = len(tasks)
-        if tasksLeft > 0:
-            task = tasks[0]
-            del tasks[0]
-        task_lock.release()
+        with task_lock:
+            if len(tasks) > 0:
+                task = tasks.pop(0)
 
         if task is None:
             break

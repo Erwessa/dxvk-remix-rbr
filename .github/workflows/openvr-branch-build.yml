@@ -8,12 +8,12 @@ on:
 
 concurrency:
   group: openvr-branch-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-windows:
     runs-on: windows-2022
-    timeout-minutes: 90
+    timeout-minutes: 350
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
