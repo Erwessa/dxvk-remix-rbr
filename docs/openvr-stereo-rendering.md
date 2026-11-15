@@ -54,9 +54,12 @@ The Main camera is consumed by many RTX passes, and `RtCamera` stores previous-f
 
 ### Stage B — tracking and calibration
 
-- Acquire predicted poses and query per-eye transforms, projections and recommended sizes.
-- Add a tested conversion from OpenVR matrices to the runtime's camera convention.
-- Log headset/runtime availability and actionable initialization errors.
+- [x] Add guarded access to `WaitGetPoses` for the active scene session.
+- [x] Query the recommended render-target size, per-eye eye-to-head transform, and raw asymmetric projection bounds.
+- [ ] Add a tested conversion from OpenVR matrices to the runtime's camera convention.
+- [ ] Log headset/runtime availability and actionable initialization errors.
+
+The pose and calibration methods are currently runtime primitives only. No frame loop consumes them yet, and no camera matrices are changed by this stage.
 
 ### Stage C — per-eye renderer refactor
 
