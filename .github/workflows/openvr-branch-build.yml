@@ -24,14 +24,14 @@ jobs:
         shell: pwsh
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-          . .\\build_common.ps1
+          . .\build_common.ps1
           PerformBuild -BuildFlavour debugoptimized -BuildSubDir _Comp64DebugOptimized -Backend ninja -EnableTracy false -ConfigureOnly $true
 
       - name: Compile (limited parallelism)
         shell: pwsh
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-          . .\\build_common.ps1
+          . .\build_common.ps1
           SetupBuild -BuildArch x64
           Push-Location _Comp64DebugOptimized
           try {
@@ -46,11 +46,11 @@ jobs:
         shell: pwsh
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-          . .\\build_common.ps1
+          . .\build_common.ps1
           SetupBuild -BuildArch x64
           Push-Location _Comp64DebugOptimized
           try {
-            meson install --tags copy_output
+            meson install
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           finally {
@@ -63,12 +63,12 @@ jobs:
         with:
           name: openvr-build-diagnostics-${{ github.sha }}
           path: |
-            _Comp64DebugOptimized\\meson-logs\\meson-log.txt
-            _Comp64DebugOptimized\\meson-logs\\*.txt
-            _Comp64DebugOptimized\\meson-private\\cmd_line.txt
-            _Comp64DebugOptimized\\.ninja_log
-            _Comp64DebugOptimized\\build.ninja
-            _Comp64DebugOptimized\\update-deps.log
+            _Comp64DebugOptimized\meson-logs\meson-log.txt
+            _Comp64DebugOptimized\meson-logs\*.txt
+            _Comp64DebugOptimized\meson-private\cmd_line.txt
+            _Comp64DebugOptimized\.ninja_log
+            _Comp64DebugOptimized\build.ninja
+            _Comp64DebugOptimized\update-deps.log
             update-deps.log
           if-no-files-found: ignore
           retention-days: 14
@@ -79,13 +79,13 @@ jobs:
         with:
           name: openvr-dxvk-remix-debugoptimized-${{ github.sha }}
           path: |
-            _output\\*.dll
-            _output\\*.pdb
-            _output\\*.txt
-            _output\\LICENSE
-            _output\\LICENSE-MIT
-            _output\\CREDITS.md
-            _output\\usd\\*
+            _output\*.dll
+            _output\*.pdb
+            _output\*.txt
+            _output\LICENSE
+            _output\LICENSE-MIT
+            _output\CREDITS.md
+            _output\usd\*
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
