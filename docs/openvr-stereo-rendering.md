@@ -133,7 +133,20 @@ A number of these passes use shared managers or resource queues today. They cann
 - `dispatchFrameInterpolation()` and DLFG require a separate decision: frame generation cannot be assumed to accept two independent eye streams without a dedicated stereo path.
 - The game target blit and screenshot/thumbnail capture currently describe a single image. VR output must be a separate pair of eye images and must not accidentally overwrite or capture one eye as the game's mono target.
 
-### Vulkan texture descriptor mapping
+### Device-scoped integration decision
+
+Do not start a scene session unconditionally from `DxvkDevice` construction yet. The current `VrInstance` is a process-wide singleton, while DXVK devices are individually constructed and destroyed. A constructor/destructor pair on every device could cause duplicate initialization, premature shutdown, or a mismatch between the Vulkan device used in `VRVulkanTextureData_t` and the device that owns the scene session.
+
+Before wiring lifecycle calls, establish these invariants:
+1. There is one explicitly selected DXVK device that owns OpenVR rendering for the process.
+2. VR mode is explicitly enabled by the host/configuration; merely discovering OpenVR Vulkan extensions must not silently turn on HMD rendering.
+3. The owning device is the same device whose logical device, physical device, instance, graphics queue, and family are placed in each OpenVR Vulkan texture descriptor.
+4. Device teardown first stops new frame acquisition/submission, waits for all submitted eye images to become reusable, then releases eye resources, and only then shuts down a DXVK-owned OpenVR scene session.
+5. If the runtime session is host-owned, DXVK releases only its own per-device submission state and never invokes global `VR_ShutdownInternal`.
+
+For the first implementation, support one OpenVR-owning DXVK device and fail closed if a second device attempts to claim the process-wide session. Add multi-device/ref-counted ownership only if an actual target application requires it. This is safer than adding implicit reference counting around a runtime API whose initialization ownership is process-global.
+
+## Vulkan texture descriptor mapping
 
 The checked-in OpenVR SDK header `include/openvr/openvr.hpp` defines `vr::VRVulkanTextureData_t` with these fields:
 - `m_nImage`: Vulkan image handle encoded as `uint64_t`.
