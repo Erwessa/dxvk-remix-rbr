@@ -1,6 +1,9 @@
 name: OpenVR branch build
 
 on:
+  push:
+    branches:
+      - feat/20261115-openvr-runtime
   workflow_dispatch:
 
 concurrency:
