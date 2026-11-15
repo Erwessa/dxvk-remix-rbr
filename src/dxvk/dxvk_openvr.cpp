@@ -400,6 +400,7 @@ namespace dxvk {
     
     m_initializedOpenVr = false;
     m_loadedOvrApi      = false;
+    m_ovrApi            = nullptr;
   }
 
 
