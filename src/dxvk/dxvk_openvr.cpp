@@ -286,6 +286,100 @@ namespace dxvk {
   }
 
 
+  bool VrInstance::initializeSceneSession() {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (m_no_vr)
+      return false;
+
+    if (m_sceneSessionActive && m_compositor && m_system)
+      return true;
+
+    if (!m_ovrApi)
+      m_ovrApi = this->loadLibrary();
+
+    if (!m_ovrApi) {
+      Logger::warn("OpenVR: failed to load runtime for scene session");
+      return false;
+    }
+
+    g_vrFunctions.initInternal        = reinterpret_cast<VR_InitInternalProc>       (this->getSym("VR_InitInternal"));
+    g_vrFunctions.shutdownInternal    = reinterpret_cast<VR_ShutdownInternalProc>   (this->getSym("VR_ShutdownInternal"));
+    g_vrFunctions.getGenericInterface = reinterpret_cast<VR_GetGenericInterfaceProc>(this->getSym("VR_GetGenericInterface"));
+
+    if (!g_vrFunctions.getGenericInterface) {
+      Logger::warn("OpenVR: VR_GetGenericInterface not found");
+      return false;
+    }
+
+    // Prefer an existing host-owned OpenVR scene session. Do not initialize or
+    // shut down a second runtime instance when the game already owns one.
+    vr::EVRInitError error = vr::VRInitError_None;
+    auto* compositor = reinterpret_cast<vr::IVRCompositor*>(
+      g_vrFunctions.getGenericInterface(vr::IVRCompositor_Version, &error));
+
+    bool initializedHere = false;
+    if (error != vr::VRInitError_None || !compositor) {
+      if (!g_vrFunctions.initInternal || !g_vrFunctions.shutdownInternal) {
+        Logger::warn("OpenVR: initialization entry points are unavailable");
+        return false;
+      }
+
+      g_vrFunctions.initInternal(&error, vr::VRApplication_Scene);
+      if (error != vr::VRInitError_None) {
+        Logger::warn(str::format("OpenVR: scene initialization failed: ", static_cast<int>(error)));
+        return false;
+      }
+
+      initializedHere = true;
+      compositor = reinterpret_cast<vr::IVRCompositor*>(
+        g_vrFunctions.getGenericInterface(vr::IVRCompositor_Version, &error));
+    }
+
+    if (error != vr::VRInitError_None || !compositor) {
+      Logger::warn("OpenVR: failed to acquire compositor for scene session");
+      if (initializedHere)
+        g_vrFunctions.shutdownInternal();
+      return false;
+    }
+
+    auto* system = reinterpret_cast<vr::IVRSystem*>(
+      g_vrFunctions.getGenericInterface(vr::IVRSystem_Version, &error));
+    if (error != vr::VRInitError_None || !system) {
+      Logger::warn("OpenVR: failed to acquire IVRSystem");
+      if (initializedHere)
+        g_vrFunctions.shutdownInternal();
+      return false;
+    }
+
+    m_compositor = compositor;
+    m_system = system;
+    m_initializedOpenVr = initializedHere;
+    m_sceneSessionActive = true;
+    Logger::info("OpenVR: scene session is active");
+    return true;
+  }
+
+
+  void VrInstance::shutdownSceneSession() {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (m_initializedOpenVr && g_vrFunctions.shutdownInternal)
+      g_vrFunctions.shutdownInternal();
+
+    m_initializedOpenVr = false;
+    m_sceneSessionActive = false;
+    m_compositor = nullptr;
+    m_system = nullptr;
+
+    if (m_loadedOvrApi)
+      this->freeLibrary();
+
+    m_loadedOvrApi = false;
+    m_ovrApi = nullptr;
+  }
+
+
   void VrInstance::shutdown() {
     if (m_vr_key)
     {
@@ -293,8 +387,13 @@ namespace dxvk {
         m_vr_key = nullptr;
     }
 
-    if (m_initializedOpenVr)
+    if (m_initializedOpenVr && g_vrFunctions.shutdownInternal)
       g_vrFunctions.shutdownInternal();
+
+    m_compositor = nullptr;
+    m_system = nullptr;
+    m_sceneSessionActive = false;
+    m_initializedOpenVr = false;
 
     if (m_loadedOvrApi)
       this->freeLibrary();
