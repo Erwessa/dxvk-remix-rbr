@@ -10,6 +10,23 @@
 
 namespace dxvk {
 
+  struct OpenVrProjectionBounds {
+    float left = 0.0f;
+    float right = 0.0f;
+    float top = 0.0f;
+    float bottom = 0.0f;
+  };
+
+  // One compositor-synchronized HMD frame. Eye transforms are eye-to-head;
+  // invert them when composing a world-to-eye view matrix.
+  struct OpenVrFrameState {
+    std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount> renderPoses = {};
+    std::array<vr::HmdMatrix34_t, 2> eyeToHead = {};
+    std::array<OpenVrProjectionBounds, 2> projection = {};
+    uint64_t frameIndex = 0;
+    bool hmdPoseValid = false;
+  };
+
   class DxvkInstance;
 
   /**
