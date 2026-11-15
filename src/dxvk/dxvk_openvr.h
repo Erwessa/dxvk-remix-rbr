@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <mutex>
 #include <vector>
 
@@ -48,6 +49,7 @@ namespace dxvk {
     // OpenVR frame primitives. Call waitGetPoses once per rendered HMD frame on
     // the render thread; eye transforms and raw projection bounds are queried
     // from the same active scene session.
+    bool acquireFrame(OpenVrFrameState& frame);
     bool waitGetPoses(std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses);
     bool getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height);
     bool getEyeToHeadTransform(vr::EVREye eye, vr::HmdMatrix34_t& transform);
@@ -67,6 +69,7 @@ namespace dxvk {
     bool m_loadedOvrApi      = false;
     bool m_initializedOpenVr = false;
     bool m_sceneSessionActive = false;
+    uint64_t m_frameIndex = 0;
     bool m_initializedInsExt = false;
     bool m_initializedDevExt = false;
 
