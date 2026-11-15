@@ -409,3 +409,40 @@ The D3D9 Main camera is a view/projection input to Remix, not a declaration of
 the physical HMD tracking origin. A recenter/anchor policy and a calibrated
 uniform scale must still be supplied before any headset translation is applied
 to the game world.
+
+
+### D3D9 draw-time camera capture and threading
+
+The D3D9 v2 frontend has an application-thread `CameraClassifier` that mirrors
+the render-thread `CameraManager::processCameraData()` classification. Its
+commented contract is explicit: draw order is the same on both threads, and
+the first Main classification of a D3D9 frame is the point at which the Main
+camera is established. The classifier retains per-type view matrices for
+frontend-side decisions; it is not the authoritative RTX camera object.
+
+On the render thread, `RtxContext::prepareGeometryForRTImpl()` first applies
+any pending host world-origin update, then calls
+`cameraManager.processCameraData(drawCallState)`. That call selects a camera
+type and updates its `RtCamera` from the draw's `worldToView` and
+`viewToProjection` matrices. This means the authoritative Main camera becomes
+available during geometry preparation, not necessarily at the beginning of
+the host's frame and not at the first D3D9 API call that sets D3DTS_VIEW.
+
+Implications for the future VR coordinator:
+
+- Do not call `WaitGetPoses` from `SetTransform` or from the app-thread
+  `CameraClassifier`; those are not the designated compositor/frame boundary.
+- A frame-start pose sample can be retained while waiting for the first valid
+  Main camera, but it must be paired with the correct game-frame identifier.
+- Alternatively, capture the current Main camera once it becomes valid and
+  consume the already-acquired predicted pose for that same frame.
+- A Main camera may be absent or rejected on menus/UI-only frames. Such a frame
+  must not update eye histories from stale camera data or submit a fabricated
+  stereo scene.
+- Sky and view-model cameras can be observed later in draw order. The eye
+  camera source must remain explicitly `CameraType::Main`, not whichever
+  camera was most recently set.
+
+This confirms the capture point and thread ownership, but does not yet provide
+a safe place to run the two-eye render graph. That remains a separate frame
+scheduler/refactor task.
