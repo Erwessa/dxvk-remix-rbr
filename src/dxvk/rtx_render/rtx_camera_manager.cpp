@@ -36,6 +36,12 @@ namespace dxvk {
     for (int i = 0; i < CameraType::Count; i++) {
       m_cameras[i].setCameraType(CameraType::Enum(i));
     }
+
+    // These cameras own independent matrix and temporal histories for the two HMD views.
+    // Unknown is safe here because they are not accessed through the CameraType aliasing path,
+    // and it avoids Main-camera-only free-camera behavior.
+    for (auto& eyeCamera : m_vrEyeCameras)
+      eyeCamera.setCameraType(CameraType::Unknown);
   }
 
   bool CameraManager::isCameraValid(CameraType::Enum cameraType) const {

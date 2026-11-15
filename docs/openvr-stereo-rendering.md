@@ -313,3 +313,10 @@ The session API now requires an explicit owner token. Only the same owner may re
 The selected DXVK device now attempts to claim the OpenVR scene session after its Vulkan queues and device-owned infrastructure are initialized. The claim is opt-in through `DXVK_ENABLE_VR=1`; `DXVK_NO_VR=1` remains a hard disable. If the runtime is unavailable, the claim fails and the existing mono path continues unchanged. A second DXVK device cannot claim the same process-global scene session.
 
 On teardown, the device first drains its DXVK work with the existing `waitForIdle()` path, then releases its own OpenVR claim before device-owned Vulkan state is destroyed. The session owner token prevents a non-owner device from shutting down the active session. This is lifecycle plumbing only: no frame acquisition or eye-image submission is wired into the game frame loop yet.
+
+
+## Dedicated RTX camera state per HMD eye
+
+`CameraManager` now owns two independent `RtCamera` instances exposed through `getVrEyeCamera(RtxEye::Left/Right)`. They are deliberately separate from `CameraType`: Main/ViewModel/Sky/Portal/RenderToTexture remain scene roles, while left/right are render views. Each eye therefore has its own frame-id guard, current/previous matrices, jitter sequence, and view-history invalidation state. The ordinary mono camera array and its classification logic are unchanged.
+
+These camera slots are storage and access infrastructure only. The frame loop does not yet update them or feed them into the RTX passes; that requires the RBR-to-OpenVR tracking calibration and the view-scoped RTX pipeline split described above.

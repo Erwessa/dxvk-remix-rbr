@@ -28,6 +28,10 @@
 #include "rtx_matrix_helpers.h"
 
 namespace dxvk {
+  namespace RtxEye {
+    enum Enum : uint32_t { Left = 0, Right = 1, Count = 2 };
+  }
+
   class DxvkDevice;
   class RayPortalManager;
   class Config;
@@ -47,6 +51,17 @@ namespace dxvk {
 
     const RtCamera& getMainCamera() const { return getCamera(CameraType::Main); }
     RtCamera& getMainCamera() { return getCamera(CameraType::Main); }
+
+    // Dedicated per-eye cameras. They are intentionally not CameraType entries:
+    // eye identity is a render-view dimension, not a scene-camera role.
+    const RtCamera& getVrEyeCamera(RtxEye::Enum eye) const {
+      assert(eye < RtxEye::Count);
+      return m_vrEyeCameras[eye];
+    }
+    RtCamera& getVrEyeCamera(RtxEye::Enum eye) {
+      assert(eye < RtxEye::Count);
+      return m_vrEyeCameras[eye];
+    }
 
     CameraType::Enum getLastSetCameraType() const { return m_lastSetCameraType; }
     
@@ -121,6 +136,7 @@ namespace dxvk {
 
   private:
     std::array<RtCamera, CameraType::Count> m_cameras;
+    std::array<RtCamera, RtxEye::Count> m_vrEyeCameras;
     CameraType::Enum m_lastSetCameraType = CameraType::Unknown;
     uint32_t m_lastCameraCutFrameId = -1;
     uint32_t m_lastCameraViewHistoryInvalidationFrameId = -1;
