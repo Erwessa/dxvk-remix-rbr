@@ -371,6 +371,54 @@ namespace dxvk {
   }
 
 
+  bool VrInstance::waitGetPoses(
+      std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_compositor)
+      return false;
+
+    // WaitGetPoses is the frame synchronization point for a scene application.
+    // Keep this call on the render thread and call it once per HMD frame.
+    const auto error = m_compositor->WaitGetPoses(
+      renderPoses.data(), static_cast<uint32_t>(renderPoses.size()), nullptr, 0);
+    if (error != vr::VRCompositorError_None) {
+      Logger::warn(str::format("OpenVR: WaitGetPoses failed: ", static_cast<int>(error)));
+      return false;
+    }
+    return true;
+  }
+
+
+  bool VrInstance::getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_system)
+      return false;
+
+    m_system->GetRecommendedRenderTargetSize(&width, &height);
+    return width != 0 && height != 0;
+  }
+
+
+  bool VrInstance::getEyeToHeadTransform(vr::EVREye eye, vr::HmdMatrix34_t& transform) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_system)
+      return false;
+
+    transform = m_system->GetEyeToHeadTransform(eye);
+    return true;
+  }
+
+
+  bool VrInstance::getProjectionRaw(vr::EVREye eye, float& left, float& right, float& top, float& bottom) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_system)
+      return false;
+
+    m_system->GetProjectionRaw(eye, &left, &right, &top, &bottom);
+    return true;
+  }
+
+
   void VrInstance::shutdownSceneSession() {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
