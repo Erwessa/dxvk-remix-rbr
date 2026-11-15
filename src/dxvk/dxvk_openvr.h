@@ -18,12 +18,62 @@ namespace dxvk {
     float bottom = 0.0f;
   };
 
-  // One compositor-synchronized HMD frame. Eye transforms are eye-to-head;
-  // invert them when composing a world-to-eye view matrix.
+  // Row-major rigid transform in OpenVR tracking coordinates. This deliberately
+  // does not apply RBR's world origin, scale, or renderer-specific handedness.
+  struct OpenVrMatrix4 {
+    std::array<float, 16> elements = {
+      1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    };
+
+    float& at(std::size_t row, std::size_t column) { return elements[row * 4 + column]; }
+    float at(std::size_t row, std::size_t column) const { return elements[row * 4 + column]; }
+
+    static OpenVrMatrix4 fromHmdMatrix34(const vr::HmdMatrix34_t& source) {
+      OpenVrMatrix4 result;
+      for (std::size_t row = 0; row < 3; row++)
+        for (std::size_t column = 0; column < 4; column++)
+          result.at(row, column) = source.m[row][column];
+      return result;
+    }
+
+    // Inverse of a rigid transform [R|t]: [R^T|-R^T t].
+    OpenVrMatrix4 inverseRigid() const {
+      OpenVrMatrix4 result;
+      for (std::size_t row = 0; row < 3; row++)
+        for (std::size_t column = 0; column < 3; column++)
+          result.at(row, column) = at(column, row);
+      for (std::size_t row = 0; row < 3; row++) {
+        result.at(row, 3) = 0.0f;
+        for (std::size_t column = 0; column < 3; column++)
+          result.at(row, 3) -= result.at(row, column) * at(column, 3);
+      }
+      return result;
+    }
+
+    OpenVrMatrix4 multipliedBy(const OpenVrMatrix4& rhs) const {
+      OpenVrMatrix4 result;
+      result.elements.fill(0.0f);
+      for (std::size_t row = 0; row < 4; row++)
+        for (std::size_t column = 0; column < 4; column++)
+          for (std::size_t k = 0; k < 4; k++)
+            result.at(row, column) += at(row, k) * rhs.at(k, column);
+      return result;
+    }
+  };
+
+  // One compositor-synchronized HMD frame. eyeToHead maps eye space to head
+  // space; eyeFromTracking maps OpenVR tracking space to each eye's view space.
   struct OpenVrFrameState {
     std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount> renderPoses = {};
     std::array<vr::HmdMatrix34_t, 2> eyeToHead = {};
     std::array<OpenVrProjectionBounds, 2> projection = {};
+    std::array<OpenVrMatrix4, 2> eyeFromTracking = {};
+    OpenVrMatrix4 trackingFromHead = {};
+    uint32_t recommendedWidth = 0;
+    uint32_t recommendedHeight = 0;
     uint64_t frameIndex = 0;
     bool hmdPoseValid = false;
   };
@@ -57,8 +107,8 @@ namespace dxvk {
 
     // Starts a long-lived OpenVR scene session after Vulkan device creation.
     // If the host already owns a scene session, it is reused and never shut down here.
-    bool initializeSceneSession();
-    void shutdownSceneSession();
+    bool initializeSceneSession(const void* owner);
+    void shutdownSceneSession(const void* owner);
 
     vr::IVRSystem* getSystem() const { return m_system; }
     vr::IVRCompositor* getActiveCompositor() const { return m_sceneSessionActive ? m_compositor : nullptr; }
@@ -89,6 +139,7 @@ namespace dxvk {
     bool m_loadedOvrApi      = false;
     bool m_initializedOpenVr = false;
     bool m_sceneSessionActive = false;
+    const void* m_sceneSessionOwner = nullptr;
     uint64_t m_frameIndex = 0;
     bool m_initializedInsExt = false;
     bool m_initializedDevExt = false;

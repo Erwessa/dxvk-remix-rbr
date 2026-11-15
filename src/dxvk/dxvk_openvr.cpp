@@ -286,14 +286,23 @@ namespace dxvk {
   }
 
 
-  bool VrInstance::initializeSceneSession() {
+  bool VrInstance::initializeSceneSession(const void* owner) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (!owner) {
+      Logger::warn("OpenVR: refusing scene session claim without an owner");
+      return false;
+    }
 
     if (m_no_vr)
       return false;
 
-    if (m_sceneSessionActive && m_compositor && m_system)
-      return true;
+    if (m_sceneSessionActive && m_compositor && m_system) {
+      if (m_sceneSessionOwner == owner)
+        return true;
+      Logger::warn("OpenVR: scene session is already owned by another DXVK device");
+      return false;
+    }
 
     if (!m_ovrApi)
       m_ovrApi = this->loadLibrary();
@@ -365,6 +374,7 @@ namespace dxvk {
     m_compositor = compositor;
     m_system = system;
     m_initializedOpenVr = initializedHere;
+    m_sceneSessionOwner = owner;
     m_sceneSessionActive = true;
     Logger::info("OpenVR: scene session is active");
     return true;
@@ -386,6 +396,12 @@ namespace dxvk {
 
     next.frameIndex = ++m_frameIndex;
     next.hmdPoseValid = next.renderPoses[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid;
+    m_system->GetRecommendedRenderTargetSize(&next.recommendedWidth, &next.recommendedHeight);
+
+    if (next.hmdPoseValid) {
+      next.trackingFromHead = OpenVrMatrix4::fromHmdMatrix34(
+        next.renderPoses[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking);
+    }
 
     constexpr std::array<vr::EVREye, 2> eyes = {
       vr::Eye_Left,
@@ -400,6 +416,12 @@ namespace dxvk {
         &next.projection[i].right,
         &next.projection[i].top,
         &next.projection[i].bottom);
+
+      if (next.hmdPoseValid) {
+        const auto headFromEye = OpenVrMatrix4::fromHmdMatrix34(next.eyeToHead[i]);
+        next.eyeFromTracking[i] = headFromEye.inverseRigid().multipliedBy(
+          next.trackingFromHead.inverseRigid());
+      }
     }
 
     // Publish only a complete snapshot. A caller never observes a mixture of
@@ -457,14 +479,20 @@ namespace dxvk {
   }
 
 
-  void VrInstance::shutdownSceneSession() {
+  void VrInstance::shutdownSceneSession(const void* owner) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (!owner || owner != m_sceneSessionOwner) {
+      Logger::warn("OpenVR: ignoring scene session release from a non-owner");
+      return;
+    }
 
     if (m_initializedOpenVr && g_vrFunctions.shutdownInternal)
       g_vrFunctions.shutdownInternal();
 
     m_initializedOpenVr = false;
     m_sceneSessionActive = false;
+    m_sceneSessionOwner = nullptr;
     m_compositor = nullptr;
     m_system = nullptr;
 
