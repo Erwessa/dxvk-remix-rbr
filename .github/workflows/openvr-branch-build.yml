@@ -1,0 +1,59 @@
+name: OpenVR branch build
+
+on:
+  push:
+    branches:
+      - feat/20261115-openvr-runtime
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup Meson
+        run: pip install meson==1.1.0
+
+      - name: Fetch pinned DLSS / NGX DLL bundle
+        shell: pwsh
+        run: .\\scripts\\update-dlss-dlls.ps1
+
+      - name: Build debugoptimized
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+          . .\\build_common.ps1
+          PerformBuild -BuildFlavour debugoptimized -BuildSubDir _Comp64DebugOptimized -Backend ninja -EnableTracy false copy_output
+
+      - name: Upload build logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: openvr-build-logs-${{ github.sha }}
+          path: |
+            _Comp64DebugOptimized\\meson-logs\\meson-log.txt
+            _Comp64DebugOptimized\\update-deps.log
+            update-deps.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Windows build
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: openvr-dxvk-remix-debugoptimized-${{ github.sha }}
+          path: |
+            _output\\*.dll
+            _output\\*.pdb
+            _output\\*.txt
+            _output\\LICENSE
+            _output\\LICENSE-MIT
+            _output\\CREDITS.md
+            _output\\usd\\*
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
