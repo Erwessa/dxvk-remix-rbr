@@ -40,7 +40,7 @@ jobs:
           $item = Get-Item -LiteralPath $source
           Write-Host ("FidelityFX DLL present: {0} bytes; modified {1:o}" -f $item.Length, $item.LastWriteTimeUtc)
 
-      - name: Compile (limited parallelism, monitored)
+      - name: Compile (limited parallelism, monitored; no repeated log tails)
         shell: pwsh
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
@@ -53,14 +53,30 @@ jobs:
             Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
             $meson = (Get-Command meson -ErrorAction Stop).Source
             $build = Start-Process -FilePath $meson -ArgumentList @("compile","-v","-j","2") -WorkingDirectory (Get-Location).Path -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $stdoutOffset = 0L
+            $stderrOffset = 0L
+            function Write-NewLogBytes([string]$Path, [ref]$Offset) {
+              if (-not (Test-Path -LiteralPath $Path)) { return }
+              $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+              try {
+                if ($stream.Length -lt $Offset.Value) { $Offset.Value = 0L }
+                [void]$stream.Seek($Offset.Value, [System.IO.SeekOrigin]::Begin)
+                $reader = [System.IO.StreamReader]::new($stream)
+                $chunk = $reader.ReadToEnd()
+                $Offset.Value = $stream.Position
+                if (-not [string]::IsNullOrEmpty($chunk)) { Write-Host $chunk.TrimEnd() }
+              } finally {
+                $stream.Dispose()
+              }
+            }
             while ($true) {
               $build.Refresh()
               Write-Host ("=== BUILD HEARTBEAT {0} PID={1} EXITED={2} ===" -f (Get-Date -Format o), $build.Id, $build.HasExited)
               Get-Process ninja,cl,python,slangc,dxc -ErrorAction SilentlyContinue |
                 Select-Object ProcessName,Id,@{Name="CPU_s";Expression={[math]::Round($_.CPU,1)}},WorkingSet64 |
                 Format-Table -AutoSize | Out-String | Write-Host
-              if (Test-Path $stdout) { Get-Content $stdout -Tail 8 | Write-Host }
-              if (Test-Path $stderr) { Get-Content $stderr -Tail 8 | Write-Host }
+              Write-NewLogBytes $stdout ([ref]$stdoutOffset)
+              Write-NewLogBytes $stderr ([ref]$stderrOffset)
               if ($build.HasExited) { break }
               Start-Sleep -Seconds 20
             }

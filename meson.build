@@ -402,7 +402,7 @@ rtx_shaders_command_arguments = [
   '-include', join_paths(numos_root, 'shaders'),
   # NV-DXVK end
   '-output', rtx_shader_output_directory,
-  '-parallel',
+  # CI builds serialize Slang variants to avoid spawning one compiler per CPU core.
 ]
 
 if get_option('buildtype').startswith('debug')
