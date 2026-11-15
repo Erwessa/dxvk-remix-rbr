@@ -294,3 +294,15 @@ The existing OpenVR bootstrap typedef for `VR_InitInternal` must match its expor
 The eye transforms are intentionally documented as eye-to-head transforms. The eventual camera integration must invert them when composing world-to-eye view transforms. This snapshot layer does not yet convert OpenVR matrices to DXVK/GLM conventions, choose a tracking origin, render either eye, or submit textures. Those steps require the camera and RTX view-matrix conventions to be audited first.
 
 The caller must still hold DXVK's submission queue gate around `acquireFrame`, because OpenVR's compositor wait may access the Vulkan queue. That synchronization belongs at the future frame-loop call site, not inside the global runtime singleton.
+
+
+## OpenVR tracking-space view matrices and exclusive session ownership
+
+The frame snapshot now also carries:
+- The HMD's `trackingFromHead` rigid transform from the compositor pose.
+- `eyeFromTracking[2]`, composed as `inverse(headFromEye) * inverse(trackingFromHead)`.
+- OpenVR's recommended per-eye render-target dimensions.
+
+These matrices are row-major and remain entirely in OpenVR tracking coordinates. They do not apply an RBR world origin, meters-to-world scale, or DXVK/GLM clip-space conversion. Those are deliberately separate integration steps; the raw projection bounds remain available for constructing the renderer-specific asymmetric projection matrix.
+
+The session API now requires an explicit owner token. Only the same owner may re-enter an active session or release it; a second DXVK device is rejected instead of accidentally sharing a process-global runtime session or shutting it down prematurely. The token is expected to be the address of the selected owning `DxvkDevice`. Runtime ownership remains separate: a host-owned OpenVR runtime is reused and is never globally shut down by DXVK.

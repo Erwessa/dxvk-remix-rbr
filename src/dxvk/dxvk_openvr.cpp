@@ -489,6 +489,7 @@ namespace dxvk {
     m_compositor = nullptr;
     m_system = nullptr;
     m_sceneSessionActive = false;
+    m_sceneSessionOwner = nullptr;
     m_initializedOpenVr = false;
 
     if (m_loadedOvrApi)
