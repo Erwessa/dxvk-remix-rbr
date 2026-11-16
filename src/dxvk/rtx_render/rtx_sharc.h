@@ -25,6 +25,8 @@
 #include "rtx_resources.h"
 #include "rtx/pass/sharc/sharc_args.h"
 
+#include <array>
+
 namespace dxvk {
   class RtxContext;
   class DxvkDevice;
@@ -149,10 +151,11 @@ namespace dxvk {
     Rc<DxvkBuffer> m_hash;
     Rc<DxvkBuffer> m_accumulation;
     Rc<DxvkBuffer> m_resolved;
-    Rc<DxvkBuffer> m_deferredVertices;
-    uint32_t m_deferredTilesX = 0;
-    uint32_t m_deferredTilesY = 0;
-    bool m_deferredAllocationFailed = false;
+    // Deferred update records are indexed by screen tile, so the two eyes must not share them.
+    std::array<Rc<DxvkBuffer>, 2> m_deferredVertices;
+    std::array<uint32_t, 2> m_deferredTilesX = {};
+    std::array<uint32_t, 2> m_deferredTilesY = {};
+    std::array<bool, 2> m_deferredAllocationFailed = {};
 
     SharcArgs m_args = {};
     bool m_resetRequested = true;

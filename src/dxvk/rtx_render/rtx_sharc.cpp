@@ -195,10 +195,10 @@ namespace dxvk {
     m_hash = nullptr;
     m_accumulation = nullptr;
     m_resolved = nullptr;
-    m_deferredVertices = nullptr;
-    m_deferredTilesX = 0;
-    m_deferredTilesY = 0;
-    m_deferredAllocationFailed = false;
+    m_deferredVertices = {};
+    m_deferredTilesX = {};
+    m_deferredTilesY = {};
+    m_deferredAllocationFailed = {};
     m_args = {};
     m_cacheAge = 0;
     m_allocationFailed = false;
@@ -328,6 +328,14 @@ namespace dxvk {
   }
 
   bool RtxSharc::prepareDeferredFlush(RtxContext& ctx, const RaytraceArgs& args, uint32_t depthSlots) {
+    // Each eye writes tile-indexed records from its own pixel grid. Sharing this buffer would let
+    // the right eye overwrite the left eye's vertices before its deferred flush consumes them.
+    const uint32_t eyeIndex = ctx.getActiveEyeIndex();
+    Rc<DxvkBuffer>& deferredVertices = m_deferredVertices[eyeIndex];
+    uint32_t& deferredTilesX = m_deferredTilesX[eyeIndex];
+    uint32_t& deferredTilesY = m_deferredTilesY[eyeIndex];
+    bool& deferredAllocationFailed = m_deferredAllocationFailed[eyeIndex];
+
     // The shaders derive the grid from cb.camera.resolution and cb.sharcArgs.updateTileSize; so does this.
     const uint32_t tileSize = std::max(1u, args.sharcArgs.updateTileSize);
     const uint32_t tilesX = (args.camera.resolution.x + tileSize - 1) / tileSize;
@@ -337,9 +345,9 @@ namespace dxvk {
       return false;
     }
 
-    const bool gridChanged = tilesX != m_deferredTilesX || tilesY != m_deferredTilesY;
-    if (m_deferredVertices == nullptr || m_deferredVertices->info().size < size) {
-      if (m_deferredAllocationFailed && !gridChanged) {
+    const bool gridChanged = tilesX != deferredTilesX || tilesY != deferredTilesY;
+    if (deferredVertices == nullptr || deferredVertices->info().size < size) {
+      if (deferredAllocationFailed && !gridChanged) {
         return false;
       }
       try {
@@ -348,41 +356,43 @@ namespace dxvk {
         info.stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_TRANSFER_BIT;
         info.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
         info.size = size;
-        m_deferredVertices = m_device->createBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "SHARC deferred vertices");
-        m_deferredAllocationFailed = false;
+        deferredVertices = m_device->createBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, eyeIndex == 0 ? "SHARC deferred vertices left" : "SHARC deferred vertices right");
+        deferredAllocationFailed = false;
       } catch (const DxvkError& e) {
-        Logger::err(str::format("[RTX SHARC] Deferred flush buffer allocation failed, keeping the inline flush: ", e.message()));
-        m_deferredVertices = nullptr;
-        m_deferredAllocationFailed = true;
-        m_deferredTilesX = tilesX;
-        m_deferredTilesY = tilesY;
+        Logger::err(str::format("[RTX SHARC] Deferred flush buffer allocation failed for eye ", eyeIndex, ", keeping the inline flush: ", e.message()));
+        deferredVertices = nullptr;
+        deferredAllocationFailed = true;
+        deferredTilesX = tilesX;
+        deferredTilesY = tilesY;
         return false;
       }
-      m_deferredTilesX = 0; // force the clear below
+      deferredTilesX = 0; // force the clear below
     }
 
     // Plane 0 (the counts) moves with the tile count, and the flush only resets the counts it consumes, so a new
     // grid or a new buffer starts from zero. Slot planes need no clear: a slot is written before its count is.
-    if (tilesX != m_deferredTilesX || tilesY != m_deferredTilesY) {
-      ctx.clearBuffer(m_deferredVertices, 0, m_deferredVertices->info().size, 0);
-      m_deferredTilesX = tilesX;
-      m_deferredTilesY = tilesY;
+    if (tilesX != deferredTilesX || tilesY != deferredTilesY) {
+      ctx.clearBuffer(deferredVertices, 0, deferredVertices->info().size, 0);
+      deferredTilesX = tilesX;
+      deferredTilesY = tilesY;
     }
     return true;
   }
 
   void RtxSharc::bindDeferredResources(RtxContext& ctx) const {
-    ctx.bindResourceBuffer(SHARC_BINDING_DEFERRED_VERTICES, DxvkBufferSlice(m_deferredVertices, 0, m_deferredVertices->info().size));
+    const Rc<DxvkBuffer>& deferredVertices = m_deferredVertices[ctx.getActiveEyeIndex()];
+    ctx.bindResourceBuffer(SHARC_BINDING_DEFERRED_VERTICES, DxvkBufferSlice(deferredVertices, 0, deferredVertices->info().size));
   }
 
   void RtxSharc::dispatchDeferredFlush(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput) {
-    ScopedGpuProfileZone(&ctx, "SHARC: Flush");
+    const uint32_t eyeIndex = ctx.getActiveEyeIndex();
+    ScopedGpuProfileZone(&ctx, eyeIndex == 0 ? "SHARC: Flush Left" : "SHARC: Flush Right");
 
     ctx.bindCommonRayTracingResources(rtOutput);
     bindResources(ctx);
     bindDeferredResources(ctx);
     ctx.bindShader(VK_SHADER_STAGE_COMPUTE_BIT, SharcUpdateFlushShader::getShader());
-    const VkExtent3D workgroups = util::computeBlockCount(VkExtent3D { m_deferredTilesX, m_deferredTilesY, 1 }, VkExtent3D { 16, 8, 1 });
+    const VkExtent3D workgroups = util::computeBlockCount(VkExtent3D { m_deferredTilesX[eyeIndex], m_deferredTilesY[eyeIndex], 1 }, VkExtent3D { 16, 8, 1 });
     ctx.dispatch(workgroups.width, workgroups.height, workgroups.depth);
   }
 
