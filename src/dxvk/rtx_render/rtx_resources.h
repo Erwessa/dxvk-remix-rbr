@@ -412,7 +412,7 @@ namespace dxvk
     }
 
     // Message function called at the beginning of the frame, usually allocate or release resources based on each pass's status
-    void onFrameBegin(Rc<DxvkContext> ctx, RtxTextureManager& textureManager, const SceneManager& sceneManager, const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent, bool resetHistory, bool isCameraCut);
+    void onFrameBegin(Rc<DxvkContext> ctx, RtxTextureManager& textureManager, const SceneManager& sceneManager, const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent, bool resetHistory, bool isCameraCut, RaytracingOutput& output, bool executeLogicalFrameWork);
 
     // Message function called when target or downscaled resolution is changed
     void onResize(Rc<DxvkContext> ctx, const VkExtent3D& downscaledExtents, const VkExtent3D& upscaledExtents);
