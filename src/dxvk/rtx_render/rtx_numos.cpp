@@ -89,8 +89,8 @@ namespace dxvk {
     bool cloudRenderHeldBack = false;
     bool secondaryLutHeldBack = false;
 
-    // Weather transitions and the host's world-change signal advance once per logical frame,
-    // even when the eye-specific renderers are begun separately.
+    // Weather transitions and the host's world-change signal advance once per logical device frame.
+    // The cache also makes repeated beginFrame calls safe when the stereo eye loop is introduced.
     numos::Settings frameSettings;
     uint32_t frameSettingsFrameId = 0;
     bool frameSettingsValid = false;
