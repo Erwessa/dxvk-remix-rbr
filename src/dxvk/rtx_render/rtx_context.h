@@ -417,7 +417,7 @@ namespace dxvk {
 
     uint32_t m_frameLastInjected = kInvalidFrameIndex;
     RtxVrFrame m_vrFrame;
-    bool m_previousVrSceneSessionActive = false;
+    bool m_previousVrStereoFrameActive = false;
 
     // rtx.retained.replayAtInjection: a DrawRetainedInstances that arrived after this frame's injection,
     // held for the start of the next one (with the scene origin it carried).

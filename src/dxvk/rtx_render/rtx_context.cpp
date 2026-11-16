@@ -457,19 +457,21 @@ namespace dxvk {
     }
 
     const uint32_t frameId = m_device->getCurrentFrameId();
-    const bool vrSceneSessionActive = VrInstance::s_instance.isSceneSessionActive();
-    // A new or ended OpenVR session invalidates temporal data even when the eye poses
-    // happen to be close to the previous session's final poses. Propagate this through
-    // the normal logical-frame reset path before either eye's resources are prepared.
-    if (vrSceneSessionActive != m_previousVrSceneSessionActive) {
-      m_resetHistory = true;
-      m_previousVrSceneSessionActive = vrSceneSessionActive;
-    }
-
     const RtCamera& mainCamera = getSceneManager().getCamera();
-    const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const bool hasVrEyeCameras = vrSceneSessionActive
+    CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const bool hasVrEyeCameras = VrInstance::s_instance.isSceneSessionActive()
       && cameraManager.areVrEyeCamerasValid(frameId);
+
+    // Entering or leaving a usable stereo frame invalidates camera-dependent temporal
+    // data as well as pass histories. This also catches a temporarily missing pose:
+    // the first valid stereo frame after it resumes starts with clean reprojection.
+    if (hasVrEyeCameras != m_previousVrStereoFrameActive) {
+      m_resetHistory = true;
+      cameraManager.getMainCamera().invalidateViewHistory(frameId);
+      cameraManager.getVrEyeCamera(RtxEye::Left).invalidateViewHistory(frameId);
+      cameraManager.getVrEyeCamera(RtxEye::Right).invalidateViewHistory(frameId);
+      m_previousVrStereoFrameActive = hasVrEyeCameras;
+    }
     const RtCamera& leftEyeCamera = hasVrEyeCameras
       ? cameraManager.getVrEyeCamera(RtxEye::Left)
       : mainCamera;
