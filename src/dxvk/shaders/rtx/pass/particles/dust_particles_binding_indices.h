@@ -73,6 +73,9 @@ struct DustParticleSystemConstants {
   float isCameraLhs;
   float anisotropy;
   float sceneScale;
+
+  // Update the shared particle buffer only once per logical frame.
+  uint simulateParticles;
 };
 
 // Inputs
