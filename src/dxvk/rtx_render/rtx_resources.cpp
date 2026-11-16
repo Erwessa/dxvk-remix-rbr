@@ -1446,7 +1446,7 @@ namespace dxvk {
     // Explicit constant to make it clear where cross format aliasing occurs
     const bool allowCompatibleFormatAliasing = true;
 
-    output.m_finalOutput = AliasedResource(ctx, m_targetExtent, VK_FORMAT_R16G16B16A16_SFLOAT, "final output", allowCompatibleFormatAliasing, 1, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, 0, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    output.m_finalOutput = AliasedResource(ctx, m_targetExtent, VK_FORMAT_R16G16B16A16_SFLOAT, "final output", allowCompatibleFormatAliasing, 1, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, 0, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     output.m_finalOutputExtent = m_targetExtent;
 
     // Post Effect intermediate textures
