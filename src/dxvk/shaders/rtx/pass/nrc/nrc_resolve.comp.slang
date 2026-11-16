@@ -187,10 +187,14 @@ void debugResolve(uint2 pixelIndex, bool pixelIsActive)
 
   const uint samplesPerPixel = push.samplesPerPixel;
 
-  const uint queryPathIndexBase = NrcCalculateQueryPathIndex(frameDimensions, pixelIndex, 0, samplesPerPixel);
+  uint2 queryPixelIndexInAtlas = pixelIndex;
+  queryPixelIndexInAtlas.x += cb.nrcArgs.eyeIndex * frameDimensions.x;
+  const uint queryPathIndexBase = NrcCalculateQueryPathIndex(
+    cb.nrcArgs.nrcConstants.frameDimensions, queryPixelIndexInAtlas, 0, samplesPerPixel);
 
-  // Load corresponding training path info for debug visualizations
+  // Training coordinates are derived in eye-local space before selecting the eye's atlas region.
   uint2 trainingPixelIndex = Nrc::calculateTrainingPixelCoordinate(pixelIndex, cb.nrcArgs);
+  trainingPixelIndex.x += cb.nrcArgs.eyeIndex * uint(cb.nrcArgs.activeTrainingDimensions.x);
   const uint trainingPathIndex = NrcCalculateTrainingPathIndex(cb.nrcArgs.nrcConstants.trainingDimensions, trainingPixelIndex);
   NrcTrainingPathInfo trainingPath = NrcUnpackTrainingPathInfo(TrainingPathInfo[trainingPathIndex]);
 
@@ -361,7 +365,10 @@ void main(uint2 threadIndex: SV_DispatchThreadID)
   const uint sampleIndex = 0;
   const uint samplesPerPixel = push.samplesPerPixel;
 
-  const uint pathIndex = NrcCalculateQueryPathIndex(cb.camera.resolution, pixelCoordinate, sampleIndex, samplesPerPixel);
+  uint2 queryPixelIndexInAtlas = pixelCoordinate;
+  queryPixelIndexInAtlas.x += cb.nrcArgs.eyeIndex * cb.camera.resolution.x;
+  const uint pathIndex = NrcCalculateQueryPathIndex(
+    cb.nrcArgs.nrcConstants.frameDimensions, queryPixelIndexInAtlas, sampleIndex, samplesPerPixel);
   const NrcQueryPathInfo queryPathInfo = NrcUnpackQueryPathInfo(QueryPathInfo[pathIndex]);
 
   vec3 indirectRadiance = vec3(0);
