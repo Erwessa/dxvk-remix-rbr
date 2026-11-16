@@ -373,9 +373,9 @@ namespace dxvk {
     in.deltaSeconds = GlobalTime::get().deltaTime();
     in.cameraCut = cameraManager.getLastCameraCutFrameId() + 1u >= deviceFrame;
     if (in.cameraCut) {
-      m_lastCameraCutFrame = m_frameIndex;
+      m_lastCameraCutFrame[m_activeEyeIndex] = m_frameIndex;
     }
-    in.lastCameraCutFrame = m_lastCameraCutFrame;
+    in.lastCameraCutFrame = m_lastCameraCutFrame[m_activeEyeIndex];
     if (!m_impl->worldChangeFrameValid || m_impl->worldChangeFrameId != deviceFrame) {
       m_impl->worldChangedThisFrame = worldChangeCount() != m_lastWorldChangeCount;
       m_lastWorldChangeCount = worldChangeCount();
