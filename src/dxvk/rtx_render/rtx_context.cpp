@@ -377,6 +377,8 @@ namespace dxvk {
     // selects the right eye explicitly for its per-eye work and must not inherit
     // an active-eye index left over from a previous frame.
     setActiveEyeIndex(0);
+    m_logicalFrameFeatures = {};
+    m_frameFeaturesEyeMask = 0;
 
     auto logRenderPassRaytraceModeRayQuery = [=](const char* renderPassName, auto mode) {
       switch (mode) {
@@ -839,6 +841,16 @@ namespace dxvk {
         updateRaytraceArgsConstantBuffer(rtOutput, downscaledExtent, renderExtent);
         // The frame feature mask, after the TLAS build and the light upload, before every pass that reads it.
         m_frameFeatures[m_activeEyeIndex] = computeFrameFeatures(*this, rtOutput.m_raytraceArgs);
+        if (m_frameFeaturesEyeMask == 0) {
+          m_logicalFrameFeatures = m_frameFeatures[m_activeEyeIndex];
+        } else {
+          // Shader validation observes the OR of feature-use bits from both eyes.
+          // Preserve the first eye's diagnostic counts/variant while unioning the selectors.
+          m_logicalFrameFeatures.scene |= m_frameFeatures[m_activeEyeIndex].scene;
+          m_logicalFrameFeatures.mode |= m_frameFeatures[m_activeEyeIndex].mode;
+          m_logicalFrameFeatures.lightTypes |= m_frameFeatures[m_activeEyeIndex].lightTypes;
+        }
+        m_frameFeaturesEyeMask |= 1u << m_activeEyeIndex;
         logFrameFeatures(m_frameFeatures[m_activeEyeIndex]);
         recordGpuStageTiming("RaytraceArgsAfterAtmosphere");
         preGateFlush(2);

@@ -475,7 +475,7 @@ namespace dxvk {
                             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
       ctx.writeTimestamp(free->ready);
       free->pending = true;
-      free->mask = ctx.getFrameFeatures();
+      free->mask = ctx.getLogicalFrameFeatures();
       free->gbuffer = v.frameGbuffer;
       free->direct = v.frameDirect;
     }
