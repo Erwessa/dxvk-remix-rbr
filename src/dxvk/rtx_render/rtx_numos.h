@@ -89,7 +89,7 @@ namespace dxvk {
     // (CompositeArgs::cloudMotionVectors): NUMOS is rendering and rtx.numos.cloudMotionVectors is on.
     bool writesCloudMotionVectors() const;
     NumosGpu& gpu();
-    const Rc<DxvkBuffer>& argsBuffer() const { return m_argsBuffer; }
+    const Rc<DxvkBuffer>& argsBuffer() const;
     numos::Renderer& renderer();
 
   private:
@@ -107,17 +107,11 @@ namespace dxvk {
     void gatherLocalLights(RtxContext& ctx);
 
     std::unique_ptr<Impl> m_impl;
-    Rc<DxvkBuffer> m_argsBuffer;
-    bool m_rendering = false;
     bool m_nightSkyLoaded = false;
     float m_missLinearViewZ = 0.0f;
-    uint32_t m_frameIndex = 0;
-    // Per-eye camera-cut markers. Renderer/GPU temporal history is still shared until the full eye-state split.
+    // Selects the per-eye renderer, adapter, args buffer and temporal bookkeeping.
     uint32_t m_activeEyeIndex = 0;
     uint32_t m_lastWorldChangeCount = 0;  // rtx.skyProvider.worldChangeCount last seen
-    bool m_hostSkyOverride = false;
-    bool m_postDepthDone = false;  // dispatchPostDepth ran since this frame's beginFrame
-    bool m_argsCleared = false;    // the args buffer was zeroed once (it is read even while NUMOS is off)
   };
 
 }
