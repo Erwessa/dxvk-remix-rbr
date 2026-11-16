@@ -126,12 +126,18 @@ NrcBuffers initializeNrcBuffers()
   return buffers;
 }
 
-// The SDK stores this coordinate directly in its shared path-info buffers; this helper does not
-// translate eye-local coordinates into an atlas. Query callers must provide frame/query-space
-// coordinates, while update callers must provide training-space coordinates. In stereo, both
-// spaces need disjoint per-eye ranges before reaching this function or the eyes overwrite each other.
+// Translate eye-local coordinates into disjoint horizontal regions of the shared NRC atlas.
+// Query paths use the eye's frame-width offset; update paths use its active training-width offset.
 NrcContext createNrcContext(uvec2 pixelCoordinate)
 {
+  if (cb.nrcArgs.eyeIndex != 0)
+  {
+    const uint eyeOffset = NrcIsUpdateMode()
+      ? uint(cb.nrcArgs.activeTrainingDimensions.x)
+      : cb.camera.resolution.x;
+    pixelCoordinate.x += cb.nrcArgs.eyeIndex * eyeOffset;
+  }
+
   return NrcCreateContext(cb.nrcArgs.nrcConstants, initializeNrcBuffers(), pixelCoordinate);
 }
 
