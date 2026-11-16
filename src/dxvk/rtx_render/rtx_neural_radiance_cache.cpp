@@ -1222,9 +1222,7 @@ namespace dxvk {
     ctx.dispatch(workgroups.width, workgroups.height, workgroups.depth);
   }
 
-  void NeuralRadianceCache::dispatchTrainingAndResolve(
-    RtxContext& ctx,
-    const Resources::RaytracingOutput& rtOutput) {
+  void NeuralRadianceCache::dispatchTraining(RtxContext& ctx) {
     if (!isActive()) {
       return;
     }
@@ -1274,7 +1272,26 @@ namespace dxvk {
       copyNumberOfTrainingRecords(ctx);
     }
 
+
+  }
+
+  void NeuralRadianceCache::dispatchResolveForEye(
+    RtxContext& ctx,
+    const Resources::RaytracingOutput& rtOutput) {
+    if (!isActive()) {
+      return;
+    }
+
+    ScopedGpuProfileZone(&ctx, "NRC: Eye Resolve");
+    ctx.setFramePassStage(RtxFramePassStage::NRC);
     dispatchResolve(ctx, rtOutput);
+  }
+
+  void NeuralRadianceCache::dispatchTrainingAndResolve(
+    RtxContext& ctx,
+    const Resources::RaytracingOutput& rtOutput) {
+    dispatchTraining(ctx);
+    dispatchResolveForEye(ctx, rtOutput);
   }
 
   void NeuralRadianceCache::onFrameEnd(Resources::RaytracingOutput& rtOutput) {
