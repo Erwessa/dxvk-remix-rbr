@@ -89,6 +89,15 @@ namespace dxvk {
     bool cloudRenderHeldBack = false;
     bool secondaryLutHeldBack = false;
 
+    // Weather transitions and the host's world-change signal advance once per logical frame,
+    // even when the eye-specific renderers are begun separately.
+    numos::Settings frameSettings;
+    uint32_t frameSettingsFrameId = 0;
+    bool frameSettingsValid = false;
+    uint32_t worldChangeFrameId = 0;
+    bool worldChangeFrameValid = false;
+    bool worldChangedThisFrame = false;
+
     explicit Impl(DxvkDevice* device) : gpu(device, env::getDllDirectory() + "/numos/spirv") { }
   };
 
@@ -333,13 +342,21 @@ namespace dxvk {
     loadNightSky();
     // The user's settings with the weather presets blended over them (rtx_numos_weather.h). The weather
     // reaches NUMOS inside the settings, so FrameInputs::weather stays null.
-    numos::Settings settings = ctx.getCommonObjects()->metaNumosWeather().update(NumosSettings::resolved(),
-                                                                                 GlobalTime::get().deltaTime());
+    Rc<DxvkContext> dxvkCtx = &ctx;
+    const uint32_t deviceFrame = ctx.getDevice()->getCurrentFrameId();
+
+    // Weather::update advances transition time. Cache its result by logical device frame so
+    // separate eye renderers receive the exact same weather without advancing the blend twice.
+    if (!m_impl->frameSettingsValid || m_impl->frameSettingsFrameId != deviceFrame) {
+      m_impl->frameSettings = ctx.getCommonObjects()->metaNumosWeather().update(
+        NumosSettings::resolved(), GlobalTime::get().deltaTime());
+      m_impl->frameSettingsFrameId = deviceFrame;
+      m_impl->frameSettingsValid = true;
+    }
+    numos::Settings settings = m_impl->frameSettings;
     holdBackUncompiledPasses(ctx, settings);
     m_impl->renderer.setSettings(settings);
 
-    Rc<DxvkContext> dxvkCtx = &ctx;
-    const uint32_t deviceFrame = ctx.getDevice()->getCurrentFrameId();
     m_impl->gpu.beginFrame(dxvkCtx, deviceFrame);
 
     SceneManager& scene = ctx.getSceneManager();
@@ -359,8 +376,13 @@ namespace dxvk {
       m_lastCameraCutFrame = m_frameIndex;
     }
     in.lastCameraCutFrame = m_lastCameraCutFrame;
-    in.worldChanged = worldChangeCount() != m_lastWorldChangeCount;
-    m_lastWorldChangeCount = worldChangeCount();
+    if (!m_impl->worldChangeFrameValid || m_impl->worldChangeFrameId != deviceFrame) {
+      m_impl->worldChangedThisFrame = worldChangeCount() != m_lastWorldChangeCount;
+      m_lastWorldChangeCount = worldChangeCount();
+      m_impl->worldChangeFrameId = deviceFrame;
+      m_impl->worldChangeFrameValid = true;
+    }
+    in.worldChanged = m_impl->worldChangedThisFrame;
 
     Camera shaderCamera = camera.getShaderConstants(/*freecam=*/true);
     {
