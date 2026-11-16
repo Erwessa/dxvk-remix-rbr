@@ -48,7 +48,7 @@ namespace dxvk {
     m_resetHistoryOnNextEvaluation = { true, true };
     m_createdPreset = -1;
     m_createdPassCount = 0;
-    mRecreate = true;
+    mRecreate.fill(true);
   }
 
   void DlssNeuralRendering::onDestroy() {
@@ -67,7 +67,7 @@ namespace dxvk {
 
   bool DlssNeuralRendering::onActivation(Rc<DxvkContext>& ctx) {
     const bool initialized = initializeDlssNeuralRendering(ctx);
-    mRecreate = !initialized;
+    mRecreate.fill(!initialized);
     if (!initialized) {
       disableAfterFailure("DLSS-NR activation failed; disabling DLSS-NR.");
     }
@@ -146,11 +146,14 @@ namespace dxvk {
     assert(eyeIndex < m_dlssNeuralRenderingContexts.size());
 
     const int passes = getClampedPassCount();
-    mRecreate |= m_createdPreset != DlssNeuralRendering::preset() || m_createdPassCount != passes;
+    if (m_createdPreset != DlssNeuralRendering::preset() || m_createdPassCount != passes) {
+      mRecreate.fill(true);
+    }
 
-    if (mRecreate) {
+    if (mRecreate[eyeIndex]) {
       const bool initialized = initializeDlssNeuralRendering(ctx);
-      mRecreate = !initialized;
+      // Initialization creates the contexts of both eyes.
+      mRecreate.fill(!initialized);
       if (!initialized) {
         disableAfterFailure("DLSS-NR feature recreation failed; disabling DLSS-NR.");
         return false;
@@ -432,7 +435,7 @@ namespace dxvk {
     m_displaySize[0] = displaySize[0];
     m_displaySize[1] = displaySize[1];
 
-    mRecreate = true;
+    mRecreate.fill(true);
   }
 
   bool DlssNeuralRendering::initializeDlssNeuralRendering(Rc<DxvkContext> renderContext) {
@@ -474,7 +477,7 @@ namespace dxvk {
 
   void DlssNeuralRendering::disableAfterFailure(const char* pReason) {
     Logger::err(pReason);
-    mRecreate = false;
+    mRecreate.fill(false);
     DlssNeuralRendering::enable.setDeferred(false);
   }
 } // namespace dxvk

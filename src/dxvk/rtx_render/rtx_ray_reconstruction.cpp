@@ -112,7 +112,7 @@ namespace dxvk {
 
   void DxvkRayReconstruction::release() {
     m_rayReconstructionContext = {};
-    mRecreate = true;
+    mRecreate.fill(true);
   }
   
   void DxvkRayReconstruction::onDestroy() {
@@ -137,14 +137,16 @@ namespace dxvk {
     }
 
     bool dlssAutoExposure = true;
-    mRecreate |= (mAutoExposure != dlssAutoExposure)
-      || m_prevPreset != preset();
+    if (mAutoExposure != dlssAutoExposure || m_prevPreset != preset()) {
+      mRecreate.fill(true);
+    }
     mAutoExposure = dlssAutoExposure;
     m_prevPreset = preset();
 
-    if (mRecreate) {
+    // Ray reconstruction has a single context, so both eye flags always change together.
+    if (mRecreate[0] || mRecreate[1]) {
       initializeRayReconstruction(ctx);
-      mRecreate = false;
+      mRecreate.fill(false);
     }
 
     SceneManager& sceneManager = device()->getCommon()->getSceneManager();
@@ -402,7 +404,7 @@ namespace dxvk {
     mActualProfile = actualProfile;
 
     // We need to force a recreation of resources before running DLSS.
-    mRecreate = true;
+    mRecreate.fill(true);
 
     // Update our requested profile
     mProfile = profile;
