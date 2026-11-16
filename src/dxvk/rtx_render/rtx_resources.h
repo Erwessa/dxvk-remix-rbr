@@ -426,7 +426,7 @@ namespace dxvk
 
     Resources::RaytracingOutput& getRaytracingOutput() { return m_raytracingOutput; }
 
-    Rc<DxvkBuffer> getConstantsBuffer();
+    Rc<DxvkBuffer> getConstantsBuffer(uint32_t eyeIndex = 0);
     Rc<DxvkImageView> getBlueNoiseTexture(Rc<DxvkContext> ctx);
     Rc<DxvkImageView> getValueNoiseLut(Rc<DxvkContext> ctx);
     Rc<DxvkImageView> getWhiteTexture(Rc<DxvkContext> ctx);
@@ -446,7 +446,7 @@ namespace dxvk
 
     Tlas& getTLAS(Tlas::Type type) { return m_tlas[type]; }
 
-    void createConstantsBuffer();
+    void createConstantsBuffer(uint32_t eyeIndex);
     void createBlueNoiseTexture(Rc<DxvkContext> ctx);
     void createValueNoiseLut(Rc<DxvkContext> ctx);
 
@@ -492,7 +492,7 @@ namespace dxvk
 
     RaytracingOutput m_raytracingOutput;
 
-    Rc<DxvkBuffer> m_constants;
+    Rc<DxvkBuffer> m_constants[2];
     Rc<DxvkImage> m_blueNoiseTex;
     Rc<DxvkImageView> m_blueNoiseTexView;
     Rc<DxvkImage> m_valueNoiseLut;
