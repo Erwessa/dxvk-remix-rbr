@@ -312,6 +312,7 @@ namespace dxvk {
   }
 
   void RtxNumos::beginFrame(RtxContext& ctx, RaytraceArgs& constants) {
+    m_activeEyeIndex = ctx.getActiveEyeIndex();
     constants.skyRadianceUnscale = 1.0f;
     constants.skyArgsProbe = 0u;
     if (!m_argsCleared) {
@@ -507,6 +508,7 @@ namespace dxvk {
   }
 
   void RtxNumos::dispatchPostDepth(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput) {
+    m_activeEyeIndex = ctx.getActiveEyeIndex();
     if (!m_rendering) {
       return;
     }
@@ -520,6 +522,7 @@ namespace dxvk {
   }
 
   void RtxNumos::bindCommonResources(RtxContext& ctx) {
+    m_activeEyeIndex = ctx.getActiveEyeIndex();
     const numos::FrameOutputs* o = outputs();
     Resources& resources = ctx.getResourceManager();
     const Rc<DxvkSampler> fallbackSampler =
@@ -554,6 +557,7 @@ namespace dxvk {
   void RtxNumos::bindCompositeResources(RtxContext& ctx, uint32_t& skyProviderActive, float& skyWorldUnitsPerKm,
                                         float& skyRadianceScale, uint32_t& skyHostSkyOverride,
                                         uint32_t& skyCloudsValid) {
+    m_activeEyeIndex = ctx.getActiveEyeIndex();
     const numos::FrameOutputs* o = outputs();
     skyProviderActive = o ? 1u : 0u;
     skyWorldUnitsPerKm = o ? o->args.worldUnitsPerKm : 1000.0f * RtxOptions::getMeterToWorldUnitScale();
