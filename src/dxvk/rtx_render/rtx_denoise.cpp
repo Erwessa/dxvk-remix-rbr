@@ -80,6 +80,11 @@ namespace dxvk {
     return m_nrdContexts[eyeIndex]->getNrdArgs();
   }
 
+  Resources::Resource DxvkDenoise::getNrdValidationTexture(uint32_t eyeIndex) const {
+    assert(eyeIndex < m_nrdContexts.size());
+    return m_nrdContexts[eyeIndex]->getValidationTexture();
+  }
+
   bool DxvkDenoise::isReferenceDenoiserEnabled(uint32_t eyeIndex) const {
     assert(eyeIndex < m_nrdContexts.size());
     return m_nrdContexts[eyeIndex]->isReferenceDenoiserEnabled();

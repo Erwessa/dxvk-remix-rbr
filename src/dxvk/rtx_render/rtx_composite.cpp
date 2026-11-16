@@ -324,7 +324,7 @@ namespace dxvk {
         for (uint32_t eyeIndex = 0; eyeIndex < m_accumulatedFinalOutput.size(); ++eyeIndex) {
           if (m_enableAccumulation) {
             m_accumulatedFinalOutput[eyeIndex] = Resources::createImageResource(
-              ctx, str::format("accumulated final output eye ", eyeIndex), frameBeginCtx.downscaledExtent,
+              ctx, str::format("accumulated final output eye ", eyeIndex).c_str(), frameBeginCtx.downscaledExtent,
               VK_FORMAT_R32G32B32A32_SFLOAT);
           } else {
             m_accumulatedFinalOutput[eyeIndex].reset();
@@ -340,7 +340,7 @@ namespace dxvk {
     if (m_enableAccumulation) {
       for (uint32_t eyeIndex = 0; eyeIndex < m_accumulatedFinalOutput.size(); ++eyeIndex) {
         m_accumulatedFinalOutput[eyeIndex] = Resources::createImageResource(
-          ctx, str::format("accumulated final output eye ", eyeIndex), downscaledExtent,
+          ctx, str::format("accumulated final output eye ", eyeIndex).c_str(), downscaledExtent,
           VK_FORMAT_R32G32B32A32_SFLOAT);
       }
     }
@@ -415,11 +415,11 @@ namespace dxvk {
     Rc<DxvkSampler> linearSampler = ctx->getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
     const RtxGlobalVolumetrics& globalVolumetrics = ctx->getCommonObjects()->metaGlobalVolumetrics();
-    ctx->bindResourceView(COMPOSITE_VOLUME_FILTERED_RADIANCE_AGE_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceAge().view, nullptr);
+    ctx->bindResourceView(COMPOSITE_VOLUME_FILTERED_RADIANCE_AGE_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceAge(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(COMPOSITE_VOLUME_FILTERED_RADIANCE_AGE_INPUT, linearSampler);
-    ctx->bindResourceView(COMPOSITE_VOLUME_FILTERED_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY().view, nullptr);
+    ctx->bindResourceView(COMPOSITE_VOLUME_FILTERED_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(COMPOSITE_VOLUME_FILTERED_RADIANCE_Y_INPUT, linearSampler);
-    ctx->bindResourceView(COMPOSITE_VOLUME_FILTERED_RADIANCE_CO_CG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg().view, nullptr);
+    ctx->bindResourceView(COMPOSITE_VOLUME_FILTERED_RADIANCE_CO_CG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(COMPOSITE_VOLUME_FILTERED_RADIANCE_CO_CG_INPUT, linearSampler);
 
     // Inputs/Outputs

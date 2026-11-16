@@ -1449,13 +1449,13 @@ namespace dxvk {
 
       switch (debugViewIdx()) {
       case DEBUG_VIEW_NRD_INSTANCE_0_VALIDATION_LAYER:
-        ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, denoiser0.getNrdContext().getValidationTexture().view, nullptr);
+        ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, denoiser0.getNrdValidationTexture(ctx->getActiveEyeIndex()).view, nullptr);
         break;
       case DEBUG_VIEW_NRD_INSTANCE_1_VALIDATION_LAYER:
-        ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, denoiser1.getNrdContext().getValidationTexture().view, nullptr);
+        ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, denoiser1.getNrdValidationTexture(ctx->getActiveEyeIndex()).view, nullptr);
         break;
       case DEBUG_VIEW_NRD_INSTANCE_2_VALIDATION_LAYER:
-        ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, denoiser2.getNrdContext().getValidationTexture().view, nullptr);
+        ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, denoiser2.getNrdValidationTexture(ctx->getActiveEyeIndex()).view, nullptr);
         break;
       default:
         ctx->bindResourceView(DEBUG_VIEW_BINDING_NRD_VALIDATION_LAYER_INPUT, m_debugView.view, nullptr);

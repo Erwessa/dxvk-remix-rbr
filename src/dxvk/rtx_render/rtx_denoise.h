@@ -87,6 +87,7 @@ namespace dxvk {
     
     void showImguiSettings();
     NrdArgs getNrdArgs(uint32_t eyeIndex) const;
+    Resources::Resource getNrdValidationTexture(uint32_t eyeIndex) const;
     bool isReferenceDenoiserEnabled(uint32_t eyeIndex) const;
     void copyNrdSettingsFrom(const DxvkDenoise& refDenoiser, uint32_t eyeIndex);
  
