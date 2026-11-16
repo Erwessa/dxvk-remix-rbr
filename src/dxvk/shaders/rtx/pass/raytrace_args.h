@@ -92,6 +92,10 @@ struct NeeCacheArgs {
   uint enableReshuffleResilience;
   uint reshuffleMaxAge;
   uint enableSpatialReuse;
+
+  // Shared world-space origin for the logical-frame NEE cache.
+  // Kept independent of per-eye cb.camera positions in stereo rendering.
+  vec4 cacheCenter;
 };
 
 struct DomeLightArgs {
