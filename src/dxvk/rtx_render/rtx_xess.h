@@ -123,7 +123,7 @@ namespace dxvk {
     XeSSPreset m_actualPreset;
     VkExtent2D m_inputSize;
     VkExtent2D m_xessOutputSize;
-        float m_lastResolutionScale; // Track resolution scale changes for Custom preset
+    float m_lastResolutionScale; // Track resolution scale changes for Custom preset
 
     // Interval counters for the [XeSS] log line.
     uint64_t m_dispatches = 0;

@@ -92,11 +92,11 @@ namespace dxvk {
   DxvkXeSS::DxvkXeSS(DxvkDevice* device) 
     : RtxPass(device),
       CommonDeviceObject(device),
-       m_preset(XeSSPreset::Balanced),
+      m_preset(XeSSPreset::Balanced),
       m_actualPreset(XeSSPreset::Balanced),
       m_inputSize{0, 0},
       m_xessOutputSize{0, 0},
-       m_lastResolutionScale(-1.0f) {
+      m_lastResolutionScale(-1.0f) {
   }
 
   DxvkXeSS::~DxvkXeSS() {
@@ -207,57 +207,47 @@ namespace dxvk {
   }
 
   VkExtent3D DxvkXeSS::getInputSize(const VkExtent3D& targetExtent) const {
-    xess_context_handle_t sizeContext = m_eyeContexts[0].context ? m_eyeContexts[0].context : m_eyeContexts[1].context;
     if (!isActive()) {
       return targetExtent;
     }
 
     XeSSPreset currentPreset = XessOptions::preset();
-    
+
     if (currentPreset == XeSSPreset::Custom) {
-      // For Custom preset, use resolution scale directly
       const float downscaleFactor = RtxOptions::resolutionScale();
       VkExtent3D inputExtent;
       inputExtent.width = std::max(1u, static_cast<uint32_t>(targetExtent.width * downscaleFactor));
       inputExtent.height = std::max(1u, static_cast<uint32_t>(targetExtent.height * downscaleFactor));
       inputExtent.depth = targetExtent.depth;
       return inputExtent;
-    } else {
-      // Use XeSS SDK to get optimal input resolution for XeSS 2.1+ compliance
+    }
+
+    xess_context_handle_t sizeContext = m_eyeContexts[0].context ? m_eyeContexts[0].context : m_eyeContexts[1].context;
+    if (sizeContext) {
       xess_2d_t targetRes = { static_cast<uint32_t>(targetExtent.width), static_cast<uint32_t>(targetExtent.height) };
       xess_2d_t optimalInputRes = { 0, 0 };
       xess_2d_t minInputRes = { 0, 0 };
       xess_2d_t maxInputRes = { 0, 0 };
-      
       xess_quality_settings_t quality = presetToQuality(currentPreset);
-      xess_result_t result = sizeContext ? xessGetOptimalInputResolution(
-        sizeContext, 
-        &targetRes, 
-        quality, 
-        &optimalInputRes, 
-        &minInputRes, 
-        &maxInputRes
-      ) : XESS_RESULT_ERROR_UNSUPPORTED;
-      
+      xess_result_t result = xessGetOptimalInputResolution(
+        sizeContext, &targetRes, quality, &optimalInputRes, &minInputRes, &maxInputRes);
       if (result == XESS_RESULT_SUCCESS) {
         VkExtent3D inputExtent;
         inputExtent.width = optimalInputRes.x;
         inputExtent.height = optimalInputRes.y;
         inputExtent.depth = targetExtent.depth;
-        
-        return inputExtent;
-      } else {
-        Logger::warn(str::format("XeSS 2.1: Failed to get optimal input resolution, using fallback: ", xessResultToString(result)));
-        // Fallback to hardcoded values
-        const float downscaleFactor = 1.f / calcUpscaleFactor();
-        
-        VkExtent3D inputExtent;
-        inputExtent.width = std::max(1u, static_cast<uint32_t>(targetExtent.width * downscaleFactor));
-        inputExtent.height = std::max(1u, static_cast<uint32_t>(targetExtent.height * downscaleFactor));
-        inputExtent.depth = targetExtent.depth;
         return inputExtent;
       }
+
+      Logger::warn(str::format("XeSS 2.1: Failed to get optimal input resolution, using fallback: ", xessResultToString(result)));
     }
+
+    const float downscaleFactor = 1.f / calcUpscaleFactor();
+    VkExtent3D inputExtent;
+    inputExtent.width = std::max(1u, static_cast<uint32_t>(targetExtent.width * downscaleFactor));
+    inputExtent.height = std::max(1u, static_cast<uint32_t>(targetExtent.height * downscaleFactor));
+    inputExtent.depth = targetExtent.depth;
+    return inputExtent;
   }
 
   void DxvkXeSS::initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent, uint32_t eyeIndex) {
