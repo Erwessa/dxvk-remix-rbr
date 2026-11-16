@@ -79,6 +79,16 @@ namespace dxvk {
     }
   }
 
+  bool RtxVrFrame::getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height) const {
+    if (!m_valid || m_pFrame->recommendedWidth == 0 || m_pFrame->recommendedHeight == 0) {
+      return false;
+    }
+
+    width = m_pFrame->recommendedWidth;
+    height = m_pFrame->recommendedHeight;
+    return true;
+  }
+
   void RtxVrFrame::updateEyeCameras(CameraManager& cameraManager, uint32_t frameId) {
     if (!m_valid) {
       return;
