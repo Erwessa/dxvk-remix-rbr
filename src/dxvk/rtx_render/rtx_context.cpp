@@ -320,12 +320,20 @@ namespace dxvk {
     dlssnr.setDlssNeuralRenderingSettings(displaySize);
 
     // Set resolution to cameras for jittering
+    CameraManager& cameraManager = getSceneManager().getCameraManager();
     for (int i = 0; i < CameraType::Count; i++) {
       if (i == CameraType::Unknown) {
         continue;
       }
-      RtCamera& camera = getSceneManager().getCameraManager().getCamera(static_cast<CameraType::Enum>(i));
+      RtCamera& camera = cameraManager.getCamera(static_cast<CameraType::Enum>(i));
       camera.setResolution(renderSize, displaySize);
+    }
+
+    // VR eye cameras are not CameraType entries, so configure their render/display
+    // resolutions explicitly. Their shader constants drive per-eye projection, jitter,
+    // motion vectors and temporal reconstruction just like the regular scene cameras.
+    for (uint32_t eye = 0; eye < RtxEye::Count; eye++) {
+      cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(eye)).setResolution(renderSize, displaySize);
     }
 
     // Note: Ensure the rendering resolution is not more than 2^14 - 1. This is due to assuming only
