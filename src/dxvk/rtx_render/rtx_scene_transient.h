@@ -67,7 +67,11 @@ namespace dxvk {
     bool draw(const Rc<DxvkContext>& ctx, ExternalDrawState& state);
 
     // SceneManager::garbageCollection, after the replacement-instance collection: unseen entries age out or are kept.
-    void collect(RtCamera& camera, bool antiCullingSupported);
+    void collect(
+        RtCamera& camera,
+        bool antiCullingSupported,
+        RtCamera* leftEyeCamera = nullptr,
+        RtCamera* rightEyeCamera = nullptr);
 
     void onInstanceFreed(const RtInstance& instance);
     void onSceneClear();
