@@ -1242,7 +1242,7 @@ namespace dxvk {
   }
 
   void RtxTextureManager::prepareSamplerFeedback(DxvkContext* ctx) {
-    auto& res = ctx->getCommonObjects()->getResources().getRaytracingOutput();
+    auto& resources = ctx->getCommonObjects()->getResources();
 
     // reset device-local sampler feedback buffer
     const auto bytesToClear = m_sf.m_idToTexture_count.load() * sizeof(uint32_t);
@@ -1251,7 +1251,7 @@ namespace dxvk {
     // does not allow for zero-sized clears).
     if (bytesToClear != 0) {
       ctx->clearBuffer(
-        res.m_samplerFeedbackDevice,
+        resources.getSamplerFeedbackDeviceBuffer(),
         0, 
         bytesToClear,
         UINT32_MAX  // to find min during the rendering
@@ -1264,24 +1264,24 @@ namespace dxvk {
 
     const auto frameid = m_device->getCurrentFrameId();
 
-    const auto curframe = frameid % std::size(res.m_samplerFeedbackReadback);
-    const auto prevframe = (frameid + (std::size(res.m_samplerFeedbackReadback) - 1)) % std::size(res.m_samplerFeedbackReadback);
+    const auto curframe = frameid % kMaxFramesInFlight;
+    const auto prevframe = (frameid + (kMaxFramesInFlight - 1)) % kMaxFramesInFlight;
     const auto bytesToCopy = m_sf.m_idToTexture_count.load() * sizeof(uint32_t);
 
     // Note: Only copy the buffer when a non-zero copy size is requested (as Vulkan
     // does not allow for zero-sized copies).
     if (bytesToCopy != 0) {
       ctx->copyBuffer(
-        res.m_samplerFeedbackReadback[curframe],
+        resources.getSamplerFeedbackReadback(curframe),
         0,
-        res.m_samplerFeedbackDevice,
+        resources.getSamplerFeedbackDeviceBuffer(),
         0,
         bytesToCopy);
     }
 
     {
       const uint32_t* gpuAccessedMips_safeToReadOnHost =
-        (const uint32_t*)res.m_samplerFeedbackReadback[prevframe]->mapPtr(0); // approximately...
+        (const uint32_t*)resources.getSamplerFeedbackReadback(prevframe)->mapPtr(0); // approximately...
 
       garbageCollection(gpuAccessedMips_safeToReadOnHost);
     }
