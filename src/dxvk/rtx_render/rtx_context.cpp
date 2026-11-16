@@ -3265,6 +3265,74 @@ namespace dxvk {
     }
   }
 
+  bool RtxContext::submitVrFrame(const std::array<Rc<DxvkImage>, 2>& eyeImages) {
+    if (!m_vrFrame.isValid() || !VrInstance::s_instance.isSceneSessionActive())
+      return false;
+
+    std::array<VkImageLayout, 2> originalLayouts = {};
+    std::array<vr::VRVulkanTextureData_t, 2> textures = {};
+
+    for (uint32_t eye = 0; eye < eyeImages.size(); eye++) {
+      const Rc<DxvkImage>& image = eyeImages[eye];
+      if (!image)
+        return false;
+
+      const DxvkImageCreateInfo& info = image->info();
+      if (info.format != VK_FORMAT_R16G16B16A16_SFLOAT
+          || info.sampleCount != VK_SAMPLE_COUNT_1_BIT
+          || (info.usage & (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT))
+              != (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+          || info.extent != eyeImages[0]->info().extent) {
+        Logger::warn("OpenVR: eye output does not satisfy the Vulkan texture requirements.");
+        return false;
+      }
+
+      originalLayouts[eye] = info.layout;
+      vr::VRVulkanTextureData_t& texture = textures[eye];
+      texture.m_nImage = reinterpret_cast<uint64_t>(image->handle());
+      texture.m_pDevice = m_device->handle();
+      texture.m_pPhysicalDevice = m_device->adapter()->handle();
+      texture.m_pInstance = m_device->instance()->handle();
+      texture.m_pQueue = m_device->queues().graphics.queueHandle;
+      texture.m_nQueueFamilyIndex = m_device->queues().graphics.queueFamily;
+      texture.m_nWidth = info.extent.width;
+      texture.m_nHeight = info.extent.height;
+      texture.m_nFormat = info.format;
+      texture.m_nSampleCount = info.sampleCount;
+    }
+
+    // Record the ownership handoff after all eye rendering commands. The segment submit keeps
+    // the logical frame's Reflex marker for the final segment, unlike flushCommandList().
+    for (const Rc<DxvkImage>& image : eyeImages)
+      changeImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+    Rc<DxvkCommandList> recorded = endRecording();
+    m_device->submitCommandList(
+      recorded,
+      VK_NULL_HANDLE,
+      VK_NULL_HANDLE,
+      false,
+      m_cachedReflexFrameId);
+    recorded = nullptr;
+    beginRecording(m_device->createCommandList());
+
+    bool submitted = false;
+    {
+      // Synchronize DXVK submissions before allowing OpenVR to use the graphics queue.
+      m_device->lockSubmission();
+      DEFER(unlockSubmission, m_device->unlockSubmission());
+      submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Linear);
+    }
+
+    // OpenVR Submit is ordered on the same graphics queue. Record the return transitions
+    // in the next DXVK command list so subsequent resource use sees the original layouts.
+    for (uint32_t eye = 0; eye < eyeImages.size(); eye++)
+      changeImageLayout(eyeImages[eye], originalLayouts[eye]);
+
+    return submitted;
+  }
+
+
   void RtxContext::dispatchGameMirror(const Rc<DxvkImage>& srcImage, const Rc<DxvkImage>& targetImage) {
     ScopedCpuProfileZone();
 
