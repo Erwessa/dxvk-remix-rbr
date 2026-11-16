@@ -90,6 +90,7 @@
 #include "rtx_render/rtx_fork_frame_features.h"
 #include "rtx_render/rtx_fork_variant_tables.h"
 #include "rtx_render/rtx_fork_camera_origin.h"
+#include "rtx_render/rtx_vr.h"
 #include "rtx_render/rtx_fork_d3d9_alpha.h"
 #include "rtx_render/rtx_fork_d3d9_identity.h"
 #include "rtx_render/rtx_host_settings.h"
@@ -1939,6 +1940,7 @@ namespace dxvk {
 
       RtCamera::showImguiSettings();
       WorldOrigin::showImguiSettings();  // rtx.worldOrigin.enable
+      RtxVr::showImguiSettings();  // rtx.vr.enable
 
       {
         ImGui::PushID("CameraInfos");

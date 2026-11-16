@@ -177,6 +177,14 @@ On a frame with displacement the SHARC update ran inline with POM compiled in, s
 - Options: added `rtx.integrateIndirect.sharcUpdateSerWithPom` (default off). Not set by the graphics presets: the screenshots so far show no difference above frame noise, from one exterior view only.
 - Measured: New Vegas, Goodsprings exterior at a low sun, 1485x835 with DLSS-RR: GPU frame 39.1 to 32.9 ms, IndirectSharcUpdate 8.3-9.5 to 2.7 ms (in-run A/B, two phases on between three off). Screenshots from one camera differ no more between on and off than between two off phases. Interiors not measured.
 
+## 2026-11-16
+
+### OpenVR headset session (opt-in)
+The runtime can claim an OpenVR scene session when the graphics device is created, and reads the headset's poses, eye transforms and projection bounds. Nothing renders to the headset yet. With the option off, rendering is unchanged.
+- Options: added `rtx.vr.enable` (default off, read once at device creation). Preset-independent: it changes no quality setting.
+- Commits: see the branch history of feat/20261115-openvr-runtime.
+- Docs: [openvr-stereo-rendering.md](openvr-stereo-rendering.md), [VrMatrixConventions.md](../documentation/VrMatrixConventions.md)
+
 ## 2026-10-28
 
 ### Developer menu: settings search

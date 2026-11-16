@@ -1,5 +1,6 @@
 #include "dxvk_instance.h"
 #include "dxvk_openvr.h"
+#include "rtx_render/rtx_vr.h"
 
 #ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
@@ -24,7 +25,6 @@ namespace dxvk {
 
   VrInstance:: VrInstance() {
     m_no_vr = env::getEnvVar("DXVK_NO_VR") == "1";
-    m_vr_enabled = env::getEnvVar("DXVK_ENABLE_VR") == "1";
   }
   VrInstance::~VrInstance() { }
 
@@ -295,7 +295,7 @@ namespace dxvk {
       return false;
     }
 
-    if (m_no_vr || !m_vr_enabled)
+    if (m_no_vr || !RtxVr::enable())
       return false;
 
     if (m_sceneSessionActive && m_compositor && m_system) {

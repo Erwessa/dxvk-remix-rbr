@@ -463,6 +463,8 @@ dxvk_src = files([
   'rtx_render/rtx_types.cpp',
   'rtx_render/rtx_types.h',
   'rtx_render/rtx_utils.h',
+  'rtx_render/rtx_vr.cpp',
+  'rtx_render/rtx_vr.h',
   'rtx_render/rtx_vr_math.h',
   'rtx_render/rtx_xess.cpp',
   'rtx_render/rtx_xess.h',

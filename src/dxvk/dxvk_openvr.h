@@ -160,7 +160,6 @@ namespace dxvk {
     HMODULE               m_ovrApi     = nullptr;
 
     bool m_no_vr;
-    bool m_vr_enabled;
     bool m_loadedOvrApi      = false;
     bool m_initializedOpenVr = false;
     bool m_sceneSessionActive = false;
