@@ -2132,6 +2132,9 @@ namespace dxvk {
     m_common->metaSharc().setRaytraceArgs(*this, constants);
 
     m_common->metaNeeCache().setRaytraceArgs(constants);
+    // NEE uses one world-space hash grid shared by both VR eyes. Do not derive
+    // its origin from cb.camera, which will differ between the left and right eye.
+    constants.neeCacheArgs.cacheCenter = vec4(camera.getPosition(), 0.0f);
     constants.surfaceCount = getSceneManager().getAccelManager().getSurfaceCount();
 
     m_common->metaSparseRendering().setSparseRenderingArgs(*this, constants.sparseRenderingArgs);
