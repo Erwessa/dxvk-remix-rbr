@@ -112,14 +112,14 @@ namespace fork_hooks {
   // remixapi_DrawScreenOverlayD3D11, bottom-first. Runs after tone mapping and before screenshot capture.
   // The CPU overlay image is recreated when its size or format changes. The GPU layers were copied into
   // their slot images when they were set, and persist until the host replaces or clears them.
-  void dispatchScreenOverlay(RtxContext& ctx, Resources::RaytracingOutput& rtOutput) {
+  void dispatchScreenOverlay(RtxContext& ctx, Resources::RaytracingOutput& rtOutput, bool consumeFrameData) {
     if (!ctx.m_pendingScreenOverlay.has_value() && ctx.m_gpuScreenOverlayCount == 0) {
       return;
     }
 
     ScopedGpuProfileZone(&ctx, "Screen Overlay");
 
-    if (ctx.m_pendingScreenOverlay.has_value()) {
+    if (ctx.m_pendingScreenOverlay.has_value() && !ctx.m_pendingScreenOverlay->uploaded) {
       auto& overlay = *ctx.m_pendingScreenOverlay;
 
       // Recreate overlay image if dimensions or format changed.
@@ -176,6 +176,7 @@ namespace fork_hooks {
 
       ctx.copyBufferToImage(ctx.m_screenOverlayImage, subresource, offset, extent,
                             overlay.stagingBuffer, 0, 0, 0);
+      overlay.uploaded = true;
     }
 
     // Dispatch overlay blend compute shader, once per layer.
@@ -211,8 +212,10 @@ namespace fork_hooks {
     if (ctx.m_pendingScreenOverlay.has_value()) {
       static const float kFullRect[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
       blend(ctx.m_screenOverlayView, ctx.m_pendingScreenOverlay->opacity, 0, kFullRect, 0.0f);
-      // Clear pending overlay after dispatch
-      ctx.m_pendingScreenOverlay.reset();
+      // Keep the uploaded source alive until the final eye has consumed this logical frame.
+      if (consumeFrameData) {
+        ctx.m_pendingScreenOverlay.reset();
+      }
     }
 
     for (uint32_t i = 0; i < ctx.m_gpuScreenOverlayCount; ++i) {
