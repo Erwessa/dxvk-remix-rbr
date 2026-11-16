@@ -39,7 +39,7 @@ Calling `injectRTX` twice for one game frame is not a valid stereo implementatio
 
 ## Matrix convention audit
 
-The checked-in DXVK math type `Matrix4Base` stores four row vectors and multiplies vectors as row vectors (`v * M)); its translation is stored in row 3. The OpenVR SDK defines `HmdMatrix34_t` as a 3-by-4 array, with the rigid-transform translation in column 3. A direct element-for-element copy is therefore not a valid conversion: the affine transform must first be represented in the DXVK row-vector convention (transpose the 3-by-3 rotation and place the OpenVR translation in row 3).
+The checked-in DXVK math type `Matrix4Base` stores four columns and multiplies column vectors: `(A * B) * v` applies `B` first, and the translation of an affine transform is in column 3. This is the same convention as `OpenVrMatrix4`, so the conversion changes only the storage order, not the math: `Matrix4[column][row] = OpenVrMatrix4.at(row, column)`. Do not transpose the 3-by-3 rotation. `matrixFromRowMajor()` in `rtx_vr_math.h` does this conversion. See `documentation/VrMatrixConventions.md`.
 
 OpenVR's documented tracking basis is +X right, +Y up, -Z forward, with positions in metres. This establishes the source convention, but not the final game-world mapping. Before constructing an HMD camera, the implementation must still define the tracking origin/recenter policy, map metres to the RBR world-unit scale, and compose the head pose with the game's base camera without double-applying its orientation. Projection conversion is a separate operation: raw asymmetric bounds must be converted to the exact clip-space/depth convention expected by Remix's RTX passes.
 
@@ -64,7 +64,7 @@ The Main camera is consumed by many RTX passes, and `RtCamera` stores previous-f
 
 - [x] Add guarded access to `WaitGetPoses` for the active scene session.
 - [x] Query the recommended render-target size, per-eye eye-to-head transform, and raw asymmetric projection bounds.
-- [ ] Add a tested conversion from OpenVR matrices to the runtime's camera convention.
+- [x] Add a conversion from OpenVR matrices and raw projection bounds to the runtime's camera convention (`rtx_vr_math.h`). It was checked numerically outside the build, and the vertical sign of the raw bounds still has to be confirmed on a headset.
 - [ ] Log headset/runtime availability and actionable initialization errors.
 
 The pose and calibration methods are currently runtime primitives only. No frame loop consumes them yet, and no camera matrices are changed by this stage.
@@ -338,9 +338,9 @@ For a valid HMD frame, the helper computes:
 eyeFromGameWorld = eyeFromTracking[eye] * trackingFromGameWorld
 ```
 
-This helper deliberately uses OpenVR's column-vector composition convention.
-DXVK's `Matrix4` uses row vectors, so the completed matrix must be transposed
-and converted explicitly at the boundary before it is passed to `RtCamera`.
+This helper uses column-vector composition. DXVK's `Matrix4` uses the same
+convention, so the completed matrix only changes storage order at the boundary
+(`matrixFromRowMajor()`) before it is passed to `RtCamera`.
 The helper does not update a camera, modify a game camera, or imply that
 calibration has been discovered automatically. This keeps the tracking-space
 math testable and prevents an uncalibrated headset pose from moving the scene.

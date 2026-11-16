@@ -88,8 +88,8 @@ namespace dxvk {
     // Compose a calibrated game-world transform with this frame's eye pose.
     // Result maps game-world positions directly into the requested eye's view
     // space. OpenVrMatrix4 uses column vectors: eyeFromTracking * trackingFromGameWorld.
-    // The caller remains responsible for converting the result to DXVK's row-vector
-    // Matrix4 convention before passing it to RtCamera.
+    // The caller converts the result with matrixFromRowMajor() before passing it
+    // to RtCamera.
     bool getEyeFromGameWorld(
       std::size_t eye,
       const OpenVrWorldCalibration& calibration,
