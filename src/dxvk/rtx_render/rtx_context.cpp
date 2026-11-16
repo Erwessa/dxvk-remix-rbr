@@ -1044,7 +1044,9 @@ namespace dxvk {
     }
 
     if (raytracedThisFrame) {
-      onInjectRtxEyeFrameEnd(0);
+      // Advance the history slot that was actually rendered. Mono currently leaves this at
+      // zero; the stereo eye loop must call this once for each completed eye.
+      onInjectRtxEyeFrameEnd(m_activeEyeIndex);
     }
 
     onInjectRtxFrameEnd(raytracedThisFrame);
