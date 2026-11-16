@@ -3448,7 +3448,7 @@ namespace dxvk {
     {
       // Synchronize DXVK submissions before allowing OpenVR to use the graphics queue.
       m_device->lockSubmission();
-      DEFER(unlockSubmission, m_device->unlockSubmission());
+      DEFER(unlockSubmission, m_device->unlockSubmission(););
       submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Linear);
     }
 

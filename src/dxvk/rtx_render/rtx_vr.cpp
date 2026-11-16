@@ -67,7 +67,7 @@ namespace dxvk {
     // Keep the gate exception-safe and release it before processing or logging the latched frame.
     {
       device.lockSubmission();
-      DEFER(unlockSubmission, device.unlockSubmission());
+      DEFER(unlockSubmission, device.unlockSubmission(););
       m_valid = VrInstance::s_instance.acquireFrame(*m_pFrame);
     }
 

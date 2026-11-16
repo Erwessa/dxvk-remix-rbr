@@ -30,6 +30,7 @@
 #include "rtx_options.h"
 #include "rtx/pass/tonemap/tonemapping.h"
 #include "dxvk_device.h"
+#include "../dxvk_openvr.h"
 #include "rtx_dlss.h"
 #include "dxvk_scoped_annotation.h"
 #include "rtx_ngx_wrapper.h"
