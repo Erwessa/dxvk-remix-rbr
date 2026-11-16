@@ -2126,7 +2126,7 @@ namespace dxvk {
     nrc.setRaytraceArgs(constants);
     m_common->metaSharc().setRaytraceArgs(*this, constants);
 
-    m_common->metaNeeCache().setRaytraceArgs(constants, m_resetHistory);
+    m_common->metaNeeCache().setRaytraceArgs(constants);
     constants.surfaceCount = getSceneManager().getAccelManager().getSurfaceCount();
 
     m_common->metaSparseRendering().setSparseRenderingArgs(*this, constants.sparseRenderingArgs);
