@@ -148,6 +148,10 @@ namespace dxvk {
     return eye.rendering ? &eye.renderer.outputs() : nullptr;
   }
 
+  const Rc<DxvkBuffer>& RtxNumos::argsBuffer() const {
+    return m_impl->eyes[m_activeEyeIndex]->argsBuffer;
+  }
+
   bool RtxNumos::writesUpscalerBiasMask() const {
     return outputs() != nullptr &&
            (RtxOptions::isDLSSOrRayReconstructionEnabled() || RtxOptions::isFSREnabled());
@@ -181,10 +185,10 @@ namespace dxvk {
     if (!m_impl->eyes[m_activeEyeIndex]->passPipelineReady[index]) {
       const Rc<DxvkShader> shader = m_impl->eyes[m_activeEyeIndex]->gpu->shaderFor(index);
       // Without the state cache workers nothing compiles ahead of use, so the dispatch compiles the pipeline itself.
-      m_impl->passPipelineReady[index] = shader != nullptr &&
+      m_impl->eyes[m_activeEyeIndex]->passPipelineReady[index] = shader != nullptr &&
         (!ctx.getCommonObjects()->pipelineManager().hasStateCache() || ctx.isComputeShaderPipelineReady(shader));
     }
-    return m_impl->passPipelineReady[index];
+    return m_impl->eyes[m_activeEyeIndex]->passPipelineReady[index];
   }
 
   bool RtxNumos::corePipelinesReady(RtxContext& ctx) {
@@ -200,13 +204,13 @@ namespace dxvk {
     }
     if (!ready) {
       if (!m_impl->eyes[m_activeEyeIndex]->coreWaitLogged) {
-        m_impl->coreWaitLogged = true;
+        m_impl->eyes[m_activeEyeIndex]->coreWaitLogged = true;
         Logger::info("[NUMOS] Its shaders are compiling in the background. Until they are ready, there is no NUMOS sky, sun or moon.");
       }
       return false;
     }
-    m_impl->corePipelinesReady = true;
-    if (m_impl->coreWaitLogged) {
+    m_impl->eyes[m_activeEyeIndex]->corePipelinesReady = true;
+    if (m_impl->eyes[m_activeEyeIndex]->coreWaitLogged) {
       Logger::info("[NUMOS] Its shaders are compiled, and it draws the sky from this frame on.");
     }
     return true;
@@ -227,7 +231,7 @@ namespace dxvk {
         settings.debugDispatchCloudRender = false;
       }
       if (heldBack != m_impl->eyes[m_activeEyeIndex]->cloudRenderHeldBack) {
-        m_impl->cloudRenderHeldBack = heldBack;
+        m_impl->eyes[m_activeEyeIndex]->cloudRenderHeldBack = heldBack;
         Logger::info(heldBack
           ? str::format("[NUMOS] The on-screen cloud pass (", numos::passInfo(cloudPass).name,
                         ") is compiling in the background. Until it is ready, the sky shows no clouds.")
@@ -240,7 +244,7 @@ namespace dxvk {
         settings.cloudSecondaryLutEnable = false;
       }
       if (heldBack != m_impl->eyes[m_activeEyeIndex]->secondaryLutHeldBack) {
-        m_impl->secondaryLutHeldBack = heldBack;
+        m_impl->eyes[m_activeEyeIndex]->secondaryLutHeldBack = heldBack;
         Logger::info(heldBack
           ? "[NUMOS] The cloud dome pass (cloud_secondary_lut) is compiling in the background. Until it is ready, reflections show no clouds."
           : "[NUMOS] The cloud dome pass is compiled, and reflections show clouds.");
