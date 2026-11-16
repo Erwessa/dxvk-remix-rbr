@@ -760,34 +760,44 @@ namespace dxvk {
       // Allocate query path data only when include direct lighting option is disabled. 
       // In this case queryPathData resolved in gbuffer is needed in indirect pass (i.e. direct lighting is resolved).
       // Note: this is done here since indirect lighting option can change after createDownscaledResource() was called
-      if (!NrcOptions::includeDirectLighting() && m_queryPathData0.image == nullptr) {
-        m_queryPathData0 = Resources::createImageResource(ctx, "NRC Query Path Data 0", downscaledExtent, VK_FORMAT_R32G32_UINT);
-      } else if (NrcOptions::includeDirectLighting() && m_queryPathData0.image != nullptr) {
-        m_queryPathData0.reset();
-      }
-
       const VkExtent3D trainingExtent = VkExtent3D { m_nrcCtxSettings->trainingDimensions.x, m_nrcCtxSettings->trainingDimensions.y, 1 };
 
       // Deferred setup stores surface radiance per pixel rather than per training cell, so it needs the render extent.
       const VkExtent3D surfaceRadianceExtent = sparseRenderingResamplesTrainingPaths ? downscaledExtent : trainingExtent;
 
-      // Allocate resources if they are invalid or have stale dimensions
-      if (m_trainingGBufferSurfaceRadianceRG.image == nullptr
-          || m_trainingGBufferSurfaceRadianceRG.image->info().extent.width != surfaceRadianceExtent.width
-          || m_trainingGBufferSurfaceRadianceRG.image->info().extent.height != surfaceRadianceExtent.height) {
+      // Query-path and training intermediates are consumed by the matching eye's Integration pass.
+      for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
+        const char* eyeName = eyeIndex == 0 ? "Left" : "Right";
 
-        m_trainingGBufferSurfaceRadianceRG = Resources::createImageResource(ctx, "NRC Training shared radiance RG", surfaceRadianceExtent, VK_FORMAT_R16G16_SFLOAT);
-        m_trainingGBufferSurfaceRadianceB = Resources::createImageResource(ctx, "NRC Training shared radiance B", surfaceRadianceExtent, VK_FORMAT_R16_SFLOAT);
-      }
+        if (!NrcOptions::includeDirectLighting() && m_queryPathData0[eyeIndex].image == nullptr) {
+          m_queryPathData0[eyeIndex] = Resources::createImageResource(
+            ctx, eyeIndex == 0 ? "NRC Query Path Data 0 Left" : "NRC Query Path Data 0 Right",
+            downscaledExtent, VK_FORMAT_R32G32_UINT);
+        } else if (NrcOptions::includeDirectLighting() && m_queryPathData0[eyeIndex].image != nullptr) {
+          m_queryPathData0[eyeIndex].reset();
+        }
 
-      // Training query-pixel resampling reservoir: selection key plus the winning pixel's offset in its cell.
-      if (!sparseRenderingResamplesTrainingPaths) {
-        m_trainingQueryReservoir.reset();
-      } else if (m_trainingQueryReservoir.image == nullptr
-          || m_trainingQueryReservoir.image->info().extent.width != trainingExtent.width
-          || m_trainingQueryReservoir.image->info().extent.height != trainingExtent.height) {
+        if (m_trainingGBufferSurfaceRadianceRG[eyeIndex].image == nullptr
+            || m_trainingGBufferSurfaceRadianceRG[eyeIndex].image->info().extent.width != surfaceRadianceExtent.width
+            || m_trainingGBufferSurfaceRadianceRG[eyeIndex].image->info().extent.height != surfaceRadianceExtent.height) {
+          m_trainingGBufferSurfaceRadianceRG[eyeIndex] = Resources::createImageResource(
+            ctx, eyeIndex == 0 ? "NRC Training radiance RG Left" : "NRC Training radiance RG Right",
+            surfaceRadianceExtent, VK_FORMAT_R16G16_SFLOAT);
+          m_trainingGBufferSurfaceRadianceB[eyeIndex] = Resources::createImageResource(
+            ctx, eyeIndex == 0 ? "NRC Training radiance B Left" : "NRC Training radiance B Right",
+            surfaceRadianceExtent, VK_FORMAT_R16_SFLOAT);
+        }
 
-        m_trainingQueryReservoir = Resources::createImageResource(ctx, "NRC Training Query Reservoir", trainingExtent, VK_FORMAT_R32_UINT);
+        // Training query-pixel resampling reservoir: selection key plus winning pixel offset.
+        if (!sparseRenderingResamplesTrainingPaths) {
+          m_trainingQueryReservoir[eyeIndex].reset();
+        } else if (m_trainingQueryReservoir[eyeIndex].image == nullptr
+            || m_trainingQueryReservoir[eyeIndex].image->info().extent.width != trainingExtent.width
+            || m_trainingQueryReservoir[eyeIndex].image->info().extent.height != trainingExtent.height) {
+          m_trainingQueryReservoir[eyeIndex] = Resources::createImageResource(
+            ctx, eyeIndex == 0 ? "NRC Training Query Reservoir Left" : "NRC Training Query Reservoir Right",
+            trainingExtent, VK_FORMAT_R32_UINT);
+        }
       }
     }
     
@@ -814,7 +824,10 @@ namespace dxvk {
     }
 
     // Reset the reservoir to empty each frame.
-    if (m_trainingQueryReservoir.image != nullptr) {
+    for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
+      if (m_trainingQueryReservoir[eyeIndex].image == nullptr)
+        continue;
+
       VkImageSubresourceRange subRange = {};
       subRange.layerCount = 1;
       subRange.levelCount = 1;
@@ -822,7 +835,7 @@ namespace dxvk {
 
       VkClearColorValue reservoirClear = {};
       reservoirClear.uint32[0] = 0u;
-      ctx->clearColorImage(m_trainingQueryReservoir.image, reservoirClear, subRange);
+      ctx->clearColorImage(m_trainingQueryReservoir[eyeIndex].image, reservoirClear, subRange);
     }
   }
 
@@ -887,10 +900,12 @@ namespace dxvk {
   }
 
   void NeuralRadianceCache::releaseDownscaledResource() {
-    m_trainingGBufferSurfaceRadianceRG.reset();
-    m_trainingGBufferSurfaceRadianceB.reset();
-
-    m_trainingQueryReservoir.reset();
+    for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
+      m_trainingGBufferSurfaceRadianceRG[eyeIndex].reset();
+      m_trainingGBufferSurfaceRadianceB[eyeIndex].reset();
+      m_trainingQueryReservoir[eyeIndex].reset();
+      m_queryPathData0[eyeIndex].reset();
+    }
 
     for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
       m_queryPathData1[eyeIndex].reset();
@@ -905,13 +920,13 @@ namespace dxvk {
     ctx.bindResourceBuffer(GBUFFER_BINDING_NRC_QUERY_RADIANCE_PARAMS_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::QueryRadianceParams));
     ctx.bindResourceBuffer(GBUFFER_BINDING_NRC_COUNTERS_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::Counters));
 
-    ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_RG_OUTPUT, m_trainingGBufferSurfaceRadianceRG.view, nullptr);
-    ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_B_OUTPUT, m_trainingGBufferSurfaceRadianceB.view, nullptr);
-    ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA0_OUTPUT, m_queryPathData0.view, nullptr);
+    const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
+    ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_RG_OUTPUT, m_trainingGBufferSurfaceRadianceRG[eyeIndex].view, nullptr);
+    ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_B_OUTPUT, m_trainingGBufferSurfaceRadianceB[eyeIndex].view, nullptr);
+    ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA0_OUTPUT, m_queryPathData0[eyeIndex].view, nullptr);
 
     // Aliased resource methods must not be called when the resource is invalid.
     if (isActive()) {
-      const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
       ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA1_OUTPUT, m_queryPathData1[eyeIndex].view(Resources::AccessType::Write), nullptr);
       ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_PATH_DATA1_OUTPUT, m_trainingPathData1[eyeIndex].view(Resources::AccessType::Write), nullptr);
     } else {
@@ -921,7 +936,8 @@ namespace dxvk {
   }
 
   void NeuralRadianceCache::bindIntegrateDirectPathTracingResources(RtxContext& ctx, const bool deferredNrcTrainingSetup) {
-    ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_TRAINING_QUERY_RESERVOIR_INPUT, m_trainingQueryReservoir.view, nullptr);
+    const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
+    ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_TRAINING_QUERY_RESERVOIR_INPUT, m_trainingQueryReservoir[eyeIndex].view, nullptr);
 
     ctx.bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NRC_QUERY_PATH_INFO_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::QueryPathInfo));
     ctx.bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NRC_TRAINING_PATH_INFO_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::TrainingPathInfo));
@@ -929,7 +945,7 @@ namespace dxvk {
     ctx.bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NRC_QUERY_RADIANCE_PARAMS_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::QueryRadianceParams));
     ctx.bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NRC_COUNTERS_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::Counters));
 
-    ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_QUERY_PATH_DATA0_OUTPUT, m_queryPathData0.view, nullptr);
+    ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_QUERY_PATH_DATA0_OUTPUT, m_queryPathData0[eyeIndex].view, nullptr);
 
     if (isActive()) {
       const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
@@ -948,14 +964,14 @@ namespace dxvk {
     ctx.bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NRC_QUERY_RADIANCE_PARAMS_INPUT_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::QueryRadianceParams));
     ctx.bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NRC_COUNTERS_INPUT_OUTPUT, getBufferSlice(ctx, NeuralRadianceCache::ResourceType::Counters));
 
-    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_RG_INPUT, m_trainingGBufferSurfaceRadianceRG.view, nullptr);
-    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_B_INPUT, m_trainingGBufferSurfaceRadianceB.view, nullptr);
-    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_TRAINING_QUERY_RESERVOIR_INPUT, m_trainingQueryReservoir.view, nullptr);
-    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_PATH_DATA0_INPUT, m_queryPathData0.view, nullptr);
+    const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
+    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_RG_INPUT, m_trainingGBufferSurfaceRadianceRG[eyeIndex].view, nullptr);
+    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_B_INPUT, m_trainingGBufferSurfaceRadianceB[eyeIndex].view, nullptr);
+    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_TRAINING_QUERY_RESERVOIR_INPUT, m_trainingQueryReservoir[eyeIndex].view, nullptr);
+    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_PATH_DATA0_INPUT, m_queryPathData0[eyeIndex].view, nullptr);
 
-    // Aliased resource methods must not be called when the resource is invalid
+    // Aliased resource methods must not be called when the resource is invalid.
     if (isActive()) {
-      const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
       ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_PATH_DATA1_INPUT, m_queryPathData1[eyeIndex].view(Resources::AccessType::Read), nullptr);
       ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_UPDATE_PATH_DATA1_INPUT, m_trainingPathData1[eyeIndex].view(Resources::AccessType::Read), nullptr);
     } else {
