@@ -64,7 +64,12 @@ namespace dxvk {
     }
 
     CameraType::Enum getLastSetCameraType() const { return m_lastSetCameraType; }
-    
+
+    bool areVrEyeCamerasValid(uint32_t frameId) const {
+      return m_vrEyeCameras[RtxEye::Left].isValid(frameId)
+          && m_vrEyeCameras[RtxEye::Right].isValid(frameId);
+    }
+
     bool isCameraValid(CameraType::Enum cameraType) const;
 
     void onFrameEnd();
