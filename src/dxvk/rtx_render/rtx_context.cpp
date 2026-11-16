@@ -838,8 +838,8 @@ namespace dxvk {
         // Generate ray tracing constant buffer
         updateRaytraceArgsConstantBuffer(rtOutput, downscaledExtent, renderExtent);
         // The frame feature mask, after the TLAS build and the light upload, before every pass that reads it.
-        m_frameFeatures = computeFrameFeatures(*this, rtOutput.m_raytraceArgs);
-        logFrameFeatures(m_frameFeatures);
+        m_frameFeatures[m_activeEyeIndex] = computeFrameFeatures(*this, rtOutput.m_raytraceArgs);
+        logFrameFeatures(m_frameFeatures[m_activeEyeIndex]);
         recordGpuStageTiming("RaytraceArgsAfterAtmosphere");
         preGateFlush(2);
 
