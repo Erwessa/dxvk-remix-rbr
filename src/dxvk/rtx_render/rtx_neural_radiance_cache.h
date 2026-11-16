@@ -190,11 +190,17 @@ namespace dxvk {
     //                  + pixel.y * samplesPerPixel * frameDimensions.x
     //   trainingPathIndex = pixel.x + pixel.y * trainingDimensions.x
     //   trainingVertexIndex = trainingPathIndex * maxPathVertices + vertex
-    // QueryRadianceParams instead uses the shared atomic Queries counter. Thus a correct
-    // single-context stereo layout can pack eye-local pixel coordinates into disjoint regions
-    // of enlarged SDK frame/training dimensions while retaining the shared atomic query counter.
-    // That layout also requires matching eye offsets in every producer and resolve consumer;
-    // simply duplicating Vulkan buffers or running QueryAndTrain between eyes is not sufficient.
+    // QueryRadianceParams instead uses the shared atomic Queries counter.
+    //
+    // A single-context stereo layout therefore needs a logical atlas with disjoint query AND
+    // training coordinates for both eyes. Merely doubling NrcConstants dimensions is not enough:
+    // NrcCreateContext stores the pixel coordinate supplied by the integrator, while resolve
+    // currently derives its query index from cb.camera.resolution and its dispatch-local pixel.
+    // Training selection additionally maps between query/training spaces through NrcArgs and
+    // uses eye-local reservoir textures. The producer coordinates, resolve coordinates,
+    // dimensions/scales, update-pixel lattice, and reservoir lookup must all agree on one atlas.
+    // QueryRadianceParams can remain shared because its Queries counter allocates disjoint records.
+    // Simply duplicating Vulkan buffers or running QueryAndTrain between eyes is not sufficient.
     // Keep this call after both eye integrations only once that complete indexing contract exists.
     void dispatchTraining(RtxContext& ctx);
 
