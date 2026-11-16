@@ -3250,6 +3250,8 @@ namespace dxvk {
   void RtxContext::dispatchDebugView(Rc<DxvkImage>& srcImage, const Resources::RaytracingOutput& rtOutput, bool captureScreenImage)  {
     ScopedCpuProfileZone();
 
+    DebugView& debugView = m_common->metaDebugView();
+
     if (!debugView.isActive()) {
       return;
     }
