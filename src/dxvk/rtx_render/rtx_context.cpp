@@ -432,7 +432,8 @@ namespace dxvk {
     // Note: this needs to be called after resetScreenResolution() call in a frame
     // since an RtxPass may alias some of its resources with the ones created in createRaytracingOutput()
     getResourceManager().onFrameBegin(this, getCommonObjects()->getTextureManager(), getSceneManager(), downscaledExtent,
-                                      upscaledExtent, m_resetHistory, mainCamera.isCameraCut());
+                                      upscaledExtent, m_resetHistory, mainCamera.isCameraCut(),
+                                      getResourceManager().getRaytracingOutput(), true);
 
     // Force history reset on integrate indirect mode change to discard incompatible history 
     if (RtxOptions::integrateIndirectMode() != m_prevIntegrateIndirectMode) {
