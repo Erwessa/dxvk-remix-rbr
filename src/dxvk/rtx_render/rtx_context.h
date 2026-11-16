@@ -34,6 +34,7 @@
 #include "rtx_options.h"
 #include "rtx_perf_log.h"
 #include "rtx_fork_frame_features.h"
+#include "rtx_vr.h"
 
 struct VolumeArgs;
 struct RaytraceArgs;
@@ -387,6 +388,7 @@ namespace dxvk {
     InternalUpscaler m_previousUpscaler = InternalUpscaler::None;
 
     uint32_t m_frameLastInjected = kInvalidFrameIndex;
+    RtxVrFrame m_vrFrame;
 
     // rtx.retained.replayAtInjection: a DrawRetainedInstances that arrived after this frame's injection,
     // held for the start of the next one (with the scene origin it carried).

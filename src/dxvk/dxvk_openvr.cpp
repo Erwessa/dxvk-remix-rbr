@@ -391,7 +391,10 @@ namespace dxvk {
     const auto error = m_compositor->WaitGetPoses(
       next.renderPoses.data(), static_cast<uint32_t>(next.renderPoses.size()), nullptr, 0);
     if (error != vr::VRCompositorError_None) {
-      Logger::warn(str::format("OpenVR: WaitGetPoses failed: ", static_cast<int>(error)));
+      // The call repeats every frame, so only every 600th failure is logged.
+      if (m_waitGetPosesFailures++ % 600 == 0) {
+        Logger::warn(str::format("OpenVR: WaitGetPoses failed: ", static_cast<int>(error)));
+      }
       return false;
     }
 

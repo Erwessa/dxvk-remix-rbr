@@ -606,6 +606,7 @@ namespace dxvk {
     // Update frame counter only after actual rendering
     if (isCameraValid) {
       m_frameLastInjected = m_device->getCurrentFrameId();
+      m_vrFrame.acquire(*m_device);
     }
 
     if (RtxOptions::upscalerType() == UpscalerType::DLSS && !common->metaDLSS().supportsDLSS()) {

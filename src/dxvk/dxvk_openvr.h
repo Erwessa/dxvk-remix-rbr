@@ -165,6 +165,7 @@ namespace dxvk {
     bool m_sceneSessionActive = false;
     const void* m_sceneSessionOwner = nullptr;
     uint64_t m_frameIndex = 0;
+    uint64_t m_waitGetPosesFailures = 0;
     bool m_initializedInsExt = false;
     bool m_initializedDevExt = false;
 
