@@ -391,10 +391,64 @@ namespace dxvk {
   Resources::Resources(DxvkDevice* device)
     : CommonDeviceObject(device) { }
 
+  void Resources::createSharedResources() {
+    if (!m_neeCache.ptr()) {
+      DxvkBufferCreateInfo neeCacheInfo;
+      neeCacheInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+      neeCacheInfo.stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+      neeCacheInfo.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+      int cellCount = NEE_CACHE_PROBE_RESOLUTION * NEE_CACHE_PROBE_RESOLUTION * NEE_CACHE_PROBE_RESOLUTION;
+      neeCacheInfo.size = cellCount * NEE_CACHE_CELL_CANDIDATE_TOTAL_SIZE;
+      m_neeCache = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Buffer");
+      neeCacheInfo.size = cellCount * NEE_CACHE_CELL_TASK_TOTAL_SIZE;
+      m_neeCacheTask = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NRR Cache Task Buffer");
+      neeCacheInfo.size = cellCount * NEE_CACHE_SAMPLES * sizeof(NeeCache_PackedSample);
+      m_neeCacheSample = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Sample Buffer");
+    }
+
+    if (!m_gpuPrintBuffer.ptr()) {
+      const uint32_t bufferLength = kMaxFramesInFlight;
+      DxvkBufferCreateInfo gpuPrintBufferInfo;
+      gpuPrintBufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+      gpuPrintBufferInfo.stages = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+      gpuPrintBufferInfo.access = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
+      gpuPrintBufferInfo.size = bufferLength * sizeof(GpuPrintBufferElement);
+      m_gpuPrintBuffer = m_device->createBuffer(gpuPrintBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DxvkMemoryStats::Category::RTXBuffer, "GPU Print Buffer");
+      GpuPrintBufferElement* gpuPrintElements = reinterpret_cast<GpuPrintBufferElement*>(m_gpuPrintBuffer->mapPtr(0));
+      if (gpuPrintElements) {
+        for (uint32_t i = 0; i < bufferLength; i++)
+          gpuPrintElements[i].invalidate();
+      }
+    }
+
+    if (!m_samplerFeedbackDevice.ptr()) {
+      constexpr size_t sizeInBytes = SAMPLER_FEEDBACK_MAX_TEXTURE_COUNT * sizeof(uint32_t);
+      DxvkBufferCreateInfo feedInfo = {};
+      feedInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+      feedInfo.stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_TRANSFER_BIT;
+      feedInfo.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+      feedInfo.size = sizeInBytes;
+      m_samplerFeedbackDevice = m_device->createBuffer(feedInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "Sampler Feedback Buffer");
+
+      for (Rc<DxvkBuffer>& readbackBuf : m_samplerFeedbackReadback) {
+        DxvkBufferCreateInfo readbackInfo = {};
+        readbackInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        readbackInfo.stages = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT;
+        readbackInfo.access = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_HOST_READ_BIT;
+        readbackInfo.size = sizeInBytes;
+        readbackBuf = m_device->createBuffer(readbackInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DxvkMemoryStats::Category::RTXBuffer, "Sampler Feedback Readback Buffer");
+        std::memset(readbackBuf->mapPtr(0), UINT8_MAX, readbackBuf->info().size);
+      }
+    }
+  }
+
   void Resources::createRaytracingOutput(Rc<DxvkContext>& ctx, const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent) {
     ScopedCpuProfileZone();
 
     assert(targetExtent.width > 0 && targetExtent.height > 0 && targetExtent.depth > 0);
+
+    // These buffers live for the Resources lifetime and are shared by both eye renders.
+    createSharedResources();
 
     const bool downscaledExtentChanged = m_downscaledExtent != downscaledExtent;
     const bool targetExtentChanged = m_targetExtent != targetExtent;
@@ -1344,15 +1398,7 @@ namespace dxvk {
     m_raytracingOutput.m_rtxdiReservoirBuffer = AliasedBuffer(m_device, m_device->createBuffer(reservoirBufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "RTXDI reservoir buffer"), "RTXDI Reservoirs");
     m_raytracingOutput.m_transmissionPSRData = AliasedBuffer(m_raytracingOutput.m_rtxdiReservoirBuffer, "Transmission PSR Data");
     
-    DxvkBufferCreateInfo neeCacheInfo = rtxdiBufferInfo;
-    int cellCount = NEE_CACHE_PROBE_RESOLUTION * NEE_CACHE_PROBE_RESOLUTION * NEE_CACHE_PROBE_RESOLUTION;
-    neeCacheInfo.size = cellCount * NEE_CACHE_CELL_CANDIDATE_TOTAL_SIZE;
-    m_neeCache = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Buffer");
-    neeCacheInfo.size = cellCount * NEE_CACHE_CELL_TASK_TOTAL_SIZE;
-    m_neeCacheTask = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NRR Cache Task Buffer");
-    neeCacheInfo.size = cellCount * NEE_CACHE_SAMPLES * sizeof(NeeCache_PackedSample);
-    m_neeCacheSample = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Sample Buffer");
-    m_neeCacheThreadTask = createImageResource(ctx, "radiance cache thread task", m_downscaledExtent, VK_FORMAT_R32G32_UINT);
+    m_raytracingOutput.m_neeCacheThreadTask = createImageResource(ctx, "radiance cache thread task", m_downscaledExtent, VK_FORMAT_R32G32_UINT);
 
     // Displacement
     // zw hold the SCCR depth scale and triangle normal (sccrSharedTextureCoord).
@@ -1362,62 +1408,9 @@ namespace dxvk {
     m_raytracingOutput.m_primarySurfaceFlagsIntermediateTexture1 = AliasedResource(m_raytracingOutput.m_secondaryPerceptualRoughness, ctx, m_downscaledExtent, VK_FORMAT_R8_UINT, "Primary Surface Flags Intermediate Texture 1");
     m_raytracingOutput.m_primarySurfaceFlagsIntermediateTexture2 = AliasedResource(m_raytracingOutput.m_sharedBiasCurrentColorMask, ctx, m_downscaledExtent, VK_FORMAT_R8_UINT, "Primary Surface Flags Intermediate Texture 2");
 
-    // GPU print buffer
-    {
-      const uint32_t bufferLength = kMaxFramesInFlight;
 
-      DxvkBufferCreateInfo gpuPrintBufferInfo;
-      gpuPrintBufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-      gpuPrintBufferInfo.stages = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-      gpuPrintBufferInfo.access = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
-      gpuPrintBufferInfo.size = bufferLength * sizeof(GpuPrintBufferElement);
-      
-      m_gpuPrintBuffer = m_device->createBuffer(gpuPrintBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DxvkMemoryStats::Category::RTXBuffer, "GPU Print Buffer");
-      GpuPrintBufferElement* gpuPrintElements = reinterpret_cast<GpuPrintBufferElement*>(m_gpuPrintBuffer->mapPtr(0));
-     
-      if (gpuPrintElements) {
-        for (uint32_t i = 0; i < bufferLength; i++) {
-          gpuPrintElements[i].invalidate();
-        }
-      }
-    }
 
-    // Sampler feedback buffer for texture streaming
-    {
-      constexpr size_t sizeInBytes = SAMPLER_FEEDBACK_MAX_TEXTURE_COUNT * sizeof(uint32_t);
-      {
-        DxvkBufferCreateInfo feedInfo = {};
-        {
-          // Note: Transfer destination usage bit required for vkCmdFillBuffer to be used on this buffer (used for clearing sections of it),
-          // transfer source used to copy from this buffer to the readback buffers.
-          feedInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-          feedInfo.stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_TRANSFER_BIT;
-          feedInfo.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-          feedInfo.size = sizeInBytes;
-        }
-        m_samplerFeedbackDevice = m_device->createBuffer(
-          feedInfo,
-          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-          DxvkMemoryStats::Category::RTXBuffer, "Sampler Feedback Buffer");
-      }
-      for (Rc<DxvkBuffer>& readbackBuf : m_samplerFeedbackReadback) {
-        DxvkBufferCreateInfo feedInfo = {};
-        {
-          feedInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-          feedInfo.stages = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT;
-          feedInfo.access = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_HOST_READ_BIT;
-          feedInfo.size = sizeInBytes;
-        }
-        readbackBuf = m_device->createBuffer(
-          feedInfo,
-          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-          DxvkMemoryStats::Category::RTXBuffer, "Sampler Feedback Readback Buffer");
 
-        // initial reset, as if all textures accessed last mip
-        // Note: Write UINT32_MAX here as this is effectively a uint32 buffer with how the texture manager reads it, but since memset only takes an 8 bit integer we do this instead by writing UINT8_MAX, rather than needing to use a copy.
-        std::memset(readbackBuf->mapPtr(0), UINT8_MAX, readbackBuf->info().size);
-      }
-    }
 
     // Let other systems know of the resize
     executeResizeEventList(m_onDownscaleResize, ctx, m_downscaledExtent);
