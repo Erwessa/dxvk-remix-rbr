@@ -464,7 +464,12 @@ namespace dxvk {
       ctx->bindResourceView(COMPOSITE_SKY_LIGHT_TEXTURE, ctx->getResourceManager().getSkyMatte(ctx).view, nullptr);
     }
 
-    compositeArgs.camera = sceneManager.getCamera().getShaderConstants();
+    // Composite runs once per eye, so camera-dependent effects must use that eye's view.
+    const CameraManager& cameraManager = sceneManager.getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameIdx)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(ctx->getActiveEyeIndex()))
+      : sceneManager.getCamera();
+    compositeArgs.camera = renderCamera.getShaderConstants();
     compositeArgs.frameIdx = frameIdx;
 
     if (enableFog()) {
