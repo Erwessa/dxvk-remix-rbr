@@ -20,6 +20,7 @@
 * DEALINGS IN THE SOFTWARE.
 */
 #include <algorithm>
+#include <cassert>
 #include <vector>
 
 #include "../../util/log/log.h"
@@ -41,7 +42,10 @@ namespace dxvk {
   }
 
   void DlssNeuralRendering::release() {
-    m_dlssNeuralRenderingContexts.clear();
+    for (auto& eyeContexts : m_dlssNeuralRenderingContexts) {
+      eyeContexts.clear();
+    }
+    m_resetHistoryOnNextEvaluation = { true, true };
     m_createdPreset = -1;
     m_createdPassCount = 0;
     mRecreate = true;
@@ -82,13 +86,15 @@ namespace dxvk {
   }
 
   bool DlssNeuralRendering::isFeatureInitialized() const {
-    if (m_dlssNeuralRenderingContexts.empty()) {
-      return false;
-    }
-
-    for (const std::unique_ptr<NGXNeuralRenderingContext>& context : m_dlssNeuralRenderingContexts) {
-      if (!context || !context->isNeuralRenderingInitialized()) {
+    for (const auto& eyeContexts : m_dlssNeuralRenderingContexts) {
+      if (eyeContexts.empty()) {
         return false;
+      }
+
+      for (const std::unique_ptr<NGXNeuralRenderingContext>& context : eyeContexts) {
+        if (!context || !context->isNeuralRenderingInitialized()) {
+          return false;
+        }
       }
     }
 
@@ -100,9 +106,11 @@ namespace dxvk {
       return false;
     }
 
-    for (const std::unique_ptr<NGXNeuralRenderingContext>& context : m_dlssNeuralRenderingContexts) {
-      if (!context->hasVramAllocation()) {
-        return false;
+    for (const auto& eyeContexts : m_dlssNeuralRenderingContexts) {
+      for (const std::unique_ptr<NGXNeuralRenderingContext>& context : eyeContexts) {
+        if (!context->hasVramAllocation()) {
+          return false;
+        }
       }
     }
 
@@ -111,9 +119,11 @@ namespace dxvk {
 
   uint64_t DlssNeuralRendering::getVramAllocationBytes() const {
     uint64_t total = 0;
-    for (const std::unique_ptr<NGXNeuralRenderingContext>& context : m_dlssNeuralRenderingContexts) {
-      if (context) {
-        total += context->getVramAllocationBytes();
+    for (const auto& eyeContexts : m_dlssNeuralRenderingContexts) {
+      for (const std::unique_ptr<NGXNeuralRenderingContext>& context : eyeContexts) {
+        if (context) {
+          total += context->getVramAllocationBytes();
+        }
       }
     }
     return total;
@@ -132,6 +142,9 @@ namespace dxvk {
       return false;
     }
 
+    const uint32_t eyeIndex = ctx->getActiveEyeIndex();
+    assert(eyeIndex < m_dlssNeuralRenderingContexts.size());
+
     const int passes = getClampedPassCount();
     mRecreate |= m_createdPreset != DlssNeuralRendering::preset() || m_createdPassCount != passes;
 
@@ -144,7 +157,7 @@ namespace dxvk {
       }
     }
 
-    if (!isFeatureInitialized() || static_cast<int>(m_dlssNeuralRenderingContexts.size()) != passes) {
+    if (!isFeatureInitialized() || static_cast<int>(m_dlssNeuralRenderingContexts[eyeIndex].size()) != passes) {
       disableAfterFailure("DLSS-NR context is not initialized; disabling DLSS-NR.");
       return false;
     }
@@ -162,7 +175,12 @@ namespace dxvk {
     const Resources::Resource& colorOutput = rtOutput.m_neuralRenderingOutput.resource(Resources::AccessType::Write);
 
     float jitterOffset[2];
-    device()->getCommon()->getSceneManager().getCamera().getJittering(jitterOffset);
+    const uint32_t frameId = ctx->getDevice()->getCurrentFrameId();
+    const CameraManager& cameraManager = ctx->getSceneManager().getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(eyeIndex))
+      : ctx->getSceneManager().getCamera();
+    renderCamera.getJittering(jitterOffset);
 
     // Screen-space motion vectors are expressed in render-pixel units.
     float motionVectorScale[2] = { 1.f, 1.f };
@@ -214,7 +232,7 @@ namespace dxvk {
     settings.jitterOffset[1] = jitterOffset[1];
     settings.motionVectorScale[0] = motionVectorScale[0];
     settings.motionVectorScale[1] = motionVectorScale[1];
-    settings.resetAccumulation = resetHistory || m_resetHistoryOnNextEvaluation;
+    settings.resetAccumulation = resetHistory || m_resetHistoryOnNextEvaluation[eyeIndex];
     settings.intensity             = DlssNeuralRendering::intensity();
     settings.toneStrength          = DlssNeuralRendering::toneStrength();
     settings.structuralStrength    = DlssNeuralRendering::structuralStrength();
@@ -302,7 +320,7 @@ namespace dxvk {
 
       barriers.recordCommands(ctx->getCommandList());
 
-      evaluateSucceeded = m_dlssNeuralRenderingContexts[pass]->evaluateNeuralRendering(ctx, buffers, settings);
+      evaluateSucceeded = m_dlssNeuralRenderingContexts[eyeIndex][pass]->evaluateNeuralRendering(ctx, buffers, settings);
       if (!evaluateSucceeded) {
         break;
       }
@@ -341,7 +359,7 @@ namespace dxvk {
       return false;
     }
 
-    m_resetHistoryOnNextEvaluation = false;
+    m_resetHistoryOnNextEvaluation[eyeIndex] = false;
     return true;
   }
 
@@ -429,27 +447,28 @@ namespace dxvk {
       m_device->waitForIdle();
     }
 
-    m_dlssNeuralRenderingContexts.resize(passes);
-
     NGXContext& ngxContext = m_device->getCommon()->metaNGXContext();
-    for (std::unique_ptr<NGXNeuralRenderingContext>& context : m_dlssNeuralRenderingContexts) {
-      if (!context) {
-        context = ngxContext.createDlssNeuralRenderingContext();
-      }
+    for (auto& eyeContexts : m_dlssNeuralRenderingContexts) {
+      eyeContexts.resize(passes);
+      for (std::unique_ptr<NGXNeuralRenderingContext>& context : eyeContexts) {
+        if (!context) {
+          context = ngxContext.createDlssNeuralRenderingContext();
+        }
 
-      if (!context) {
-        m_dlssNeuralRenderingContexts.clear();
-        return false;
-      }
+        if (!context) {
+          release();
+          return false;
+        }
 
-      context->initialize(renderContext, m_displaySize, static_cast<uint32_t>(preset), DlssNeuralRendering::showVramUsage());
-      if (!context->isNeuralRenderingInitialized()) {
-        m_dlssNeuralRenderingContexts.clear();
-        return false;
+        context->initialize(renderContext, m_displaySize, static_cast<uint32_t>(preset), DlssNeuralRendering::showVramUsage());
+        if (!context->isNeuralRenderingInitialized()) {
+          release();
+          return false;
+        }
       }
     }
 
-    m_resetHistoryOnNextEvaluation = true;
+    m_resetHistoryOnNextEvaluation = { true, true };
     return true;
   }
 

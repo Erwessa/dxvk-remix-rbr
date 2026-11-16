@@ -21,6 +21,7 @@
 */
 #pragma once
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -174,15 +175,14 @@ namespace dxvk {
 
     uint32_t m_displaySize[2] = {};
 
-    // One context per pass. Each owns one NGX feature handle, and the temporal history lives on the
-    // handle: a shared handle would let the last pass of one frame seed the first pass of the next,
-    // compounding the enhancement frame over frame.
-    std::vector<std::unique_ptr<NGXNeuralRenderingContext>> m_dlssNeuralRenderingContexts;
+    // Each eye owns an independent set of pass contexts. NGX temporal history is attached to each
+    // feature handle, so neither a later pass nor the opposite eye may reuse that history.
+    std::array<std::vector<std::unique_ptr<NGXNeuralRenderingContext>>, 2> m_dlssNeuralRenderingContexts;
 
     int m_createdPreset = -1;
     int m_createdPassCount = 0;
 
-    // A newly created feature has no history to reproject.
-    bool m_resetHistoryOnNextEvaluation = true;
+    // A newly created feature has no history to reproject; track this independently per eye.
+    std::array<bool, 2> m_resetHistoryOnNextEvaluation = { true, true };
   };
 } // namespace dxvk
