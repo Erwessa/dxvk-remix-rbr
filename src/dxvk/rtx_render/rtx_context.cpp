@@ -764,13 +764,24 @@ namespace dxvk {
         m_preGatePoint = (preGatePoint && !preGateHeavyFrame(preGateBuildBase)) ? preGatePoint : 0u;
         preGateFlush(1);
 
-        VkExtent3D downscaledExtent = onInjectRtxFrameBegin(targetImage->info().extent);
-        RtxSessionLog::noteExtents(targetImage->info().extent, downscaledExtent);
+        // OpenVR's recommended size is the per-eye render extent. Keep the game's
+        // backbuffer as the presentation target; the completed eye image is scaled to it below.
+        VkExtent3D renderExtent = targetImage->info().extent;
+        if (m_vrFrame.isValid()) {
+          const OpenVrFrameState& vrFrame = m_vrFrame.get();
+          if (vrFrame.recommendedWidth > 0 && vrFrame.recommendedHeight > 0) {
+            renderExtent.width = vrFrame.recommendedWidth;
+            renderExtent.height = vrFrame.recommendedHeight;
+          }
+        }
+
+        VkExtent3D downscaledExtent = onInjectRtxFrameBegin(renderExtent);
+        RtxSessionLog::noteExtents(renderExtent, downscaledExtent);
         recordGpuStageTiming("FrameResourcePreparation");
         m_perfCpu.renderW = downscaledExtent.width;
         m_perfCpu.renderH = downscaledExtent.height;
-        m_perfCpu.outputW = targetImage->info().extent.width;
-        m_perfCpu.outputH = targetImage->info().extent.height;
+        m_perfCpu.outputW = renderExtent.width;
+        m_perfCpu.outputH = renderExtent.height;
 
         Resources::RaytracingOutput& rtOutput = getResourceManager().getRaytracingOutput();
 
@@ -786,7 +797,7 @@ namespace dxvk {
         getCommonObjects()->getTextureManager().prepareSamplerFeedback(this);
 
         // Generate ray tracing constant buffer
-        updateRaytraceArgsConstantBuffer(rtOutput, downscaledExtent, targetImage->info().extent);
+        updateRaytraceArgsConstantBuffer(rtOutput, downscaledExtent, renderExtent);
         // The frame feature mask, after the TLAS build and the light upload, before every pass that reads it.
         m_frameFeatures = computeFrameFeatures(*this, rtOutput.m_raytraceArgs);
         logFrameFeatures(m_frameFeatures);
@@ -867,7 +878,7 @@ namespace dxvk {
         }
 
         getCommonObjects()->getTextureManager().copySamplerFeedbackToHost(this);
-        dispatchObjectPicking(rtOutput, downscaledExtent, targetImage->info().extent);
+        dispatchObjectPicking(rtOutput, downscaledExtent, renderExtent);
         recordGpuStageTiming("FeedbackAndPicking");
         midFrameFlush(16); // rtx.present.midFrameFlushes bit 16, before upscaling
 
@@ -954,10 +965,10 @@ namespace dxvk {
         {
           ScopedGpuProfileZone(this, "Blit to Game");
           
-          // Note: the resolution between srcImage and dstImage always matches
-          // so we can use the same blit with nearest neighbor filtering
-          assert(srcImage->info().extent == targetImage->info().extent);
-          blitImageHelper(this, srcImage, targetImage, VkFilter::VK_FILTER_NEAREST);
+          // The VR eye render extent may differ from the game's backbuffer extent.
+          const bool extentsMatch = srcImage->info().extent == targetImage->info().extent;
+          blitImageHelper(this, srcImage, targetImage,
+                          extentsMatch ? VkFilter::VK_FILTER_NEAREST : VkFilter::VK_FILTER_LINEAR);
         }
 
         // Thumbnails are of the frame without the game's interface, which is drawn after this.
