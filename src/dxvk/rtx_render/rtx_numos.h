@@ -112,7 +112,7 @@ namespace dxvk {
     bool m_nightSkyLoaded = false;
     float m_missLinearViewZ = 0.0f;
     uint32_t m_frameIndex = 0;
-    std::array<uint32_t, 2> m_lastCameraCutFrame = {};  // NUMOS temporal histories are independent per eye.
+    // Per-eye camera-cut markers. Renderer/GPU temporal history is still shared until the full eye-state split.
     uint32_t m_activeEyeIndex = 0;
     uint32_t m_lastWorldChangeCount = 0;  // rtx.skyProvider.worldChangeCount last seen
     bool m_hostSkyOverride = false;
