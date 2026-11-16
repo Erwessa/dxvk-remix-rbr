@@ -218,6 +218,11 @@ namespace dxvk {
       return m_trainingQueryReservoir[eyeIndex];
     }
 
+    // Preserve the legacy accessor for existing mono/debug callers.
+    const Resources::Resource& getTrainingQueryReservoir() const {
+      return getTrainingQueryReservoir(0);
+    }
+
     const Vector2& getNumQueryPixelsPerTrainingPixel() const;
     bool isUpdateResolveModeActive() const;
 
