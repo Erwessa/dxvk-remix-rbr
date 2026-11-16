@@ -142,8 +142,9 @@ namespace dxvk {
     return cameraType;
   }
 
-  void CameraManager::setVrHeadPose(const Matrix4& headToSeat) {
+  void CameraManager::setVrHeadPose(const Matrix4& headToSeat, uint32_t frameId) {
     m_vrHeadToSeat = headToSeat;
+    m_vrHeadPoseFrameId = frameId;
     m_vrHeadPoseValid = true;
   }
 
@@ -163,8 +164,12 @@ namespace dxvk {
     if (cameraType == CameraType::Main) {
       m_gameMainWorldToView = gameWorldToView;
       m_gameMainWorldToViewFrameId = frameId;
-      if (m_vrHeadPoseValid) {
+      // The pose is acquired after the host camera is applied, so it is consumed on the next frame.
+      // Expire it if no fresh OpenVR frame arrived; otherwise a stalled or closed session could move mono rendering.
+      if (m_vrHeadPoseValid && frameId - m_vrHeadPoseFrameId <= 1u) {
         worldToView = inverse(m_vrHeadToSeat) * gameWorldToView;
+      } else {
+        m_vrHeadPoseValid = false;
       }
     }
 

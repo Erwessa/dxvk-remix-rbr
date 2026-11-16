@@ -109,7 +109,7 @@ namespace dxvk {
 
     // Sets the headset pose, in game units and the game's basis, that is applied to the Main camera of later frames.
     // The pose maps head space to the seated origin, which sits at the game's own camera.
-    void setVrHeadPose(const Matrix4& headToSeat);
+    void setVrHeadPose(const Matrix4& headToSeat, uint32_t frameId);
     void clearVrHeadPose() { m_vrHeadPoseValid = false; }
 
     // Returns the Main camera's world-to-view matrix as the game set it, before any headset pose was applied.
@@ -155,6 +155,7 @@ namespace dxvk {
     uint32_t m_lastCameraCutFrameId = -1;
 
     Matrix4 m_vrHeadToSeat;
+    uint32_t m_vrHeadPoseFrameId = 0;
     bool m_vrHeadPoseValid = false;
     Matrix4 m_gameMainWorldToView;
     uint32_t m_gameMainWorldToViewFrameId = -1;

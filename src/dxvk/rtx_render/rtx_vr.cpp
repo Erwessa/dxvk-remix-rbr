@@ -125,7 +125,7 @@ namespace dxvk {
     const Matrix4 headToSeat = toGameBasis(frame.trackingFromHead, unitsPerMeter, isLHS);
 
     if (RtxVr::headTrackMainCamera()) {
-      cameraManager.setVrHeadPose(headToSeat);
+      cameraManager.setVrHeadPose(headToSeat, frameId);
     } else {
       cameraManager.clearVrHeadPose();
     }
