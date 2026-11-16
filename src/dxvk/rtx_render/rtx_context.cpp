@@ -477,6 +477,18 @@ namespace dxvk {
                                       upscaledExtent, m_resetHistory, rightEyeCameraCut,
                                       getResourceManager().getRaytracingOutput(1), false);
 
+    // DLFG's depth and motion-vector queues belong to each eye output. Advance both here,
+    // after their per-frame resources have been reconciled and before either eye is rendered.
+    for (uint32_t eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
+      Resources::RaytracingOutput& eyeOutput = getResourceManager().getRaytracingOutput(eyeIndex);
+      if (eyeOutput.m_primaryDepthQueue[1].isValid()) {
+        eyeOutput.m_primaryDepthQueue.next();
+        eyeOutput.m_primaryScreenSpaceMotionVectorQueue.next();
+      }
+      eyeOutput.m_primaryDepth = eyeOutput.m_primaryDepthQueue.get();
+      eyeOutput.m_primaryScreenSpaceMotionVector = eyeOutput.m_primaryScreenSpaceMotionVectorQueue.get();
+    }
+
     // Force history reset on integrate indirect mode change to discard incompatible history 
     if (RtxOptions::integrateIndirectMode() != m_prevIntegrateIndirectMode) {
       m_resetHistory = true;
@@ -826,15 +838,6 @@ namespace dxvk {
         m_perfCpu.outputH = renderExtent.height;
 
         Resources::RaytracingOutput& rtOutput = getResourceManager().getRaytracingOutput();
-
-        // The queues hold a single entry unless frame generation runs, see Resources::createDlfgResourceQueues.
-        if (rtOutput.m_primaryDepthQueue[1].isValid()) {
-          rtOutput.m_primaryDepthQueue.next();
-          rtOutput.m_primaryScreenSpaceMotionVectorQueue.next();
-        }
-
-        rtOutput.m_primaryDepth = rtOutput.m_primaryDepthQueue.get();
-        rtOutput.m_primaryScreenSpaceMotionVector = rtOutput.m_primaryScreenSpaceMotionVectorQueue.get();
 
         getCommonObjects()->getTextureManager().prepareSamplerFeedback(this);
 
