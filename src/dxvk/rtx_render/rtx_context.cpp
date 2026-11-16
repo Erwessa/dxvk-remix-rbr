@@ -471,6 +471,9 @@ namespace dxvk {
       }
     }
 
+    // NEE cache reset/resolution state is logical-frame scoped and shared by both VR eyes.
+    m_common->metaNeeCache().beginFrame(m_resetHistory, mainCamera.getShaderConstants().resolution);
+
     return downscaledExtent;
   }
 
