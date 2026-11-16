@@ -480,10 +480,10 @@ namespace dxvk {
 
   void RtxContext::onInjectRtxFrameEnd(bool rayTracedThisFrame) {
     if (rayTracedThisFrame) {
-      Resources::RaytracingOutput& rtOutput = getResourceManager().getRaytracingOutput();
-
-      m_common->metaNeuralRadianceCache().onFrameEnd(rtOutput);
-      rtOutput.onFrameEnd();
+      // NRC training is logical-frame scoped; per-eye history swaps are output-local.
+      m_common->metaNeuralRadianceCache().onFrameEnd(getResourceManager().getRaytracingOutput(0));
+      getResourceManager().getRaytracingOutput(0).onFrameEnd();
+      getResourceManager().getRaytracingOutput(1).onFrameEnd();
     }
 
     getSceneManager().onFrameEnd(this, rayTracedThisFrame);
