@@ -2958,7 +2958,11 @@ namespace dxvk {
     setFramePassStage(RtxFramePassStage::TAA);
 
     DxvkTemporalAA& taa = m_common->metaTAA();
-    RtCamera& mainCamera = getSceneManager().getCamera();
+    const uint32_t frameId = m_device->getCurrentFrameId();
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
+      : getSceneManager().getCamera();
     const bool isViewHistoryInvalidated = renderCamera.isViewHistoryInvalidated(frameId);
 
     if (taa.isActive() && !isViewHistoryInvalidated) {
