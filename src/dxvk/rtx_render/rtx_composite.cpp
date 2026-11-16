@@ -399,7 +399,7 @@ namespace dxvk {
 
     const DxvkReSTIRGIRayQuery& restirGI = ctx->getCommonObjects()->metaReSTIRGIRayQuery();
     ctx->bindResourceView(COMPOSITE_BSDF_FACTOR_INPUT, rtOutput.m_bsdfFactor.view, nullptr);
-    ctx->bindResourceView(COMPOSITE_BSDF_FACTOR2_INPUT, restirGI.getBsdfFactor2().view, nullptr);
+    ctx->bindResourceView(COMPOSITE_BSDF_FACTOR2_INPUT, restirGI.getBsdfFactor2(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceView(COMPOSITE_PIXEL_SAMPLING_RATE_INPUT, rtOutput.m_sparseRenderingPixelSamplingRate.view, nullptr);
     ctx->bindResourceView(COMPOSITE_ALPHA_GBUFFER_INPUT, rtOutput.m_alphaBlendGBuffer.view, nullptr);
     ctx->bindResourceView(COMPOSITE_ACTIVE_PIXEL_MASK_INPUT, rtOutput.m_sparseRenderingActivePixelMask.view, nullptr);
@@ -426,7 +426,7 @@ namespace dxvk {
 
     ctx->bindResourceView(COMPOSITE_FINAL_OUTPUT, rtOutput.m_compositeOutput.view(Resources::AccessType::Write), nullptr);
     ctx->bindResourceView(COMPOSITE_ALPHA_BLEND_RADIANCE_OUTPUT, rtOutput.m_alphaBlendRadiance.view(Resources::AccessType::Write), nullptr);
-    ctx->bindResourceView(COMPOSITE_LAST_FINAL_OUTPUT, restirGI.isActive() ? restirGI.getLastCompositeOutput().view(Resources::AccessType::Write) : nullptr, nullptr);
+    ctx->bindResourceView(COMPOSITE_LAST_FINAL_OUTPUT, restirGI.isActive() ? restirGI.getLastCompositeOutput(ctx->getActiveEyeIndex()).view(Resources::AccessType::Write) : nullptr, nullptr);
     ctx->bindResourceView(COMPOSITE_BLUE_NOISE_TEXTURE, ctx->getResourceManager().getBlueNoiseTexture(ctx), nullptr);
     ctx->bindResourceView(COMPOSITE_VALUE_NOISE_SAMPLER, ctx->getResourceManager().getValueNoiseLut(ctx), nullptr);
     Rc<DxvkSampler> valueNoiseSampler = ctx->getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT);

@@ -2315,7 +2315,7 @@ namespace dxvk {
     getCommonObjects()->metaNumos().beginFrame(*this, constants);
     recordGpuStageTiming("AtmosphereFinish");
 
-    constants.isLastCompositeOutputValid = restirGI.isActive() && restirGI.getLastCompositeOutput().matchesWriteFrameIdx(frameIdx - 1);
+    constants.isLastCompositeOutputValid = restirGI.isActive() && restirGI.getLastCompositeOutput(m_activeEyeIndex).matchesWriteFrameIdx(frameIdx - 1);
     constants.isZUp = RtxOptions::zUp();
     constants.cardNormalsUpWeight = RtxOptions::CardNormals::upWeight();
     constants.cardNormalsKeepGeometryNormal = RtxOptions::CardNormals::cardNormalsKeepGeometryNormal() ? 1 : 0;

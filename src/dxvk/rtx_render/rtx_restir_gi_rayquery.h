@@ -21,6 +21,8 @@
 */
 #pragma once
 
+#include <array>
+
 #include "../dxvk_format.h"
 #include "../dxvk_include.h"
 
@@ -76,8 +78,8 @@ namespace dxvk {
 
     void bindIntegrateIndirectPathTracingResources(RtxContext& ctx);
     void bindIntegrateIndirectNeeResources(RtxContext& ctx);
-    const Resources::Resource& getBsdfFactor2() const;
-    const Resources::AliasedResource& getLastCompositeOutput() const;
+    const Resources::Resource& getBsdfFactor2(uint32_t eyeIndex) const;
+    const Resources::AliasedResource& getLastCompositeOutput(uint32_t eyeIndex) const;
 
     static void setToNRDPreset();
 
@@ -142,12 +144,13 @@ namespace dxvk {
     RTX_OPTION_ENV("rtx.restirGI", float, lightingValidationThreshold, 0.5, "DXVK_RESTIR_GI_SAMPLE_VALIDATION_THRESHOLD", "Invalidate a sample when pixel change ratio is above this value.");
     RTX_OPTION("rtx.restirGI", float, visibilityValidationRange, 0.05, "Check actual hit distance of a shadow ray, invalidate a sample if hit length is longer than one plus this portion, compared to the distance from the surface to the sample.");
 
-    Resources::AliasedResource m_restirGIRadiance;
-    Resources::Resource m_restirGIHitGeometry;
-    Rc<DxvkBuffer> m_restirGIReservoirBuffer;
-    Resources::Resource m_bsdfFactor2;
+    // ReSTIR GI's temporal reservoir and output history must never cross-contaminate the two views.
+    std::array<Resources::AliasedResource, 2> m_restirGIRadiance;
+    std::array<Resources::Resource, 2> m_restirGIHitGeometry;
+    std::array<Rc<DxvkBuffer>, 2> m_restirGIReservoirBuffer;
+    std::array<Resources::Resource, 2> m_bsdfFactor2;
 
-    // Last composite output is not aliased right now, but created as such AliasedResource for ::matchesWriteFrameIdx() functionality
-    Resources::AliasedResource m_lastCompositeOutput;
+    // Last composite output is not aliased right now, but created as such AliasedResource for ::matchesWriteFrameIdx() functionality.
+    std::array<Resources::AliasedResource, 2> m_lastCompositeOutput;
   };
 }

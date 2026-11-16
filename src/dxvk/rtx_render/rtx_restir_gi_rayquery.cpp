@@ -279,13 +279,14 @@ namespace dxvk {
   }
 
   void DxvkReSTIRGIRayQuery::bindIntegrateIndirectPathTracingResources(RtxContext& ctx) {
+    const uint32_t eyeIndex = ctx.getActiveEyeIndex();
 
-    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_HIT_GEOMETRY_OUTPUT, m_restirGIHitGeometry.view, nullptr);
+    ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_HIT_GEOMETRY_OUTPUT, m_restirGIHitGeometry[eyeIndex].view, nullptr);
 
     // Aliased resource methods must not be called when the resource is invalid
     if (isActive()) {
-      ctx.bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer));
-      ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_RADIANCE_OUTPUT, m_restirGIRadiance.view(Resources::AccessType::Write), nullptr);
+      ctx.bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer[eyeIndex]));
+      ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_RADIANCE_OUTPUT, m_restirGIRadiance[eyeIndex].view(Resources::AccessType::Write), nullptr);
     } else {
       ctx.bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(nullptr, 0, 0));
       ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_RESTIR_GI_RADIANCE_OUTPUT, nullptr, nullptr);
@@ -293,19 +294,22 @@ namespace dxvk {
   }
 
   void DxvkReSTIRGIRayQuery::bindIntegrateIndirectNeeResources(RtxContext& ctx) {
+    const uint32_t eyeIndex = ctx.getActiveEyeIndex();
     if (isActive()) {
-      ctx.bindResourceBuffer(INTEGRATE_NEE_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer));
+      ctx.bindResourceBuffer(INTEGRATE_NEE_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer[eyeIndex]));
     } else {
       ctx.bindResourceBuffer(INTEGRATE_NEE_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(nullptr, 0, 0));
     }
   }
 
-  const Resources::Resource& DxvkReSTIRGIRayQuery::getBsdfFactor2() const {
-    return m_bsdfFactor2;
+  const Resources::Resource& DxvkReSTIRGIRayQuery::getBsdfFactor2(uint32_t eyeIndex) const {
+    assert(eyeIndex < m_bsdfFactor2.size());
+    return m_bsdfFactor2[eyeIndex];
   }
 
-  const Resources::AliasedResource& DxvkReSTIRGIRayQuery::getLastCompositeOutput() const {
-    return m_lastCompositeOutput;
+  const Resources::AliasedResource& DxvkReSTIRGIRayQuery::getLastCompositeOutput(uint32_t eyeIndex) const {
+    assert(eyeIndex < m_lastCompositeOutput.size());
+    return m_lastCompositeOutput[eyeIndex];
   }
 
   bool DxvkReSTIRGIRayQuery::isEnabled() const {
@@ -316,7 +320,7 @@ namespace dxvk {
     Rc<DxvkContext>& ctx,
     const VkExtent3D& downscaledExtent) {
 
-    const Resources::RaytracingOutput& rtOutput = ctx->getCommonObjects()->getResources().getRaytracingOutput();
+    auto& resources = ctx->getCommonObjects()->getResources();
 
     int numReservoirBuffer = 3;
     int reservoirSize = sizeof(ReSTIRGI_PackedReservoir);
@@ -329,21 +333,35 @@ namespace dxvk {
     bufferInfo.stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     bufferInfo.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
     bufferInfo.size = reservoirBufferPixels * numReservoirBuffer * reservoirSize;
-    m_restirGIReservoirBuffer = ctx->getDevice()->createBuffer(bufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "Restir GI Reservoir Buffer");
-
-    m_restirGIRadiance = Resources::AliasedResource(rtOutput.m_compositeOutput, ctx, downscaledExtent, VK_FORMAT_R16G16B16A16_SFLOAT, "ReSTIR GI Radiance");
-    m_restirGIHitGeometry = Resources::createImageResource(ctx, "ReSTIR GI Hit Geometry", downscaledExtent, VK_FORMAT_R32G32B32A32_SFLOAT);
-
-    m_bsdfFactor2 = Resources::createImageResource(ctx, "bsdf factor 2", downscaledExtent, VK_FORMAT_R16G16_SFLOAT);
-    m_lastCompositeOutput = Resources::AliasedResource(ctx, downscaledExtent, VK_FORMAT_R16G16B16A16_SFLOAT, "Last Composite Output");
+    for (uint32_t eyeIndex = 0; eyeIndex < m_restirGIReservoirBuffer.size(); ++eyeIndex) {
+      const Resources::RaytracingOutput& rtOutput = resources.getRaytracingOutput(eyeIndex);
+      const char* eyeLabel = eyeIndex == 0 ? "left" : "right";
+      m_restirGIReservoirBuffer[eyeIndex] = ctx->getDevice()->createBuffer(
+        bufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer,
+        str::format("ReSTIR GI Reservoir Buffer ", eyeLabel).c_str());
+      m_restirGIRadiance[eyeIndex] = Resources::AliasedResource(
+        rtOutput.m_compositeOutput, ctx, downscaledExtent, VK_FORMAT_R16G16B16A16_SFLOAT,
+        eyeIndex == 0 ? "ReSTIR GI Radiance Left" : "ReSTIR GI Radiance Right");
+      m_restirGIHitGeometry[eyeIndex] = Resources::createImageResource(
+        ctx, eyeIndex == 0 ? "ReSTIR GI Hit Geometry Left" : "ReSTIR GI Hit Geometry Right",
+        downscaledExtent, VK_FORMAT_R32G32B32A32_SFLOAT);
+      m_bsdfFactor2[eyeIndex] = Resources::createImageResource(
+        ctx, eyeIndex == 0 ? "BSDF Factor 2 Left" : "BSDF Factor 2 Right",
+        downscaledExtent, VK_FORMAT_R16G16_SFLOAT);
+      m_lastCompositeOutput[eyeIndex] = Resources::AliasedResource(
+        ctx, downscaledExtent, VK_FORMAT_R16G16B16A16_SFLOAT,
+        eyeIndex == 0 ? "Last Composite Output Left" : "Last Composite Output Right");
+    }
   }
 
   void DxvkReSTIRGIRayQuery::releaseDownscaledResource() {
-    m_restirGIReservoirBuffer = nullptr;
-    m_restirGIRadiance.reset();
-    m_restirGIHitGeometry.reset();
-    m_bsdfFactor2.reset();
-    m_lastCompositeOutput.reset();
+    for (uint32_t eyeIndex = 0; eyeIndex < m_restirGIReservoirBuffer.size(); ++eyeIndex) {
+      m_restirGIReservoirBuffer[eyeIndex] = nullptr;
+      m_restirGIRadiance[eyeIndex].reset();
+      m_restirGIHitGeometry[eyeIndex].reset();
+      m_bsdfFactor2[eyeIndex].reset();
+      m_lastCompositeOutput[eyeIndex].reset();
+    }
   }
 
   void DxvkReSTIRGIRayQuery::dispatch(RtxContext* ctx, const Resources::RaytracingOutput& rtOutput) {
@@ -353,6 +371,12 @@ namespace dxvk {
     }
 
     ScopedGpuProfileZone(ctx, "ReSTIR GI");
+
+    const uint32_t eyeIndex = ctx->getActiveEyeIndex();
+    auto& restirGIRadiance = restirGIRadiance[eyeIndex];
+    auto& restirGIHitGeometry = restirGIHitGeometry[eyeIndex];
+    auto& restirGIReservoirBuffer = restirGIReservoirBuffer[eyeIndex];
+    auto& bsdfFactor2 = bsdfFactor2[eyeIndex];
 
     const uint32_t frameIdx = ctx->getDevice()->getCurrentFrameId();
     const auto& numRaysExtent = rtOutput.m_compositeOutputExtent;
@@ -375,8 +399,8 @@ namespace dxvk {
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_VIEW_DIRECTION_INPUT, rtOutput.m_primaryViewDirection.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_CONE_RADIUS_INPUT, rtOutput.m_primaryConeRadius.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_MVEC_INPUT, rtOutput.m_primaryVirtualMotionVector.view(Resources::AccessType::Read), nullptr);
-      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_RADIANCE_INPUT, m_restirGIRadiance.view(Resources::AccessType::Read), nullptr);
-      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_HIT_GEOMETRY_INPUT, m_restirGIHitGeometry.view, nullptr);
+      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_RADIANCE_INPUT, restirGIRadiance.view(Resources::AccessType::Read), nullptr);
+      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_HIT_GEOMETRY_INPUT, restirGIHitGeometry.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_POSITION_ERROR_INPUT, rtOutput.m_primaryPositionError.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_SHARED_SURFACE_INDEX_INPUT, rtOutput.m_sharedSurfaceIndex.view(Resources::AccessType::Read), nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_SUBSURFACE_DATA_INPUT, rtOutput.m_sharedSubsurfaceData.view, nullptr);
@@ -385,7 +409,7 @@ namespace dxvk {
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_GRADIENTS_INPUT, rtOutput.m_rtxdiGradients.view, nullptr);
 
       // Inputs / Outputs
-      ctx->bindResourceBuffer(RESTIR_GI_REUSE_BINDING_RESERVOIR_INPUT_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer, 0, m_restirGIReservoirBuffer->info().size));
+      ctx->bindResourceBuffer(RESTIR_GI_REUSE_BINDING_RESERVOIR_INPUT_OUTPUT, DxvkBufferSlice(restirGIReservoirBuffer, 0, restirGIReservoirBuffer->info().size));
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_LAST_GBUFFER_INPUT_OUTPUT, rtOutput.m_gbufferLast.view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, ReSTIRGITemporalReuseShader::getShader());
@@ -407,8 +431,8 @@ namespace dxvk {
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_VIEW_DIRECTION_INPUT, rtOutput.m_primaryViewDirection.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_CONE_RADIUS_INPUT, rtOutput.m_primaryConeRadius.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_MVEC_INPUT, rtOutput.m_primaryVirtualMotionVector.view(Resources::AccessType::Read), nullptr);
-      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_RADIANCE_INPUT, m_restirGIRadiance.view(Resources::AccessType::Read), nullptr);
-      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_HIT_GEOMETRY_INPUT, m_restirGIHitGeometry.view, nullptr);
+      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_RADIANCE_INPUT, restirGIRadiance.view(Resources::AccessType::Read), nullptr);
+      ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_HIT_GEOMETRY_INPUT, restirGIHitGeometry.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_POSITION_ERROR_INPUT, rtOutput.m_primaryPositionError.view, nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_SHARED_SURFACE_INDEX_INPUT, rtOutput.m_sharedSurfaceIndex.view(Resources::AccessType::Read), nullptr);
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_SUBSURFACE_DATA_INPUT, rtOutput.m_sharedSubsurfaceData.view, nullptr);
@@ -417,7 +441,7 @@ namespace dxvk {
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_GRADIENTS_INPUT, rtOutput.m_rtxdiGradients.view, nullptr);
 
       // Inputs / Outputs
-      ctx->bindResourceBuffer(RESTIR_GI_REUSE_BINDING_RESERVOIR_INPUT_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer, 0, m_restirGIReservoirBuffer->info().size));
+      ctx->bindResourceBuffer(RESTIR_GI_REUSE_BINDING_RESERVOIR_INPUT_OUTPUT, DxvkBufferSlice(restirGIReservoirBuffer, 0, restirGIReservoirBuffer->info().size));
       ctx->bindResourceView(RESTIR_GI_REUSE_BINDING_LAST_GBUFFER_INPUT_OUTPUT, rtOutput.m_gbufferLast.view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, ReSTIRGISpatialReuseShader::getShader());
@@ -451,8 +475,8 @@ namespace dxvk {
       ctx->bindResourceView(RESTIR_GI_FINAL_SHADING_BINDING_PRIMARY_INDIRECT_DIFFUSE_RADIANCE_HIT_DISTANCE_INPUT_OUTPUT, rtOutput.m_primaryIndirectDiffuseRadiance.view(Resources::AccessType::ReadWrite), nullptr);
       ctx->bindResourceView(RESTIR_GI_FINAL_SHADING_BINDING_PRIMARY_INDIRECT_SPECULAR_RADIANCE_HIT_DISTANCE_INPUT_OUTPUT, rtOutput.m_primaryIndirectSpecularRadiance.view(Resources::AccessType::ReadWrite), nullptr);
 
-      ctx->bindResourceBuffer(RESTIR_GI_FINAL_SHADING_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(m_restirGIReservoirBuffer, 0, m_restirGIReservoirBuffer->info().size));
-      ctx->bindResourceView(RESTIR_GI_FINAL_SHADING_BINDING_BSDF_FACTOR2_OUTPUT, m_bsdfFactor2.view, nullptr);
+      ctx->bindResourceBuffer(RESTIR_GI_FINAL_SHADING_BINDING_RESTIR_GI_RESERVOIR_OUTPUT, DxvkBufferSlice(restirGIReservoirBuffer, 0, restirGIReservoirBuffer->info().size));
+      ctx->bindResourceView(RESTIR_GI_FINAL_SHADING_BINDING_BSDF_FACTOR2_OUTPUT, bsdfFactor2.view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, ReSTIRGIFinalShadingShader::getShader());
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
