@@ -577,7 +577,7 @@ namespace dxvk {
     output.m_primaryRtxdiTemporalPosition.reset();
     m_primaryDenoisingNormalAllocated = primaryNormalIsNeeded;
 
-    if (resourcesAreNeeded && output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.empty()) {
+    if (resourcesAreNeeded && !output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.isValid()) {
       output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising = createImageResource(ctx, "secondary virtual world shading normal perceptual roughness denoising", m_downscaledExtent, VK_FORMAT_A2B10G10R10_UNORM_PACK32);
     } else if (!resourcesAreNeeded) {
       output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.reset();
@@ -590,7 +590,7 @@ namespace dxvk {
     const bool resourcesAreNeeded =
       device()->getCommon()->metaDlssNeuralRendering().useDlssNeuralRendering();
 
-    if (resourcesAreNeeded && output.m_controlMask.empty()) {
+    if (resourcesAreNeeded && !output.m_controlMask.isValid()) {
       output.m_controlMask =
         createImageResource(ctx, "DLSS-NR Control Mask texture", m_downscaledExtent, VK_FORMAT_R8G8B8A8_UNORM,
         1, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, 0, 8, { 1, 1, 1, 1 });

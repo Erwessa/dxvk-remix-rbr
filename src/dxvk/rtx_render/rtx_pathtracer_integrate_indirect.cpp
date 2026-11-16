@@ -1724,7 +1724,7 @@ namespace dxvk {
     ctx->bindResourceView(INTEGRATE_NEE_BINDING_PRIMARY_INDIRECT_SPECULAR_RADIANCE_HIT_DISTANCE_OUTPUT, resources.primaryIndirectSpecularRadiance.view(Resources::AccessType::Write), nullptr);
 
     if (nrcEnabled || restirGiEnabled || visualizeNee) {
-      ctx->bindResourceView(INTEGRATE_NEE_BINDING_BSDF_FACTOR2_OUTPUT, reSTIRGI.getBsdfFactor2().view, nullptr);
+      ctx->bindResourceView(INTEGRATE_NEE_BINDING_BSDF_FACTOR2_OUTPUT, reSTIRGI.getBsdfFactor2(ctx->getActiveEyeIndex()).view, nullptr);
       reSTIRGI.bindIntegrateIndirectNeeResources(*ctx);
     }
 
