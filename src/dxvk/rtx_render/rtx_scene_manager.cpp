@@ -457,6 +457,16 @@ namespace dxvk {
     // rtx.parallelScenePrepScans: each collection below first finds what it acts on with a scan of
     // every entry on worker threads, then acts on those alone, in its original order.
     const bool parallelScans = RtxOptions::parallelScenePrepScans();
+    const uint32_t currentFrame = m_device->getCurrentFrameId();
+
+    RtCamera* leftEyeCamera = nullptr;
+    RtCamera* rightEyeCamera = nullptr;
+
+    if (m_cameraManager.areVrEyeCamerasValid(currentFrame)) {
+      leftEyeCamera = &m_cameraManager.getVrEyeCamera(RtxEye::Left);
+      rightEyeCamera = &m_cameraManager.getVrEyeCamera(RtxEye::Right);
+    }
+
     auto gcStart = std::chrono::steady_clock::now();
     const auto gcPhase = [&](uint32_t nestedIndex) {
       const auto now = std::chrono::steady_clock::now();
@@ -520,16 +530,18 @@ namespace dxvk {
     // and clears their back-pointers while they are still alive.
     D3d9IdentityTrace::recordCollect(m_device->getCurrentFrameId(), getCamera().isCameraCut(), m_isAntiCullingSupported);
     m_drawCallTracker.garbageCollectReplacementInstances(
-        getCamera(), m_isAntiCullingSupported, parallelScans, m_lastKeptCutFrame);
+        getCamera(), m_isAntiCullingSupported, parallelScans, m_lastKeptCutFrame,
+        leftEyeCamera, rightEyeCamera);
     // rtx.scene.directTransient: the same lifetime rule for the scene's transient (DrawInstance) entries.
-    m_retainedScene->transient().collect(getCamera(), m_isAntiCullingSupported);
+    m_retainedScene->transient().collect(
+        getCamera(), m_isAntiCullingSupported, leftEyeCamera, rightEyeCamera);
     gcPhase(kPrepNestedGcReplacementInstances);
 
     // Instance/light GC: removes entities marked for GC by ReplacementInstance::clear()
     // or marked on creation (ephemeral copies). Back-pointers are already null.
     m_instanceManager.garbageCollection(parallelScans);
     m_accelManager.garbageCollection();
-    m_lightManager.garbageCollection(getCamera());
+    m_lightManager.garbageCollection(getCamera(), leftEyeCamera, rightEyeCamera);
     m_rayPortalManager.garbageCollection();
     gcPhase(kPrepNestedGcInstancesAndRest);
   }
