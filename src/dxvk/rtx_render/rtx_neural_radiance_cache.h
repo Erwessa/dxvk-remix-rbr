@@ -180,8 +180,14 @@ namespace dxvk {
 
     void prewarmShaders(DxvkPipelineManager& pipelineManager) const;
 
-    // To be called after both query and training PT passes completed to get a resolved radiance output
-    void dispatchTrainingAndResolve(RtxContext& ctx,  const Resources::RaytracingOutput& rtOutput);
+    // Run the shared NRC SDK training step after all eye query paths have been produced.
+    void dispatchTraining(RtxContext& ctx);
+
+    // Resolve the shared NRC query results into one eye's output after dispatchTraining().
+    void dispatchResolveForEye(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput);
+
+    // Mono/legacy convenience path: train and resolve one output.
+    void dispatchTrainingAndResolve(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput);
 
     // Invoked after the command list has been submitted.
     // The command queue must be the same one that was used to execute all the previous command lists
