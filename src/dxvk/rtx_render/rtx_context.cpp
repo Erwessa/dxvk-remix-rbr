@@ -2729,6 +2729,13 @@ namespace dxvk {
   void RtxContext::dispatchLogicalFramePostPathTracing() {
     // This is a logical-frame barrier, not an eye pass. In stereo it must be called only
     // after every eye has completed Integration, because NRC's SDK buffers are shared.
+    // Guard the shared readback and training dispatch against accidental per-eye callers.
+    const uint32_t frameId = m_device->getCurrentFrameId();
+    if (m_logicalPostPathTracingFrame == frameId) {
+      return;
+    }
+    m_logicalPostPathTracingFrame = frameId;
+
     frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
     m_common->metaNeuralRadianceCache().dispatchTraining(*this);
   }

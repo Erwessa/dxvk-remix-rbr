@@ -451,6 +451,8 @@ namespace dxvk {
     std::array<RtFrameFeatures, 2> m_frameFeatures;
      RtFrameFeatures m_logicalFrameFeatures;
      uint32_t m_frameFeaturesEyeMask = 0;
+    // Shared NRC training and feature readback must execute once per logical frame.
+    uint32_t m_logicalPostPathTracingFrame = ~0u;
     // Mono uses slot 0; stereo selects 0 for left and 1 for right before each eye dispatch.
     uint32_t m_activeEyeIndex = 0;
     // rtx.profile.detailedLogging
