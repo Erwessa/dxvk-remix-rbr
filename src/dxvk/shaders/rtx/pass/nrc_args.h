@@ -56,7 +56,7 @@ struct NrcArgs {
   float trainingLuminanceClamp;
 
   uint boostEmissives;
-  uint pad0;
+  uint eyeIndex;
   uint pad1;
   uint pad2;
 };
