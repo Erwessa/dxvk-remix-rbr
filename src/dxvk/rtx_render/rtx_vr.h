@@ -49,6 +49,10 @@ namespace dxvk {
     // Returns whether the latched frame holds a valid headset pose.
     bool isValid() const { return m_valid; }
 
+    // Returns the runtime's recommended per-eye render size for this latched frame.
+    // Returns false when no valid frame or no usable size is available.
+    bool getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height) const;
+
     // Returns the latched frame. Only meaningful while isValid() returns true.
     const OpenVrFrameState& get() const { return *m_pFrame; }
 
