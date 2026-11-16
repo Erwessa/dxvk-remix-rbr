@@ -551,25 +551,19 @@ namespace dxvk {
 
     const bool primaryNormalIsNeeded = needsPrimaryDenoisingNormal();
 
-    if (primaryNormalIsNeeded != m_primaryDenoisingNormalAllocated) {
-      if (primaryNormalIsNeeded) {
-        output.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising = AliasedResource(ctx, m_downscaledExtent, VK_FORMAT_A2B10G10R10_UNORM_PACK32, "primary virtual world shading normal perceptual roughness denoising", true);
-      } else {
-        output.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.reset();
-      }
-
-      // Re-aliased in onFrameBegin, so it never holds on to a host that was freed.
-      output.m_primaryRtxdiTemporalPosition.reset();
-      m_primaryDenoisingNormalAllocated = primaryNormalIsNeeded;
+    if (primaryNormalIsNeeded && output.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.empty()) {
+      output.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising = AliasedResource(ctx, m_downscaledExtent, VK_FORMAT_A2B10G10R10_UNORM_PACK32, "primary virtual world shading normal perceptual roughness denoising", true);
+    } else if (!primaryNormalIsNeeded && !output.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.empty()) {
+      output.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.reset();
     }
 
-    if (resourcesAreNeeded == m_nrdDenoisingGuideResourcesAllocated) {
-      return;
-    }
+    // Re-aliased in onFrameBegin, so it never holds on to a host that was freed.
+    output.m_primaryRtxdiTemporalPosition.reset();
+    m_primaryDenoisingNormalAllocated = primaryNormalIsNeeded;
 
-    if (resourcesAreNeeded) {
+    if (resourcesAreNeeded && output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.empty()) {
       output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising = createImageResource(ctx, "secondary virtual world shading normal perceptual roughness denoising", m_downscaledExtent, VK_FORMAT_A2B10G10R10_UNORM_PACK32);
-    } else {
+    } else if (!resourcesAreNeeded) {
       output.m_secondaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.reset();
     }
 
@@ -580,16 +574,12 @@ namespace dxvk {
     const bool resourcesAreNeeded =
       device()->getCommon()->metaDlssNeuralRendering().useDlssNeuralRendering();
 
-    if (resourcesAreNeeded == m_dlssNeuralRenderingResourcesAllocated) {
-      return;
-    }
-
-    if (resourcesAreNeeded) {
+    if (resourcesAreNeeded && output.m_controlMask.empty()) {
       output.m_controlMask =
         createImageResource(ctx, "DLSS-NR Control Mask texture", m_downscaledExtent, VK_FORMAT_R8G8B8A8_UNORM,
         1, VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D, 0, 8, { 1, 1, 1, 1 });
       createNeuralRenderingOutput(ctx, output);
-    } else {
+    } else if (!resourcesAreNeeded) {
       output.m_controlMask.reset();
       output.m_neuralRenderingOutput.reset();
     }
