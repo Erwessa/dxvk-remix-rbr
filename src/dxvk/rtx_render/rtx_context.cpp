@@ -890,6 +890,8 @@ namespace dxvk {
           dispatchPostDepthForEye(eyeOutput);
         }
 
+        // Shared logical-frame work uses the canonical left-eye binding after both eyes finish Integration.
+        setActiveEyeIndex(0);
         dispatchLogicalFramePostPathTracing();
 
         // Phase two: resolve NRC and produce each eye's denoised/composited HDR image.
