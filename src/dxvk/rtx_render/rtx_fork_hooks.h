@@ -59,6 +59,11 @@ namespace dxvk {
 
   namespace fork_hooks {
 
+    // Performs once-per-logical-frame external-effect loading and hot-reload publication.
+    // Call once before dispatching the stack for either eye.
+    // Implementation in rtx_fork_post_processing.cpp.
+    void preparePostProcessingStack(Rc<RtxContext> ctx);
+
     // Dispatches the post-processing stack. The stack keeps the HDR/display-space boundary,
     // and the developer UI can reorder the effects that allow it.
     // updateAutoExposure is forwarded to RtxContext::dispatchToneMapping.
