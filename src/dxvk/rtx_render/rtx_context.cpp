@@ -2376,7 +2376,7 @@ namespace dxvk {
 
     // Upload the constants to the GPU
     {
-      Rc<DxvkBuffer> cb = getResourceManager().getConstantsBuffer();
+      Rc<DxvkBuffer> cb = getResourceManager().getConstantsBuffer(m_activeEyeIndex);
 
       writeToBuffer(cb, 0, sizeof(constants), &constants);
 
@@ -2387,7 +2387,7 @@ namespace dxvk {
   void RtxContext::bindCommonRayTracingResources(const Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
 
-    Rc<DxvkBuffer> constantsBuffer = getResourceManager().getConstantsBuffer();
+    Rc<DxvkBuffer> constantsBuffer = getResourceManager().getConstantsBuffer(m_activeEyeIndex);
     Rc<DxvkBuffer> surfaceBuffer = getSceneManager().getSurfaceBuffer();
     Rc<DxvkBuffer> surfaceMappingBuffer = getSceneManager().getSurfaceMappingBuffer();
     Rc<DxvkBuffer> billboardsBuffer = getSceneManager().getBillboardsBuffer();
@@ -2425,7 +2425,7 @@ namespace dxvk {
     bindResourceBuffer(BINDING_LIGHT_BVH_BUFFER, lightBvhBuffer.ptr() ? DxvkBufferSlice(lightBvhBuffer, 0, lightBvhBuffer->info().size) : DxvkBufferSlice());
     bindResourceBuffer(BINDING_BILLBOARDS_BUFFER, DxvkBufferSlice(billboardsBuffer, 0, billboardsBuffer.ptr() ? billboardsBuffer->info().size : 0));
     bindResourceView(BINDING_BLUE_NOISE_TEXTURE, getResourceManager().getBlueNoiseTexture(this), nullptr);
-    bindResourceBuffer(BINDING_CONSTANTS, DxvkBufferSlice(constantsBuffer, 0, constantsBuffer->info().size));
+    bindResourceBuffer(BINDING_CONSTANTS, DxvkBufferSlice(constantsBuffer, 0, sizeof(RaytraceArgs)));
     bindResourceView(BINDING_DEBUG_VIEW_TEXTURE, debugView.getDebugOutput(), nullptr);
     bindResourceBuffer(BINDING_GPU_PRINT_BUFFER, DxvkBufferSlice(gpuPrintBuffer, 0, gpuPrintBuffer.ptr() ? gpuPrintBuffer->info().size : 0));
     bindResourceView(BINDING_VALUE_NOISE_SAMPLER, valueNoiseLut, nullptr);
