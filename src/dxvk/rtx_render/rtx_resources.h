@@ -537,6 +537,7 @@ namespace dxvk
     static void executeResizeEventList(ResizeEventList& eventList, Rc<DxvkContext>& ctx, const VkExtent3D& extent);
     static void executeFrameBeginEventList(FrameBeginEventList& eventList, Rc<DxvkContext>& ctx, const FrameBeginContext& frameBeginCtx);
 
+    void createSharedResources();
     void createRaytracingOutput(Rc<DxvkContext>& ctx, const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent);
 
     void createTargetResources(Rc<DxvkContext>& ctx);
