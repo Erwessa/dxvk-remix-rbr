@@ -3494,8 +3494,12 @@ namespace dxvk {
   // Queues this frame's frame generation inputs for its present. DLSS-G and FSR frame generation both consume them
   // in the presenter, in present order.
   void RtxContext::dispatchFrameInterpolation(const Rc<DxvkImage>& finalOutput) {
-    const bool dlfg = isDLFGEnabled();
-    const bool fsrfg = !dlfg && isFSRFGEnabled();
+    // DLSS-G and FSR frame generation currently accept one mono image and Main-camera
+    // motion/depth inputs. Do not enqueue those inputs for an active OpenVR stereo frame:
+    // doing so would mix the left-eye output with non-eye-specific camera data.
+    const bool vrStereoFrame = m_vrFrame.isValid();
+    const bool dlfg = !vrStereoFrame && isDLFGEnabled();
+    const bool fsrfg = !vrStereoFrame && !dlfg && isFSRFGEnabled();
     if (!dlfg && !fsrfg) {
       // Restores the saved V-Sync choice after frame generation is turned off.
       if (RtxOptions::enableVsync() != EnableVsync::WaitingForImplicitSwapchain) {
