@@ -868,6 +868,9 @@ namespace dxvk {
 
         dispatchEyeDenoisingAndComposition(rtOutput, captureScreenImage, captureDebugImage);
 
+        // Sampler feedback and object-picking requests are logical-frame work, not one operation per eye.
+        // Object picking consumes one mouse-space request and reads an eye-local ID buffer; once a stereo
+        // loop is added, run it only for the eye selected for the game mirror.
         getCommonObjects()->getTextureManager().copySamplerFeedbackToHost(this);
         dispatchObjectPicking(rtOutput, downscaledExtent, renderExtent);
         recordGpuStageTiming("FeedbackAndPicking");
