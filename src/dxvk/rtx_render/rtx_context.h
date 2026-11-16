@@ -379,7 +379,7 @@ namespace dxvk {
     void dispatchDebugView(Rc<DxvkImage>& srcImage, const Resources::RaytracingOutput& rtOutput, bool captureScreenImage);
     void dispatchObjectPicking(Resources::RaytracingOutput& rtOutput, const VkExtent3D& srcExtent, const VkExtent3D& targetExtent);
     void dispatchFrameInterpolation(const Rc<DxvkImage>& finalOutput);
-    void dispatchScreenOverlay(Resources::RaytracingOutput& rtOutput);
+    void dispatchScreenOverlay(Resources::RaytracingOutput& rtOutput, bool consumeFrameData = true);
     void updateMetrics(const float gpuIdleTimeMilliseconds) const;
     void rasterizeToSkyMatte(const DrawParameters& params, const DrawCallState& drawCallState);
     void initSkyProbe();
@@ -488,6 +488,7 @@ namespace dxvk {
       uint32_t height = 0;
       VkFormat format = VK_FORMAT_UNDEFINED;
       float opacity = 1.0f;
+      bool uploaded = false;
     };
     std::optional<ScreenOverlayFrame> m_pendingScreenOverlay;
     Rc<DxvkImage> m_screenOverlayImage;
@@ -526,7 +527,7 @@ namespace dxvk {
 #endif
 
     // Grant the hooks access to the private state above. See rtx_fork_hooks.h.
-    friend void fork_hooks::dispatchScreenOverlay(RtxContext&, Resources::RaytracingOutput&);
+    friend void fork_hooks::dispatchScreenOverlay(RtxContext&, Resources::RaytracingOutput&, bool);
     friend bool fork_hooks::isFsrUpscalerActive(RtxContext&);
     friend void fork_hooks::dispatchFsrUpscale(RtxContext&, const Resources::RaytracingOutput&);
     friend void fork_hooks::dispatchRcasSharpening(RtxContext&, const Resources::RaytracingOutput&);
