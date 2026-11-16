@@ -369,18 +369,10 @@ namespace dxvk
       AliasedBuffer m_rtxdiReservoirBuffer;
       AliasedBuffer m_transmissionPSRData;
 
-      Rc<DxvkBuffer> m_neeCache;
-      Rc<DxvkBuffer> m_neeCacheTask;
-      Rc<DxvkBuffer> m_neeCacheSample;
       Resource m_neeCacheThreadTask;
 
       Resource m_sharedTextureCoord;
     
-      Rc<DxvkBuffer> m_gpuPrintBuffer;
-
-      Rc<DxvkBuffer> m_samplerFeedbackDevice;
-      Rc<DxvkBuffer> m_samplerFeedbackReadback[kMaxFramesInFlight];
-
       RaytraceArgs m_raytraceArgs;
 
       bool isReady() const { return m_primaryLinearViewZ.image != nullptr; }
@@ -425,6 +417,16 @@ namespace dxvk
     bool validateRaytracingOutput(const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent) const;
 
     Resources::RaytracingOutput& getRaytracingOutput() { return m_raytracingOutput; }
+
+    Rc<DxvkBuffer> getNeeCacheBuffer() const { return m_neeCache; }
+    Rc<DxvkBuffer> getNeeCacheTaskBuffer() const { return m_neeCacheTask; }
+    Rc<DxvkBuffer> getNeeCacheSampleBuffer() const { return m_neeCacheSample; }
+    Rc<DxvkBuffer> getGpuPrintBuffer() const { return m_gpuPrintBuffer; }
+    Rc<DxvkBuffer> getSamplerFeedbackDeviceBuffer() const { return m_samplerFeedbackDevice; }
+    Rc<DxvkBuffer> getSamplerFeedbackReadback(uint32_t frameIndex) const {
+      assert(frameIndex < kMaxFramesInFlight);
+      return m_samplerFeedbackReadback[frameIndex];
+    }
 
     Rc<DxvkBuffer> getConstantsBuffer(uint32_t eyeIndex = 0);
     Rc<DxvkImageView> getBlueNoiseTexture(Rc<DxvkContext> ctx);
@@ -491,6 +493,14 @@ namespace dxvk
     Resources& operator=(Resources const&) = delete;
 
     RaytracingOutput m_raytracingOutput;
+
+    // Shared across both eye renders for one logical frame.
+    Rc<DxvkBuffer> m_neeCache;
+    Rc<DxvkBuffer> m_neeCacheTask;
+    Rc<DxvkBuffer> m_neeCacheSample;
+    Rc<DxvkBuffer> m_gpuPrintBuffer;
+    Rc<DxvkBuffer> m_samplerFeedbackDevice;
+    Rc<DxvkBuffer> m_samplerFeedbackReadback[kMaxFramesInFlight];
 
     Rc<DxvkBuffer> m_constants[2];
     Rc<DxvkImage> m_blueNoiseTex;
