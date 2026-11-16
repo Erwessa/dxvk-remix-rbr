@@ -1826,7 +1826,9 @@ void updateNrcOnGBufferMiss(
   uvec2 pixelCoordinate)
 {
 #if ENABLE_NRC
-  // Query path is always traced at the full ray tracing resolution
+  // Query path is traced at the full per-eye ray tracing resolution. pixelCoordinate is still
+  // eye-local here: do not treat it as an NRC SDK atlas coordinate. A stereo implementation must
+  // apply the eye's query-space offset before registering the path in the shared SDK buffers.
   const uvec2 queryPixelCoordinate = pixelCoordinate;
 
   // Update NRC Query Path
@@ -1868,7 +1870,9 @@ void updateNrcOnGBufferHitTrainingAndQueryPaths(
   inout RNG randomState)
 {
 #if ENABLE_NRC
-  // Query path is always traced at the full ray tracing resolution
+  // Query path is traced at the full per-eye ray tracing resolution. pixelCoordinate is still
+  // eye-local here: do not treat it as an NRC SDK atlas coordinate. A stereo implementation must
+  // apply the eye's query-space offset before registering the path in the shared SDK buffers.
   const uvec2 queryPixelCoordinate = pixelCoordinate;
 
   // Update NRC Query Path
