@@ -301,6 +301,12 @@ namespace dxvk {
     m_accumulationDispatchedThisFrame = false;
     RtxPass::onFrameBegin(ctx, frameBeginCtx);
 
+    // A logical-frame history reset must also discard accumulated output from the
+    // previous camera/session state. Both eye outputs will seed fresh accumulation.
+    if (frameBeginCtx.resetHistory) {
+      m_accumulation.resetNumAccumulatedFrames();
+    }
+
     // Accumulation per-frame setup
     {
       const bool enableAccumulationChanged = m_enableAccumulation != enableAccumulation();
