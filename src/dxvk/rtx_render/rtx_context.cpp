@@ -486,10 +486,10 @@ namespace dxvk {
 
   void RtxContext::onInjectRtxFrameEnd(bool rayTracedThisFrame) {
     if (rayTracedThisFrame) {
-      // NRC training is logical-frame scoped; per-eye history swaps are output-local.
+      // NRC training is logical-frame scoped. Only advance histories for outputs
+      // that were actually rendered; the second eye is prepared but not rendered yet.
       m_common->metaNeuralRadianceCache().onFrameEnd(getResourceManager().getRaytracingOutput(0));
       getResourceManager().getRaytracingOutput(0).onFrameEnd();
-      getResourceManager().getRaytracingOutput(1).onFrameEnd();
     }
 
     getSceneManager().onFrameEnd(this, rayTracedThisFrame);
