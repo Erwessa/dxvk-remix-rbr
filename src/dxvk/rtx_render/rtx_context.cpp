@@ -3212,8 +3212,8 @@ namespace dxvk {
     m_common->metaSRGBDither().dispatch(this, rtOutput, performSRGBConversion);
   }
 
-  void RtxContext::dispatchScreenOverlay(Resources::RaytracingOutput& rtOutput) {
-    fork_hooks::dispatchScreenOverlay(*this, rtOutput);
+  void RtxContext::dispatchScreenOverlay(Resources::RaytracingOutput& rtOutput, bool consumeFrameData) {
+    fork_hooks::dispatchScreenOverlay(*this, rtOutput, consumeFrameData);
   }
 
   void RtxContext::dispatchGpuPrint() {
