@@ -660,6 +660,7 @@ namespace dxvk {
     Rc<DxvkContext> ctx,
     DxvkBarrierSet& barriers,
     const SceneManager& sceneManager,
+    const RtCamera& renderCamera,
     const Resources::RaytracingOutput& rtOutput,
     const DxvkDenoise::Input& inputs,
     const DxvkDenoise::Output& outputs) {
@@ -674,7 +675,7 @@ namespace dxvk {
 
     prepareResources(ctx, rtOutput);
 
-    updateNRDSettings(sceneManager, inputs, rtOutput);
+    updateNRDSettings(sceneManager, renderCamera, inputs, rtOutput);
 
     std::vector<Rc<DxvkImageView>> pInputs, pOutputs;
     if (m_settings.m_denoiserDesc.denoiser == nrd::Denoiser::REFERENCE) {
@@ -871,6 +872,7 @@ namespace dxvk {
 
   void NRDContext::updateNRDSettings(
     const SceneManager& sceneManager,
+    const RtCamera& renderCamera,
     const DxvkDenoise::Input& inputs,
     const Resources::RaytracingOutput& rtOutput) {
 
@@ -888,7 +890,7 @@ namespace dxvk {
     // nrd::SetCommonSettings
     nrd::CommonSettings& commonSettings = m_settings.m_commonSettings;
     {
-      const auto& camera = sceneManager.getCamera();
+      const auto& camera = renderCamera;
 
       const uint16_t width = static_cast<uint16_t>(rtOutput.m_compositeOutputExtent.width);
       const uint16_t height = static_cast<uint16_t>(rtOutput.m_compositeOutputExtent.height);

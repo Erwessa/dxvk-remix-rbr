@@ -41,6 +41,7 @@ namespace dxvk {
       Rc<DxvkContext> ctx,
       DxvkBarrierSet& barriers,
       const SceneManager& sceneManager,
+      const RtCamera& renderCamera,
       const Resources::RaytracingOutput& rtOutput,
       const DxvkDenoise::Input& inputs,
       const DxvkDenoise::Output& outputs);
@@ -79,6 +80,7 @@ namespace dxvk {
 
     void updateNRDSettings(
       const SceneManager& sceneManager,
+      const RtCamera& renderCamera,
       const DxvkDenoise::Input& inputs,
       const Resources::RaytracingOutput& rtOutput);
 

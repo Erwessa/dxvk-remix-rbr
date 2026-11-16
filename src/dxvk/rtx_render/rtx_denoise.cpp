@@ -50,9 +50,13 @@ namespace dxvk {
     uint32_t eyeIndex) 
   {
     const SceneManager& sceneManager = device()->getCommon()->getSceneManager();
+    const CameraManager& cameraManager = sceneManager.getCameraManager();
 
     assert(eyeIndex < m_nrdContexts.size());
-    m_nrdContexts[eyeIndex]->dispatch(ctx, barriers, sceneManager, rtOutput, inputs, outputs);
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(device()->getCurrentFrameId())
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(eyeIndex))
+      : cameraManager.getMainCamera();
+    m_nrdContexts[eyeIndex]->dispatch(ctx, barriers, sceneManager, renderCamera, rtOutput, inputs, outputs);
   }
 
   void DxvkDenoise::releaseResources() {
