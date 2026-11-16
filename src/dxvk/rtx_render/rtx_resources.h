@@ -375,6 +375,9 @@ namespace dxvk
     
       RaytraceArgs m_raytraceArgs;
 
+      // Ray reconstruction alias topology is tracked independently for each eye output.
+      bool m_rayReconstructionEnabled = false;
+
       bool isReady() const { return m_primaryLinearViewZ.image != nullptr; }
       void onFrameEnd() { m_swapTextures = !m_swapTextures; }
 
