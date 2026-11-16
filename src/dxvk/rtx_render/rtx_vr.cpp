@@ -2,7 +2,9 @@
 
 #include <cmath>
 
+#include "rtx_camera_manager.h"
 #include "rtx_imgui.h"
+#include "rtx_options.h"
 #include "rtx_vr_math.h"
 #include "../dxvk_device.h"
 #include "../dxvk_openvr.h"
@@ -12,6 +14,15 @@
 namespace dxvk {
 
   namespace {
+
+    // Converts an OpenVR transform in metres to the game's units and handedness.
+    Matrix4 toGameBasis(const OpenVrMatrix4& source, float unitsPerMeter, bool isLHS) {
+      Matrix4 result = matrixFromRowMajor(source.elements);
+      for (std::size_t row = 0; row < 3; row++) {
+        result[3][row] *= unitsPerMeter;
+      }
+      return isLHS ? flipHandedness(result) : result;
+    }
 
     // Returns whether the projection maps the left and right planes to -1 and 1 for a left-handed camera.
     bool projectionMatchesBounds(const OpenVrProjectionBounds& bounds) {
@@ -64,6 +75,47 @@ namespace dxvk {
       if (!projectionMatchesBounds(frame.projection[0]) || !projectionMatchesBounds(frame.projection[1])) {
         Logger::warn("OpenVR: the projection built from the raw bounds does not map the side planes to the clip range.");
       }
+    }
+  }
+
+  void RtxVrFrame::updateEyeCameras(CameraManager& cameraManager, uint32_t frameId) {
+    if (!m_valid) {
+      return;
+    }
+
+    const OpenVrFrameState& frame = *m_pFrame;
+    const RtCamera& mainCamera = cameraManager.getMainCamera();
+    const bool isLHS = mainCamera.isLHS();
+    const float unitsPerMeter = RtxOptions::getMeterToWorldUnitScale();
+    const Matrix4 gameViewToWorld = inverse(mainCamera.getWorldToViewf(false));
+    const Matrix4 headToSeat = toGameBasis(frame.trackingFromHead, unitsPerMeter, isLHS);
+
+    Vector3 eyePositions[RtxEye::Count];
+    for (uint32_t eye = 0; eye < RtxEye::Count; eye++) {
+      const OpenVrProjectionBounds& bounds = frame.projection[eye];
+      const Matrix4 eyeToHead = toGameBasis(OpenVrMatrix4::fromHmdMatrix34(frame.eyeToHead[eye]), unitsPerMeter, isLHS);
+      const Matrix4 eyeViewToWorld = gameViewToWorld * headToSeat * eyeToHead;
+      const Matrix4 projection = projectionFromRawBounds(
+        bounds.left, bounds.right, bounds.top, bounds.bottom, mainCamera.getNearPlane(), mainCamera.getFarPlane(), isLHS);
+
+      // The free camera belongs to the Main camera, so the eye cameras skip its update.
+      // The raw vertical bounds are flipped, so the upper tangent is -top and the lower tangent is -bottom.
+      const float fov = std::atan(bounds.bottom) - std::atan(bounds.top);
+      const float aspectRatio = (bounds.right - bounds.left) / (bounds.bottom - bounds.top);
+
+      cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(eye)).update(
+        frameId, inverse(eyeViewToWorld), projection, fov, aspectRatio,
+        mainCamera.getNearPlane(), mainCamera.getFarPlane(), isLHS,
+        RtCamera::IncrementShakingFrame | RtCamera::UpdateJitterFrame);
+
+      eyePositions[eye] = Vector3(eyeViewToWorld[3].x, eyeViewToWorld[3].y, eyeViewToWorld[3].z);
+    }
+
+    if (frame.frameIndex == 1 || frame.frameIndex % 600 == 0) {
+      const Vector3 separation = eyePositions[RtxEye::Right] - eyePositions[RtxEye::Left];
+      Logger::info(str::format(
+        "OpenVR eye separation ", length(separation) / unitsPerMeter, " m (an adult's is about 0.063 m), game units per metre ",
+        unitsPerMeter, ", game camera handedness ", isLHS ? "left" : "right"));
     }
   }
 

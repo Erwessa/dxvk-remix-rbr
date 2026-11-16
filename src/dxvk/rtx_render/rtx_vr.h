@@ -7,6 +7,7 @@
 
 namespace dxvk {
 
+  class CameraManager;
   class DxvkDevice;
   struct OpenVrFrameState;
 
@@ -35,6 +36,11 @@ namespace dxvk {
     // Waits for the compositor and latches the poses and eye parameters for this game frame.
     // Does nothing when no OpenVR scene session is active.
     void acquire(DxvkDevice& device);
+
+    // Updates both eye cameras once from the game's Main camera and the latched headset pose.
+    // The Main camera has to be valid for the frame. The headset pose is applied on top of the game's camera, with
+    // the headset's seated origin placed at the game camera. Does nothing when no headset frame is latched.
+    void updateEyeCameras(CameraManager& cameraManager, uint32_t frameId);
 
     // Returns whether the latched frame holds a valid headset pose.
     bool isValid() const { return m_valid; }
