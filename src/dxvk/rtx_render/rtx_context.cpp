@@ -2717,14 +2717,14 @@ namespace dxvk {
     recordGpuStageTiming("IndirectIntegration");
   }
 
-  void RtxContext::dispatchPathTracing(const Resources::RaytracingOutput& rtOutput) {
-
-    // Gbuffer Raytracing
+  void RtxContext::dispatchGBuffer(const Resources::RaytracingOutput& rtOutput) {
+    // G-buffer is the first eye-local stage. It writes the depth, material,
+    // motion and surface data consumed by every later path-tracing stage.
     m_common->metaPathtracerGbuffer().dispatch(this, rtOutput);
     recordGpuStageTiming("GBuffer");
-    preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
-    midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
+  }
 
+  void RtxContext::dispatchPathTracingAfterGBuffer(const Resources::RaytracingOutput& rtOutput) {
     // Sparse Rendering: sampling rates + active-pixel mask + compaction.
     // Runs after Gbuffer so the active-pixel mask can read current-frame SharedFlags.
     m_common->metaSparseRendering().dispatch(*this, rtOutput);
@@ -2744,6 +2744,13 @@ namespace dxvk {
 
     // Integration Raytracing
     dispatchIntegrate(rtOutput);
+  }
+
+  void RtxContext::dispatchPathTracing(const Resources::RaytracingOutput& rtOutput) {
+    dispatchGBuffer(rtOutput);
+    preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
+    midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
+    dispatchPathTracingAfterGBuffer(rtOutput);
   }
   
   void RtxContext::dispatchDemodulate(const Resources::RaytracingOutput& rtOutput) {
