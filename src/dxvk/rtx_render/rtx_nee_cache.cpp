@@ -120,6 +120,14 @@ namespace dxvk {
     m_resetCacheRequested = true;
   }
 
+  void NeeCachePass::beginFrame(bool resetHistory, const uvec2& resolution) {
+    const bool canClearCache = isActive() && enableUpdate();
+    m_frameResetCacheRequested = canClearCache && m_resetCacheRequested;
+    m_frameClearCache = resetHistory || m_resetCacheRequested ||
+      m_previousResolution.x != resolution.x || m_previousResolution.y != resolution.y;
+    m_previousResolution = resolution;
+  }
+
   void NeeCachePass::setRaytraceArgs(RaytraceArgs& constants, bool resetHistory) const {
     const bool neeCacheActive = isActive();
 
@@ -146,14 +154,7 @@ namespace dxvk {
     constants.neeCacheArgs.enableReshuffleResilience = enableReshuffleResilience();
     constants.neeCacheArgs.reshuffleMaxAge = reshuffleMaxAge();
 
-    static uvec2 oldResolution {0, 0};
-    const bool canClearCache = neeCacheActive && enableUpdate();
-    const bool resetRequested = m_resetCacheRequested;
-    if (canClearCache) {
-      m_resetCacheRequested = false;
-    }
-    constants.neeCacheArgs.clearCache = resetHistory || resetRequested || oldResolution.x != constants.camera.resolution.x || oldResolution.y != constants.camera.resolution.y;
-    oldResolution = constants.camera.resolution;
+    constants.neeCacheArgs.clearCache = m_frameClearCache;
   }
 
   void NeeCachePass::dispatch(RtxContext* ctx, const Resources::RaytracingOutput& rtOutput) {
@@ -184,6 +185,12 @@ namespace dxvk {
       // Each frame the integrator generates some records to update the cache in the next frame
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, UpdateNEECacheShader::getShader());
       ctx->dispatch(NEE_CACHE_PROBE_RESOLUTION, NEE_CACHE_PROBE_RESOLUTION/8, NEE_CACHE_PROBE_RESOLUTION);
+    }
+
+    // Consume a manual reset only after the cache update has actually been dispatched.
+    if (m_frameResetCacheRequested) {
+      m_resetCacheRequested = false;
+      m_frameResetCacheRequested = false;
     }
   }
   
