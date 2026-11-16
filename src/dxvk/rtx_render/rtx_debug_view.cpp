@@ -22,6 +22,7 @@
 #include "rtx_pre_exposure.h"
 #include "rtx_debug_view.h"
 #include "dxvk_device.h"
+#include "../dxvk_openvr.h"
 #include "dxvk_context.h"
 #include "dxvk_objects.h"
 #include "rtx/utility/shader_types.h"
@@ -1321,18 +1322,18 @@ namespace dxvk {
       case DEBUG_VIEW_DENOISED_PRIMARY_DIRECT_SPECULAR_RADIANCE:
       case DEBUG_VIEW_DENOISED_PRIMARY_DIRECT_DIFFUSE_HIT_T:
       case DEBUG_VIEW_DENOISED_PRIMARY_DIRECT_SPECULAR_HIT_T:
-        debugViewArgs.nrd = common.metaPrimaryDirectLightDenoiser().getNrdArgs();
+        debugViewArgs.nrd = common.metaPrimaryDirectLightDenoiser().getNrdArgs(ctx.getActiveEyeIndex());
         break;
       case DEBUG_VIEW_DENOISED_PRIMARY_INDIRECT_DIFFUSE_RADIANCE:
       case DEBUG_VIEW_DENOISED_PRIMARY_INDIRECT_SPECULAR_RADIANCE:
       case DEBUG_VIEW_DENOISED_PRIMARY_INDIRECT_DIFFUSE_HIT_T:
       case DEBUG_VIEW_DENOISED_PRIMARY_INDIRECT_SPECULAR_HIT_T:
-        debugViewArgs.nrd = common.metaPrimaryIndirectLightDenoiser().getNrdArgs();
+        debugViewArgs.nrd = common.metaPrimaryIndirectLightDenoiser().getNrdArgs(ctx.getActiveEyeIndex());
         break;
       default: break;
       }
     } else {
-      debugViewArgs.nrd = common.metaPrimaryCombinedLightDenoiser().getNrdArgs();
+      debugViewArgs.nrd = common.metaPrimaryCombinedLightDenoiser().getNrdArgs(ctx.getActiveEyeIndex());
     }
 
     // Fill in accumulation args
@@ -1425,12 +1426,12 @@ namespace dxvk {
     Resources::Resource terrain = common.getSceneManager().getTerrainBaker().getTerrainTexture(terrainTextureType);
     ctx->bindResourceView(DEBUG_VIEW_BINDING_TERRAIN_INPUT, terrain.view, nullptr);
 
-    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_RESERVOIRS_INPUT, globalVolumetrics.getPreviousVolumeReservoirs().view, nullptr);
-    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_AGE_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceAge().view, nullptr);
+    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_RESERVOIRS_INPUT, globalVolumetrics.getPreviousVolumeReservoirs(ctx->getActiveEyeIndex()).view, nullptr);
+    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_AGE_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceAge(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(DEBUG_VIEW_BINDING_VOLUME_AGE_INPUT, linearSampler);
-    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY().view, nullptr);
+    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(DEBUG_VIEW_BINDING_VOLUME_RADIANCE_Y_INPUT, linearSampler);
-    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_RADIANCE_COCG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg().view, nullptr);
+    ctx->bindResourceView(DEBUG_VIEW_BINDING_VOLUME_RADIANCE_COCG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(DEBUG_VIEW_BINDING_VOLUME_RADIANCE_COCG_INPUT, linearSampler);
     ctx->bindResourceView(DEBUG_VIEW_BINDING_VALUE_NOISE_SAMPLER, common.getResources().getValueNoiseLut(ctx), nullptr);
     Rc<DxvkSampler> valueNoiseSampler = common.getResources().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT);

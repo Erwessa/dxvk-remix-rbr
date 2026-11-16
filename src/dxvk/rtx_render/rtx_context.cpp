@@ -3402,7 +3402,7 @@ namespace dxvk {
 
     for (uint32_t eye = 0; eye < eyeImages.size(); eye++) {
       const Rc<DxvkImage>& image = eyeImages[eye];
-      if (!image)
+      if (image == nullptr)
         return false;
 
       const DxvkImageCreateInfo& info = image->info();
