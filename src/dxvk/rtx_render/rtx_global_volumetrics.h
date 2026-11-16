@@ -280,21 +280,21 @@ enum class FroxelConsumerCacheQuality : int {
     RtxGlobalVolumetrics(DxvkDevice* device);
     ~RtxGlobalVolumetrics() = default;
 
-    VolumeArgs getVolumeArgs(CameraManager const& cameraManager, FogState const& fogState, bool enablePortalVolumes) const;
+    VolumeArgs getVolumeArgs(CameraManager const& cameraManager, FogState const& fogState, bool enablePortalVolumes, uint32_t eyeIndex) const;
 
-    void dispatch(class RtxContext* ctx, const Resources::RaytracingOutput& rtOutput, uint32_t numActiveFroxelVolumes);
+    void dispatch(class RtxContext* ctx, const Resources::RaytracingOutput& rtOutput, uint32_t numActiveFroxelVolumes, uint32_t eyeIndex);
 
     // Whether the froxel radiance cache is built this frame (latched in onFrameBegin).
     bool isFroxelCacheActive() const { return m_froxelCacheActive; }
 
-    const Resources::Resource& getCurrentVolumeReservoirs() const { return m_volumeReservoirs[0]; }
-    const Resources::Resource& getPreviousVolumeReservoirs() const { return m_volumeReservoirs[1]; }
-    const Resources::Resource& getCurrentVolumeAccumulatedRadianceY() const { return m_volumeAccumulatedRadianceY[m_swapTextures]; }
-    const Resources::Resource& getPreviousVolumeAccumulatedRadianceY() const { return m_volumeAccumulatedRadianceY[!m_swapTextures]; }
-    const Resources::Resource& getCurrentVolumeAccumulatedRadianceCoCg() const { return m_volumeAccumulatedRadianceCoCg[m_swapTextures]; }
-    const Resources::Resource& getPreviousVolumeAccumulatedRadianceCoCg() const { return m_volumeAccumulatedRadianceCoCg[!m_swapTextures]; }
-    const Resources::Resource& getCurrentVolumeAccumulatedRadianceAge() const { return m_volumeAccumulatedRadianceAge[m_swapTextures]; }
-    const Resources::Resource& getPreviousVolumeAccumulatedRadianceAge() const { return m_volumeAccumulatedRadianceAge[!m_swapTextures]; }
+    const Resources::Resource& getCurrentVolumeReservoirs(uint32_t eyeIndex) const { return m_volumeReservoirs[eyeIndex][0]; }
+    const Resources::Resource& getPreviousVolumeReservoirs(uint32_t eyeIndex) const { return m_volumeReservoirs[eyeIndex][1]; }
+    const Resources::Resource& getCurrentVolumeAccumulatedRadianceY(uint32_t eyeIndex) const { return m_volumeAccumulatedRadianceY[eyeIndex][m_swapTextures[eyeIndex]]; }
+    const Resources::Resource& getPreviousVolumeAccumulatedRadianceY(uint32_t eyeIndex) const { return m_volumeAccumulatedRadianceY[eyeIndex][!m_swapTextures[eyeIndex]]; }
+    const Resources::Resource& getCurrentVolumeAccumulatedRadianceCoCg(uint32_t eyeIndex) const { return m_volumeAccumulatedRadianceCoCg[eyeIndex][m_swapTextures[eyeIndex]]; }
+    const Resources::Resource& getPreviousVolumeAccumulatedRadianceCoCg(uint32_t eyeIndex) const { return m_volumeAccumulatedRadianceCoCg[eyeIndex][!m_swapTextures[eyeIndex]]; }
+    const Resources::Resource& getCurrentVolumeAccumulatedRadianceAge(uint32_t eyeIndex) const { return m_volumeAccumulatedRadianceAge[eyeIndex][m_swapTextures[eyeIndex]]; }
+    const Resources::Resource& getPreviousVolumeAccumulatedRadianceAge(uint32_t eyeIndex) const { return m_volumeAccumulatedRadianceAge[eyeIndex][!m_swapTextures[eyeIndex]]; }
 
     void showPresetMenu();
     void showFroxelCacheQuality();
@@ -314,16 +314,13 @@ enum class FroxelConsumerCacheQuality : int {
     VkExtent3D m_restirFroxelVolumeExtent;
     uint32_t m_numFroxelVolumes;
 
-    // These histories are currently shared by the logical frame, not owned by an eye.
-    // A stereo render loop must not dispatch the volumetric temporal passes independently
-    // for both eyes until these resources (including the ReSTIR reservoirs) are made
-    // eye-local and the camera-specific VolumeArgs are selected per eye.
-    Resources::Resource m_volumeReservoirs[2];
-    Resources::Resource m_volumeAccumulatedRadianceY[2];
-    Resources::Resource m_volumeAccumulatedRadianceCoCg[2];
-    Resources::Resource m_volumeAccumulatedRadianceAge[2];
-    // This ping-pong index advances once per logical frame; it is not an eye index.
-    bool m_swapTextures = false;
+    // Each eye owns an independent froxel radiance history and ReSTIR reservoir pair.
+    Resources::Resource m_volumeReservoirs[RtxEye::Count][2];
+    Resources::Resource m_volumeAccumulatedRadianceY[RtxEye::Count][2];
+    Resources::Resource m_volumeAccumulatedRadianceCoCg[RtxEye::Count][2];
+    Resources::Resource m_volumeAccumulatedRadianceAge[RtxEye::Count][2];
+    // Each eye advances its own history ping-pong once at logical-frame begin.
+    bool m_swapTextures[RtxEye::Count] = { false, false };
     bool m_rebuildFroxels = false;
     // Whether the froxel cache passes run this frame, latched in onFrameBegin.
     // m_froxelCacheHistoryStale makes the first frame after a skip or a size change drop its history like a camera cut.
