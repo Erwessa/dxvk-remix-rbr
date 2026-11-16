@@ -332,17 +332,20 @@ namespace dxvk {
     return true;
   }
 
+  void RtxPostProcessingStack::prepareFrame(Rc<RtxContext> ctx) {
+    ScopedCpuProfileZone();
+    RtxExternalEffects::instance().ensureLoaded(ctx->getDevice().ptr());
+    // Apply completed recompiles once before either eye dispatches the stack. This prevents
+    // left and right eyes from observing different external-effect pipeline layouts.
+    RtxExternalEffects::instance().pumpHotReload(ctx->getDevice().ptr());
+  }
+
   void RtxPostProcessingStack::dispatch(
     Rc<RtxContext> ctx,
     Resources::RaytracingOutput& rtOutput,
     bool performSRGBConversion,
     bool updateAutoExposure) {
     ScopedCpuProfileZone();
-    RtxExternalEffects::instance().ensureLoaded(ctx->getDevice().ptr());
-    // A finished recompile is swapped in here, before the loop, so the two dispatches of one effect
-    // never see different layouts within a frame.
-    RtxExternalEffects::instance().pumpHotReload(ctx->getDevice().ptr());
-
     // The post-FX option switches the optional effects. Tonemapping and the terminal sRGB/dither
     // conversion always run, because skipping either would change the output format.
     const bool optionalEffectsEnabled = ctx->getCommonObjects()->metaPostFx().enable();
