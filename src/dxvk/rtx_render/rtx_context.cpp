@@ -450,7 +450,8 @@ namespace dxvk {
     const uint32_t frameId = m_device->getCurrentFrameId();
     const RtCamera& mainCamera = getSceneManager().getCamera();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const bool hasVrEyeCameras = cameraManager.areVrEyeCamerasValid(frameId);
+    const bool hasVrEyeCameras = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameId);
     const RtCamera& leftEyeCamera = hasVrEyeCameras
       ? cameraManager.getVrEyeCamera(RtxEye::Left)
       : mainCamera;
@@ -1862,7 +1863,9 @@ namespace dxvk {
     // projection value below must match the active RaytracingOutput. A stereo frame must
     // select the eye before calling this function and regenerate that eye's constants;
     // reusing the first eye's buffer for the second would also corrupt NRC query indexing.
-    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameIdx)
+    const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameIdx);
+    const RtCamera& renderCamera = useVrEyeCamera
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : logicalCamera;
 
@@ -3022,7 +3025,9 @@ namespace dxvk {
     DxvkTemporalAA& taa = m_common->metaTAA();
     const uint32_t frameId = m_device->getCurrentFrameId();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+    const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameId);
+    const RtCamera& renderCamera = useVrEyeCamera
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : getSceneManager().getCamera();
     const bool isViewHistoryInvalidated = renderCamera.isViewHistoryInvalidated(frameId);
@@ -3160,7 +3165,9 @@ namespace dxvk {
     DxvkPostFx& postFx = m_common->metaPostFx();
     const uint32_t frameId = m_device->getCurrentFrameId();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+    const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameId);
+    const RtCamera& renderCamera = useVrEyeCamera
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : getSceneManager().getCamera();
     if (!postFx.enable()) {
@@ -3181,7 +3188,9 @@ namespace dxvk {
     DxvkPostFx& postFx = m_common->metaPostFx();
     const uint32_t frameId = m_device->getCurrentFrameId();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+    const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameId);
+    const RtCamera& renderCamera = useVrEyeCamera
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : getSceneManager().getCamera();
 
@@ -3196,7 +3205,9 @@ namespace dxvk {
     DxvkPostFx& postFx = m_common->metaPostFx();
     const uint32_t frameId = m_device->getCurrentFrameId();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+    const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameId);
+    const RtCamera& renderCamera = useVrEyeCamera
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : getSceneManager().getCamera();
     if (!postFx.enable()) {
@@ -3223,7 +3234,9 @@ namespace dxvk {
     DxvkPostFx& postFx = m_common->metaPostFx();
     const uint32_t frameId = m_device->getCurrentFrameId();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+    const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+      && cameraManager.areVrEyeCamerasValid(frameId);
+    const RtCamera& renderCamera = useVrEyeCamera
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : getSceneManager().getCamera();
     if (!postFx.enable()) {
