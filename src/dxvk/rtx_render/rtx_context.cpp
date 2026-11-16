@@ -364,6 +364,11 @@ namespace dxvk {
   }
 
   VkExtent3D RtxContext::onInjectRtxFrameBegin(const VkExtent3D& upscaledExtent) {
+    // The logical frame starts from the left-eye output. A future stereo loop
+    // selects the right eye explicitly for its per-eye work and must not inherit
+    // an active-eye index left over from a previous frame.
+    setActiveEyeIndex(0);
+
     auto logRenderPassRaytraceModeRayQuery = [=](const char* renderPassName, auto mode) {
       switch (mode) {
       case decltype(mode)::RayQuery:
