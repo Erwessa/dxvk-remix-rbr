@@ -26,6 +26,7 @@
 #include "rtx_resources.h"
 
 #include "rtx_denoise_type.h"
+#include <array>
 
 struct NrdArgs;
 
@@ -79,20 +80,20 @@ namespace dxvk {
       DxvkBarrierSet& barriers,
       const Resources::RaytracingOutput& rtOutput,
       const Input& inputs,
-      Output& outputs);
+      Output& outputs,
+      uint32_t eyeIndex);
 
     void releaseResources();
     
     void showImguiSettings();
-    NrdArgs getNrdArgs() const;
-    bool isReferenceDenoiserEnabled() const;
-    void copyNrdSettingsFrom(const DxvkDenoise& refDenoiser);
-    const NRDContext& getNrdContext() const;
-
+    NrdArgs getNrdArgs(uint32_t eyeIndex) const;
+    bool isReferenceDenoiserEnabled(uint32_t eyeIndex) const;
+    void copyNrdSettingsFrom(const DxvkDenoise& refDenoiser, uint32_t eyeIndex);
+ 
     void onDestroy();
 
   private:
-    std::unique_ptr<NRDContext> m_nrdContext;
+    std::array<std::unique_ptr<NRDContext>, 2> m_nrdContexts;
 
   };
 }  // namespace dxvk

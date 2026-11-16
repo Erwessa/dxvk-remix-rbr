@@ -28,14 +28,16 @@ namespace dxvk {
   
   DxvkDenoise::DxvkDenoise(DxvkDevice* device, DenoiserType type)
   : CommonDeviceObject(device) {
-    m_nrdContext = std::make_unique<NRDContext>(device, type);
+    for (auto& context : m_nrdContexts)
+      context = std::make_unique<NRDContext>(device, type);
   }
 
   DxvkDenoise::~DxvkDenoise() {
   }
 
   void DxvkDenoise::onDestroy() {
-    m_nrdContext->onDestroy();
+    for (auto& context : m_nrdContexts)
+      context->onDestroy();
   }
 
   void DxvkDenoise::dispatch(
@@ -43,35 +45,37 @@ namespace dxvk {
     DxvkBarrierSet& barriers,
     const Resources::RaytracingOutput& rtOutput,
     const Input& inputs,
-    Output& outputs) 
+    Output& outputs,
+    uint32_t eyeIndex) 
   {
     const SceneManager& sceneManager = device()->getCommon()->getSceneManager();
 
-    m_nrdContext->dispatch(ctx, barriers, sceneManager, rtOutput, inputs, outputs);
+    assert(eyeIndex < m_nrdContexts.size());
+    m_nrdContexts[eyeIndex]->dispatch(ctx, barriers, sceneManager, rtOutput, inputs, outputs);
   }
 
   void DxvkDenoise::releaseResources() {
-    m_nrdContext->release();
+    for (auto& context : m_nrdContexts)
+      context->release();
   }
 
   void DxvkDenoise::copyNrdSettingsFrom(
-    const DxvkDenoise& refDenoiser) {
-    m_nrdContext->setNrdSettings(refDenoiser.getNrdContext().getNrdSettings());
-  }
-
-  const NRDContext& DxvkDenoise::getNrdContext() const {
-    return *m_nrdContext.get();
+    const DxvkDenoise& refDenoiser, uint32_t eyeIndex) {
+    assert(eyeIndex < m_nrdContexts.size());
+    m_nrdContexts[eyeIndex]->setNrdSettings(refDenoiser.m_nrdContexts[eyeIndex]->getNrdSettings());
   }
 
   void DxvkDenoise::showImguiSettings() {
-    m_nrdContext->showImguiSettings();
+    m_nrdContexts[0]->showImguiSettings();
   }
 
-  NrdArgs DxvkDenoise::getNrdArgs() const {
-    return m_nrdContext->getNrdArgs();
+  NrdArgs DxvkDenoise::getNrdArgs(uint32_t eyeIndex) const {
+    assert(eyeIndex < m_nrdContexts.size());
+    return m_nrdContexts[eyeIndex]->getNrdArgs();
   }
 
-  bool DxvkDenoise::isReferenceDenoiserEnabled() const {
-    return m_nrdContext->isReferenceDenoiserEnabled();
+  bool DxvkDenoise::isReferenceDenoiserEnabled(uint32_t eyeIndex) const {
+    assert(eyeIndex < m_nrdContexts.size());
+    return m_nrdContexts[eyeIndex]->isReferenceDenoiserEnabled();
   }
 }

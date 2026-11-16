@@ -1828,9 +1828,9 @@ namespace dxvk {
     auto& denoiser1 = (separateDenoiserEnabled ? m_common->metaPrimaryIndirectLightDenoiser() : m_common->metaPrimaryCombinedLightDenoiser());
     auto& denoiser2 = m_common->metaSecondaryCombinedLightDenoiser();
 
-    outPrimaryDirectNrdArgs = denoiser0.getNrdArgs();
-    outPrimaryIndirectNrdArgs = denoiser1.getNrdArgs();
-    outSecondaryNrdArgs = denoiser2.getNrdArgs();
+    outPrimaryDirectNrdArgs = denoiser0.getNrdArgs(getActiveEyeIndex());
+    outPrimaryIndirectNrdArgs = denoiser1.getNrdArgs(getActiveEyeIndex());
+    outSecondaryNrdArgs = denoiser2.getNrdArgs(getActiveEyeIndex());
 
     // Disable ReBLUR when RR is on because ReBLUR uses a different buffer encoding
     bool useRR = useRayReconstruction();
@@ -2869,18 +2869,18 @@ namespace dxvk {
       }
 
       // Need to run the denoiser twice for diffuse and specular when reference denoising is enabled on non-combined inputs
-      if (denoiser.isReferenceDenoiserEnabled()) {
+      if (denoiser.isReferenceDenoiserEnabled(getActiveEyeIndex())) {
         denoiseInput.reference = denoiseInput.diffuse_hitT;
         denoiseOutput.reference = denoiseOutput.diffuse_hitT;
-        denoiser.dispatch(this, m_execBarriers, rtOutput, denoiseInput, denoiseOutput);
+        denoiser.dispatch(this, m_execBarriers, rtOutput, denoiseInput, denoiseOutput, getActiveEyeIndex());
 
         // Reference denoiser accumulates internally, so the second signal has to be denoised through a separate reference denoiser
-        secondLobeReferenceDenoiser.copyNrdSettingsFrom(denoiser);
+        secondLobeReferenceDenoiser.copyNrdSettingsFrom(denoiser, getActiveEyeIndex());
         denoiseInput.reference = denoiseInput.specular_hitT;
         denoiseOutput.reference = denoiseOutput.specular_hitT;
-        secondLobeReferenceDenoiser.dispatch(this, m_execBarriers, rtOutput, denoiseInput, denoiseOutput);
+        secondLobeReferenceDenoiser.dispatch(this, m_execBarriers, rtOutput, denoiseInput, denoiseOutput, getActiveEyeIndex());
       } else
-        denoiser.dispatch(this, m_execBarriers, rtOutput, denoiseInput, denoiseOutput);
+        denoiser.dispatch(this, m_execBarriers, rtOutput, denoiseInput, denoiseOutput, getActiveEyeIndex());
     };
 
     // Primary Direct light denoiser
