@@ -1,0 +1,148 @@
+name: OpenVR branch build
+
+on:
+  push:
+    branches:
+      - feat/20261115-openvr-runtime
+  workflow_dispatch:
+
+concurrency:
+  group: openvr-branch-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 350
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup Meson
+        run: pip install meson==1.1.0
+
+      - name: Configure debugoptimized
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+          . .\build_common.ps1
+          PerformBuild -BuildFlavour debugoptimized -BuildSubDir _Comp64DebugOptimized -Backend ninja -EnableTracy false -ConfigureOnly $true
+
+      - name: Verify FidelityFX runtime DLL source
+        shell: pwsh
+        run: |
+          $source = Join-Path $PWD "submodules\FidelityFX-SDK\PrebuiltSignedDLL\amd_fidelityfx_vk.dll"
+          if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "FidelityFX source DLL is missing: $source"
+          }
+          $item = Get-Item -LiteralPath $source
+          Write-Host ("FidelityFX DLL present: {0} bytes; modified {1:o}" -f $item.Length, $item.LastWriteTimeUtc)
+
+      - name: Compile (limited parallelism, monitored; no repeated log tails)
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+          . .\build_common.ps1
+          SetupBuild -BuildArch x64
+          Push-Location _Comp64DebugOptimized
+          try {
+            $stdout = Join-Path $env:RUNNER_TEMP "openvr-compile.stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "openvr-compile.stderr.log"
+            Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
+            $shaderProgress = Join-Path $env:RUNNER_TEMP "openvr-shader-progress.log"
+            Remove-Item $shaderProgress -Force -ErrorAction SilentlyContinue
+            $env:REMIX_SHADER_PROGRESS_FILE = $shaderProgress
+            $meson = (Get-Command meson -ErrorAction Stop).Source
+            $build = Start-Process -FilePath $meson -ArgumentList @("compile","-v","-j","2") -WorkingDirectory (Get-Location).Path -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $stdoutOffset = 0L
+            $stderrOffset = 0L
+            function Write-NewLogBytes([string]$Path, [ref]$Offset) {
+              if (-not (Test-Path -LiteralPath $Path)) { return }
+              $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+              try {
+                if ($stream.Length -lt $Offset.Value) { $Offset.Value = 0L }
+                [void]$stream.Seek($Offset.Value, [System.IO.SeekOrigin]::Begin)
+                $reader = [System.IO.StreamReader]::new($stream)
+                $chunk = $reader.ReadToEnd()
+                $Offset.Value = $stream.Position
+                if (-not [string]::IsNullOrEmpty($chunk)) { Write-Host $chunk.TrimEnd() }
+              } finally {
+                $stream.Dispose()
+              }
+            }
+            while ($true) {
+              $build.Refresh()
+              Write-Host ("=== BUILD HEARTBEAT {0} PID={1} EXITED={2} ===" -f (Get-Date -Format o), $build.Id, $build.HasExited)
+              Get-Process ninja,cl,python,slangc,dxc -ErrorAction SilentlyContinue |
+                Select-Object ProcessName,Id,@{Name="CPU_s";Expression={[math]::Round($_.CPU,1)}},WorkingSet64 |
+                Format-Table -AutoSize | Out-String | Write-Host
+              if (Test-Path -LiteralPath $shaderProgress) {
+                Write-Host ("Shader progress: " + (Get-Content -LiteralPath $shaderProgress -Tail 1))
+              }
+              Write-NewLogBytes $stdout ([ref]$stdoutOffset)
+              Write-NewLogBytes $stderr ([ref]$stderrOffset)
+              if ($build.HasExited) { break }
+              Start-Sleep -Seconds 20
+            }
+            $build.WaitForExit()
+            Write-Host ("Compile process exit code: {0}" -f $build.ExitCode)
+            if (Test-Path $stdout) { Get-Content $stdout | Write-Host }
+            if (Test-Path $stderr) { Get-Content $stderr | Write-Host }
+            if ($build.ExitCode -ne 0) { exit $build.ExitCode }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Install build outputs
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+          . .\build_common.ps1
+          SetupBuild -BuildArch x64
+          Push-Location _Comp64DebugOptimized
+          try {
+            meson install
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Upload build diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: openvr-build-diagnostics-${{ github.sha }}
+          path: |
+            _Comp64DebugOptimized\meson-logs\meson-log.txt
+            _Comp64DebugOptimized\meson-logs\*.txt
+            _Comp64DebugOptimized\meson-private\cmd_line.txt
+            _Comp64DebugOptimized\.ninja_log
+            _Comp64DebugOptimized\build.ninja
+            _Comp64DebugOptimized\update-deps.log
+            update-deps.log
+            D:\a\_temp\openvr-compile.stdout.log
+            D:\a\_temp\openvr-compile.stderr.log
+            D:\a\_temp\openvr-shader-progress.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Windows build
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: openvr-dxvk-remix-debugoptimized-${{ github.sha }}
+          path: |
+            _output\*.dll
+            _output\*.pdb
+            _output\*.txt
+            _output\LICENSE
+            _output\LICENSE-MIT
+            _output\CREDITS.md
+            _output\usd\*
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

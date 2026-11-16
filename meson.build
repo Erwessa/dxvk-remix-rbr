@@ -402,7 +402,9 @@ rtx_shaders_command_arguments = [
   '-include', join_paths(numos_root, 'shaders'),
   # NV-DXVK end
   '-output', rtx_shader_output_directory,
-  '-parallel',
+  # Bound internal Slang workers: one Ninja shader target expands into many variants.
+  # Four workers keep the large shader-variant batch moving on hosted Windows runners.
+  '-jobs', '4',
 ]
 
 if get_option('buildtype').startswith('debug')

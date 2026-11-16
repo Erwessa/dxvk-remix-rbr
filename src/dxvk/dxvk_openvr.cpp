@@ -7,7 +7,7 @@
 
 #include <openvr/openvr.hpp>
 
-using VR_InitInternalProc        = vr::IVRSystem* (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
+using VR_InitInternalProc        = uint32_t (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
 using VR_ShutdownInternalProc    = void  (VR_CALLTYPE *)();
 using VR_GetGenericInterfaceProc = void* (VR_CALLTYPE *)(const char*, vr::EVRInitError*);
 
@@ -24,6 +24,7 @@ namespace dxvk {
 
   VrInstance:: VrInstance() {
     m_no_vr = env::getEnvVar("DXVK_NO_VR") == "1";
+    m_vr_enabled = env::getEnvVar("DXVK_ENABLE_VR") == "1";
   }
   VrInstance::~VrInstance() { }
 
@@ -286,6 +287,224 @@ namespace dxvk {
   }
 
 
+  bool VrInstance::initializeSceneSession(const void* owner) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (!owner) {
+      Logger::warn("OpenVR: refusing scene session claim without an owner");
+      return false;
+    }
+
+    if (m_no_vr || !m_vr_enabled)
+      return false;
+
+    if (m_sceneSessionActive && m_compositor && m_system) {
+      if (m_sceneSessionOwner == owner)
+        return true;
+      Logger::warn("OpenVR: scene session is already owned by another DXVK device");
+      return false;
+    }
+
+    if (!m_ovrApi)
+      m_ovrApi = this->loadLibrary();
+
+    if (!m_ovrApi) {
+      Logger::warn("OpenVR: failed to load runtime for scene session");
+      return false;
+    }
+
+    auto releaseFailedInitialization = [this](bool shutdownRuntime) {
+      if (shutdownRuntime && g_vrFunctions.shutdownInternal)
+        g_vrFunctions.shutdownInternal();
+      if (m_loadedOvrApi)
+        this->freeLibrary();
+      m_loadedOvrApi = false;
+      m_ovrApi = nullptr;
+    };
+
+    g_vrFunctions.initInternal        = reinterpret_cast<VR_InitInternalProc>       (this->getSym("VR_InitInternal"));
+    g_vrFunctions.shutdownInternal    = reinterpret_cast<VR_ShutdownInternalProc>   (this->getSym("VR_ShutdownInternal"));
+    g_vrFunctions.getGenericInterface = reinterpret_cast<VR_GetGenericInterfaceProc>(this->getSym("VR_GetGenericInterface"));
+
+    if (!g_vrFunctions.getGenericInterface) {
+      Logger::warn("OpenVR: VR_GetGenericInterface not found");
+      releaseFailedInitialization(false);
+      return false;
+    }
+
+    // Prefer an existing host-owned OpenVR scene session. Do not initialize or
+    // shut down a second runtime instance when the game already owns one.
+    vr::EVRInitError error = vr::VRInitError_None;
+    auto* compositor = reinterpret_cast<vr::IVRCompositor*>(
+      g_vrFunctions.getGenericInterface(vr::IVRCompositor_Version, &error));
+
+    bool initializedHere = false;
+    if (error != vr::VRInitError_None || !compositor) {
+      if (!g_vrFunctions.initInternal || !g_vrFunctions.shutdownInternal) {
+        Logger::warn("OpenVR: initialization entry points are unavailable");
+        releaseFailedInitialization(false);
+        return false;
+      }
+
+      g_vrFunctions.initInternal(&error, vr::VRApplication_Scene);
+      if (error != vr::VRInitError_None) {
+        Logger::warn(str::format("OpenVR: scene initialization failed: ", static_cast<int>(error)));
+        releaseFailedInitialization(false);
+        return false;
+      }
+
+      initializedHere = true;
+      compositor = reinterpret_cast<vr::IVRCompositor*>(
+        g_vrFunctions.getGenericInterface(vr::IVRCompositor_Version, &error));
+    }
+
+    if (error != vr::VRInitError_None || !compositor) {
+      Logger::warn("OpenVR: failed to acquire compositor for scene session");
+      releaseFailedInitialization(initializedHere);
+      return false;
+    }
+
+    auto* system = reinterpret_cast<vr::IVRSystem*>(
+      g_vrFunctions.getGenericInterface(vr::IVRSystem_Version, &error));
+    if (error != vr::VRInitError_None || !system) {
+      Logger::warn("OpenVR: failed to acquire IVRSystem");
+      releaseFailedInitialization(initializedHere);
+      return false;
+    }
+
+    m_compositor = compositor;
+    m_system = system;
+    m_initializedOpenVr = initializedHere;
+    m_sceneSessionOwner = owner;
+    m_sceneSessionActive = true;
+    Logger::info("OpenVR: scene session is active");
+    return true;
+  }
+
+
+  bool VrInstance::acquireFrame(OpenVrFrameState& frame) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_compositor || !m_system)
+      return false;
+
+    OpenVrFrameState next = {};
+    const auto error = m_compositor->WaitGetPoses(
+      next.renderPoses.data(), static_cast<uint32_t>(next.renderPoses.size()), nullptr, 0);
+    if (error != vr::VRCompositorError_None) {
+      Logger::warn(str::format("OpenVR: WaitGetPoses failed: ", static_cast<int>(error)));
+      return false;
+    }
+
+    next.frameIndex = ++m_frameIndex;
+    next.hmdPoseValid = next.renderPoses[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid;
+    m_system->GetRecommendedRenderTargetSize(&next.recommendedWidth, &next.recommendedHeight);
+
+    if (next.hmdPoseValid) {
+      next.trackingFromHead = OpenVrMatrix4::fromHmdMatrix34(
+        next.renderPoses[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking);
+    }
+
+    constexpr std::array<vr::EVREye, 2> eyes = {
+      vr::Eye_Left,
+      vr::Eye_Right,
+    };
+
+    for (size_t i = 0; i < eyes.size(); i++) {
+      next.eyeToHead[i] = m_system->GetEyeToHeadTransform(eyes[i]);
+      m_system->GetProjectionRaw(
+        eyes[i],
+        &next.projection[i].left,
+        &next.projection[i].right,
+        &next.projection[i].top,
+        &next.projection[i].bottom);
+
+      if (next.hmdPoseValid) {
+        const auto headFromEye = OpenVrMatrix4::fromHmdMatrix34(next.eyeToHead[i]);
+        next.eyeFromTracking[i] = headFromEye.inverseRigid().multipliedBy(
+          next.trackingFromHead.inverseRigid());
+      }
+    }
+
+    // Publish only a complete snapshot. A caller never observes a mixture of
+    // poses from one frame and eye parameters from another.
+    frame = next;
+    return next.hmdPoseValid;
+  }
+
+
+  bool VrInstance::waitGetPoses(
+      std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_compositor)
+      return false;
+
+    // WaitGetPoses is the frame synchronization point for a scene application.
+    // Keep this call on the render thread and call it once per HMD frame.
+    const auto error = m_compositor->WaitGetPoses(
+      renderPoses.data(), static_cast<uint32_t>(renderPoses.size()), nullptr, 0);
+    if (error != vr::VRCompositorError_None) {
+      Logger::warn(str::format("OpenVR: WaitGetPoses failed: ", static_cast<int>(error)));
+      return false;
+    }
+    return true;
+  }
+
+
+  bool VrInstance::getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_system)
+      return false;
+
+    m_system->GetRecommendedRenderTargetSize(&width, &height);
+    return width != 0 && height != 0;
+  }
+
+
+  bool VrInstance::getEyeToHeadTransform(vr::EVREye eye, vr::HmdMatrix34_t& transform) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_system)
+      return false;
+
+    transform = m_system->GetEyeToHeadTransform(eye);
+    return true;
+  }
+
+
+  bool VrInstance::getProjectionRaw(vr::EVREye eye, float& left, float& right, float& top, float& bottom) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_system)
+      return false;
+
+    m_system->GetProjectionRaw(eye, &left, &right, &top, &bottom);
+    return true;
+  }
+
+
+  void VrInstance::shutdownSceneSession(const void* owner) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (!owner || owner != m_sceneSessionOwner) {
+      Logger::warn("OpenVR: ignoring scene session release from a non-owner");
+      return;
+    }
+
+    if (m_initializedOpenVr && g_vrFunctions.shutdownInternal)
+      g_vrFunctions.shutdownInternal();
+
+    m_initializedOpenVr = false;
+    m_sceneSessionActive = false;
+    m_sceneSessionOwner = nullptr;
+    m_compositor = nullptr;
+    m_system = nullptr;
+
+    if (m_loadedOvrApi)
+      this->freeLibrary();
+
+    m_loadedOvrApi = false;
+    m_ovrApi = nullptr;
+  }
+
+
   void VrInstance::shutdown() {
     if (m_vr_key)
     {
@@ -293,14 +512,21 @@ namespace dxvk {
         m_vr_key = nullptr;
     }
 
-    if (m_initializedOpenVr)
+    if (m_initializedOpenVr && g_vrFunctions.shutdownInternal)
       g_vrFunctions.shutdownInternal();
+
+    m_compositor = nullptr;
+    m_system = nullptr;
+    m_sceneSessionActive = false;
+    m_sceneSessionOwner = nullptr;
+    m_initializedOpenVr = false;
 
     if (m_loadedOvrApi)
       this->freeLibrary();
     
     m_initializedOpenVr = false;
     m_loadedOvrApi      = false;
+    m_ovrApi            = nullptr;
   }
 
 

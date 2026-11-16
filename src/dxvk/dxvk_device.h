@@ -716,6 +716,7 @@ namespace dxvk {
     sync::Spinlock              m_d3d9DeviceLock;
     uint32_t                    m_d3d9DeviceCount = 0;
     std::atomic<bool>           m_retired = { false };
+    bool                        m_openVrSessionOwned = false;
 
     sync::Spinlock              m_statLock;
     DxvkStatCounters            m_statCounters;

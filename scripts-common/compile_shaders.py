@@ -31,6 +31,7 @@ parser.add_argument('-I', '-include', action='append', type=str, dest='includes'
 parser.add_argument('-output', required=True, type=str, dest='output')
 parser.add_argument('-force', action='store_true', dest='force')
 parser.add_argument('-parallel', action='store_true', dest='parallel')
+parser.add_argument('-jobs', required=False, type=int, dest='jobs', default=None)
 parser.add_argument('-binary', action='store_true', dest='binary')
 parser.add_argument('-debug', action='store_true', dest='debug')
 parser.add_argument('-spirvopt', required=False, type=str, dest='spirvopt', default=None)
@@ -80,10 +81,22 @@ spirvValFlags = '--target-env vulkan1.2 --scalar-block-layout'
 os.makedirs(args.output, exist_ok = True)
 
 
+# A single shader command that runs longer than this is treated as stuck and fails the build.
+kCommandTimeoutSeconds = 20 * 60
+
+# Ninja holds the output of this script until it exits. When this variable names a file, progress lines are appended
+# there as well, so that a CI job can show them while the build runs.
+progressFile = os.environ.get('REMIX_SHADER_PROGRESS_FILE')
+
 def printFromThread(what):
-    report_lock.acquire()
-    print(what)
-    report_lock.release()
+    with report_lock:
+        print(what, flush=True)
+        writeProgressFile(what)
+
+def writeProgressFile(what):
+    if progressFile:
+        with open(progressFile, 'a', encoding='utf-8') as file:
+            file.write(what + '\n')
 
 
 class Task:
@@ -135,7 +148,15 @@ class Task:
             timeStart = time.time()
 
             process = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-            out, err = process.communicate()
+            try:
+                out, err = process.communicate(timeout = kCommandTimeoutSeconds)
+            except subprocess.TimeoutExpired:
+                if os.name == 'nt':
+                    subprocess.run(f'taskkill /F /T /PID {process.pid}', shell = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+                process.kill()
+                process.communicate()
+                printFromThread(f'Timed out after {kCommandTimeoutSeconds}s: {self.getName()}')
+                return (1, f'Command timed out after {kCommandTimeoutSeconds} seconds.', os.path.basename(command.split(' ')[0]))
 
             duration = time.time() - timeStart
 
@@ -166,19 +187,16 @@ class Task:
         return "<UnknownTask>"
 
 def runTasks(tasks):
-    global terminate
+    global terminate, completedTasks
     while True:
         if terminate:
             break
 
         task = None
 
-        task_lock.acquire()
-        tasksLeft = len(tasks)
-        if tasksLeft > 0:
-            task = tasks[0]
-            del tasks[0]
-        task_lock.release()
+        with task_lock:
+            if len(tasks) > 0:
+                task = tasks.pop(0)
 
         if task is None:
             break
@@ -202,6 +220,12 @@ def runTasks(tasks):
                 if (exitCode == 1) and (attempt < maxAttempts - 1):
                     continue
             break
+
+        with progress_lock:
+            completedTasks += 1
+            progressLine = f'[shader progress {completedTasks}/{totalTasks}] {task.getName()}'
+            print(progressLine, flush=True)
+            writeProgressFile(progressLine)
 
         if exitCode != 0:
             terminate = True
@@ -664,8 +688,15 @@ for root, dirs, files in os.walk(args.input):
                     tasks.append(task)
 
 if len(tasks):
+    totalTasks = len(tasks)
+    completedTasks = 0
+    progress_lock = threading.Lock()
+    print(f'[shader progress 0/{totalTasks}] starting workers', flush=True)
+    writeProgressFile(f'[shader progress 0/{totalTasks}] starting workers')
     threads = []
-    threadCount = multiprocessing.cpu_count() if args.parallel else 1
+    if args.jobs is not None and args.jobs < 1:
+        parser.error('-jobs must be at least 1')
+    threadCount = args.jobs if args.jobs is not None else (multiprocessing.cpu_count() if args.parallel else 1)
     for i in range(threadCount):
         thread = threading.Thread(target = runTasks, args = (tasks,))
         thread.start()
