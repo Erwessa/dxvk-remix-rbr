@@ -1294,7 +1294,7 @@ namespace dxvk {
     dispatchResolveForEye(ctx, rtOutput);
   }
 
-  void NeuralRadianceCache::onFrameEnd(Resources::RaytracingOutput& rtOutput) {
+  void NeuralRadianceCache::onFrameEnd() {
     if (!isActive()) {
       return;
     }
