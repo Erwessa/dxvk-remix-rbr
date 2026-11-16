@@ -37,6 +37,7 @@ namespace dxvk {
 
   void RtxVr::showImguiSettings() {
     RemixGui::Checkbox("OpenVR Headset (restart required)", &enableObject());
+    RemixGui::Checkbox("Headset Moves Main Camera", &headTrackMainCameraObject());
   }
 
   RtxVrFrame::RtxVrFrame() : m_pFrame(std::make_unique<OpenVrFrameState>()) { }
@@ -87,8 +88,16 @@ namespace dxvk {
     const RtCamera& mainCamera = cameraManager.getMainCamera();
     const bool isLHS = mainCamera.isLHS();
     const float unitsPerMeter = RtxOptions::getMeterToWorldUnitScale();
-    const Matrix4 gameViewToWorld = inverse(mainCamera.getWorldToViewf(false));
+    Matrix4 gameWorldToView = mainCamera.getWorldToViewf(false);
+    cameraManager.getGameWorldToView(gameWorldToView);
+    const Matrix4 gameViewToWorld = inverse(gameWorldToView);
     const Matrix4 headToSeat = toGameBasis(frame.trackingFromHead, unitsPerMeter, isLHS);
+
+    if (RtxVr::headTrackMainCamera()) {
+      cameraManager.setVrHeadPose(headToSeat);
+    } else {
+      cameraManager.clearVrHeadPose();
+    }
 
     Vector3 eyePositions[RtxEye::Count];
     for (uint32_t eye = 0; eye < RtxEye::Count; eye++) {

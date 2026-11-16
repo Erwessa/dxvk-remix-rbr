@@ -21,6 +21,10 @@ namespace dxvk {
                "The setting is read once when the graphics device is created, so a change takes effect after "
                "the game restarts. When off, or when no headset runtime is found, rendering is unchanged.");
 
+    RTX_OPTION("rtx.vr", bool, headTrackMainCamera, false,
+               "Moves the game's main camera with the headset, so the head pose is visible in the game window. "
+               "Takes effect from the second frame after the headset session starts.");
+
     static void showImguiSettings();
   };
 

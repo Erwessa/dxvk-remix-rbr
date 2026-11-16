@@ -181,7 +181,7 @@ On a frame with displacement the SHARC update ran inline with POM compiled in, s
 
 ### OpenVR headset session (opt-in)
 The runtime can claim an OpenVR scene session when the graphics device is created, and reads the headset's poses, eye transforms and projection bounds. Nothing renders to the headset yet. With the option off, rendering is unchanged.
-- Options: added `rtx.vr.enable` (default off, read once at device creation). Preset-independent: it changes no quality setting.
+- Options: added `rtx.vr.enable` (default off, read once at device creation) and `rtx.vr.headTrackMainCamera` (default off, moves the main camera with the headset so the head pose shows in the game window). Both are preset-independent: they change no quality setting.
 - Commits: see the branch history of feat/20261115-openvr-runtime.
 - Docs: [openvr-stereo-rendering.md](openvr-stereo-rendering.md), [VrMatrixConventions.md](../documentation/VrMatrixConventions.md)
 

@@ -142,8 +142,32 @@ namespace dxvk {
     return cameraType;
   }
 
-  void CameraManager::applyFrameCamera(CameraType::Enum cameraType, const Matrix4& worldToView, const Matrix4& viewToProjection) {
+  void CameraManager::setVrHeadPose(const Matrix4& headToSeat) {
+    m_vrHeadToSeat = headToSeat;
+    m_vrHeadPoseValid = true;
+  }
+
+  bool CameraManager::getGameWorldToView(Matrix4& worldToView) const {
+    if (m_gameMainWorldToViewFrameId != m_device->getCurrentFrameId()) {
+      return false;
+    }
+    worldToView = m_gameMainWorldToView;
+    return true;
+  }
+
+  void CameraManager::applyFrameCamera(CameraType::Enum cameraType, const Matrix4& gameWorldToView, const Matrix4& viewToProjection) {
     const uint32_t frameId = m_device->getCurrentFrameId();
+
+    // The headset pose moves the Main camera from the game's view, so the eye cameras can start from the original.
+    Matrix4 worldToView = gameWorldToView;
+    if (cameraType == CameraType::Main) {
+      m_gameMainWorldToView = gameWorldToView;
+      m_gameMainWorldToViewFrameId = frameId;
+      if (m_vrHeadPoseValid) {
+        worldToView = inverse(m_vrHeadToSeat) * gameWorldToView;
+      }
+    }
+
     const DecomposeProjectionParams decomposeProjectionParams = getOrDecomposeProjection(viewToProjection);
     auto& camera = getCamera(cameraType);
     auto cameraSequence = RtCameraSequence::getInstance();

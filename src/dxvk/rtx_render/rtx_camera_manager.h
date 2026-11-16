@@ -101,6 +101,15 @@ namespace dxvk {
     bool apiWorldOriginSeen() const { return m_apiWorldOriginSeen; }
 
     uint32_t getLastCameraCutFrameId() const { return m_lastCameraCutFrameId; }
+
+    // Sets the headset pose, in game units and the game's basis, that is applied to the Main camera of later frames.
+    // The pose maps head space to the seated origin, which sits at the game's own camera.
+    void setVrHeadPose(const Matrix4& headToSeat);
+    void clearVrHeadPose() { m_vrHeadPoseValid = false; }
+
+    // Returns the Main camera's world-to-view matrix as the game set it, before any headset pose was applied.
+    // Returns false when the Main camera was not set this frame.
+    bool getGameWorldToView(Matrix4& worldToView) const;
     bool isCameraCutThisFrame() const;
 
     // Scene interface (remixapi_CameraInfoFrameEventsEXT): a cut the host stated. Restarts temporal history this
@@ -139,6 +148,11 @@ namespace dxvk {
     std::array<RtCamera, RtxEye::Count> m_vrEyeCameras;
     CameraType::Enum m_lastSetCameraType = CameraType::Unknown;
     uint32_t m_lastCameraCutFrameId = -1;
+
+    Matrix4 m_vrHeadToSeat;
+    bool m_vrHeadPoseValid = false;
+    Matrix4 m_gameMainWorldToView;
+    uint32_t m_gameMainWorldToViewFrameId = -1;
     uint32_t m_lastCameraViewHistoryInvalidationFrameId = -1;
     fast_unordered_cache<DecomposeProjectionParams> m_decompositionCache;
     std::array<Vector3, CameraType::Count> m_externalCameraOrigins {};
