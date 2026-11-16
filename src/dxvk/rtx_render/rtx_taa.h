@@ -30,6 +30,8 @@
 #include "../util/util_matrix.h"
 #include "rtx_options.h"
 
+#include <array>
+
 namespace dxvk {
 
   class DxvkDevice;
@@ -48,7 +50,8 @@ namespace dxvk {
       const Resources::Resource& colorTextureInput,
       const Resources::Resource& primaryScreenSpaceMotionVector,
       const Resources::Resource& colorTextureOutput,
-      const bool isUpscale);
+      const bool isUpscale,
+      uint32_t eyeIndex);
 
     void prewarmShaders(DxvkPipelineManager& pipelineManager) const;
 
@@ -62,7 +65,8 @@ namespace dxvk {
 
     Rc<vk::DeviceFn> m_vkd;
 
-    Resources::Resource m_taaFeedbackTexture[2];
+    // TAA history is independent per view; each eye also ping-pongs across frames.
+    std::array<std::array<Resources::Resource, 2>, 2> m_taaFeedbackTexture;
 
     RTX_OPTION_ARGS("rtx.temporalAA", float, maximumRadiance, 10000.0f,
                "The maximum value to use in TAA-U's perceptual quantizer color transformation, measured in cd/m^2.\n"

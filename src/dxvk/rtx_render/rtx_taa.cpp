@@ -82,7 +82,9 @@ namespace dxvk {
     const Resources::Resource& colorTextureInput,
     const Resources::Resource& primaryScreenSpaceMotionVector,
     const Resources::Resource& colorTextureOutput,
-    const bool isUpscale) {
+    const bool isUpscale,
+    uint32_t eyeIndex) {
+    assert(eyeIndex < m_taaFeedbackTexture.size());
     ScopedGpuProfileZone(ctx, "TAA");
 
     const VkExtent3D& inputSize = colorTextureInput.image->info().extent;
@@ -109,9 +111,9 @@ namespace dxvk {
     const uint32_t feedbackOutputIdx = (feedbackInputIdx ^ 1);
 
     ctx->bindResourceView(TAA_INPUT, colorTextureInput.view, nullptr);
-    ctx->bindResourceView(TAA_FEEDBACK_INPUT, m_taaFeedbackTexture[feedbackInputIdx].view, nullptr);
+    ctx->bindResourceView(TAA_FEEDBACK_INPUT, m_taaFeedbackTexture[eyeIndex][feedbackInputIdx].view, nullptr);
     ctx->bindResourceView(TAA_PRIMARY_SCREEN_SPACE_MOTION_INPUT, primaryScreenSpaceMotionVector.view, nullptr);
-    ctx->bindResourceView(TAA_FEEDBACK_OUTPUT, m_taaFeedbackTexture[feedbackOutputIdx].view, nullptr);
+    ctx->bindResourceView(TAA_FEEDBACK_OUTPUT, m_taaFeedbackTexture[eyeIndex][feedbackOutputIdx].view, nullptr);
     ctx->bindResourceView(TAA_OUTPUT, colorTextureOutput.view, nullptr);
     ctx->bindResourceSampler(TAA_LINEAR_SAMPLER, linearSampler);
 
@@ -126,15 +128,21 @@ namespace dxvk {
   }
 
   void DxvkTemporalAA::createTargetResource(Rc<DxvkContext>& ctx, const VkExtent3D& targetExtent) {
-    // TAA intermediate textures
-    for (uint32_t i = 0; i < 2; i++) {
-      m_taaFeedbackTexture[i] = Resources::createImageResource(ctx, "TAA feedback texture", targetExtent, VK_FORMAT_R32G32B32A32_SFLOAT);
+    // Keep independent temporal feedback for each eye and each ping-pong frame slot.
+    for (uint32_t eyeIndex = 0; eyeIndex < m_taaFeedbackTexture.size(); ++eyeIndex) {
+      for (uint32_t frameIndex = 0; frameIndex < m_taaFeedbackTexture[eyeIndex].size(); ++frameIndex) {
+        m_taaFeedbackTexture[eyeIndex][frameIndex] = Resources::createImageResource(
+          ctx, str::format("TAA feedback texture eye ", eyeIndex, " frame ", frameIndex),
+          targetExtent, VK_FORMAT_R32G32B32A32_SFLOAT);
+      }
     }
   }
 
   void DxvkTemporalAA::releaseTargetResource() {
-    for (uint32_t i = 0; i < 2; i++) {
-      m_taaFeedbackTexture[i].reset();
+    for (auto& eyeFeedback : m_taaFeedbackTexture) {
+      for (auto& frameFeedback : eyeFeedback) {
+        frameFeedback.reset();
+      }
     }
   }
 }

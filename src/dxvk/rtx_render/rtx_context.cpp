@@ -3030,7 +3030,8 @@ namespace dxvk {
         rtOutput.m_compositeOutput.resource(Resources::AccessType::Read),
         rtOutput.m_primaryScreenSpaceMotionVector,
         rtOutput.m_finalOutput.resource(Resources::AccessType::Write),
-        true);
+        true,
+        m_activeEyeIndex);
     }
   }
 
