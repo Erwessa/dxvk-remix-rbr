@@ -822,7 +822,12 @@ namespace dxvk {
         fork_hooks::dispatchRainMap(*this, rtOutput);
 
         // Path Tracing
-        dispatchPathTracing(rtOutput);
+        // Keep the eye-local G-buffer boundary visible at the frame-pipeline level.
+        // A stereo path can render both eyes' G-buffers before advancing either eye.
+        dispatchGBuffer(rtOutput);
+        preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
+        midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
+        dispatchPathTracingAfterGBuffer(rtOutput);
         frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
 
         // Sky provider, post-depth slot: NUMOS's screen-space pass (the clouds) runs here,
@@ -2746,12 +2751,7 @@ namespace dxvk {
     dispatchIntegrate(rtOutput);
   }
 
-  void RtxContext::dispatchPathTracing(const Resources::RaytracingOutput& rtOutput) {
-    dispatchGBuffer(rtOutput);
-    preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
-    midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
-    dispatchPathTracingAfterGBuffer(rtOutput);
-  }
+
   
   void RtxContext::dispatchDemodulate(const Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
