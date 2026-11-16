@@ -355,6 +355,8 @@ namespace dxvk {
     void dispatchPathTracingPreparationAfterGBuffer(const Resources::RaytracingOutput& rtOutput);
     void dispatchPathTracingIntegration(const Resources::RaytracingOutput& rtOutput);
     void dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput);
+    // Shared consumers that require query paths from every rendered eye run at this barrier.
+    void dispatchLogicalFramePostPathTracing();
     void dispatchPostDepthForEye(const Resources::RaytracingOutput& rtOutput);
     void dispatchPostNrcForEye(const Resources::RaytracingOutput& rtOutput);
     void dispatchEyeDenoisingAndComposition(const Resources::RaytracingOutput& rtOutput, bool captureScreenImage, bool captureDebugImage);

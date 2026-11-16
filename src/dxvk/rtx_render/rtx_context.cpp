@@ -863,11 +863,7 @@ namespace dxvk {
         // Eye-local path tracing starts after the logical-frame NEE cache update.
         // Keep all passes that consume or write the active eye's resources together.
         dispatchEyePathTracing(rtOutput);
-        frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
-
-        // Mono currently trains immediately; stereo will move this logical-frame operation
-        // after both eyes have generated their Integration query paths.
-        m_common->metaNeuralRadianceCache().dispatchTraining(*this);
+        dispatchLogicalFramePostPathTracing();
 
         // Resolve and the following reuse passes consume eye-local output resources.
         dispatchPostNrcForEye(rtOutput);
@@ -2728,6 +2724,13 @@ namespace dxvk {
 
     // Integration Raytracing produces the NRC query paths consumed by logical-frame training.
     dispatchIntegrate(rtOutput);
+  }
+
+  void RtxContext::dispatchLogicalFramePostPathTracing() {
+    // This is a logical-frame barrier, not an eye pass. In stereo it must be called only
+    // after every eye has completed Integration, because NRC's SDK buffers are shared.
+    frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
+    m_common->metaNeuralRadianceCache().dispatchTraining(*this);
   }
 
   void RtxContext::dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput) {
