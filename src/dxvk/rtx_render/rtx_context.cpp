@@ -1845,17 +1845,19 @@ namespace dxvk {
     RaytraceArgs &constants = rtOutput.m_raytraceArgs;
     constants = {}; 
 
-    auto const& camera{ getSceneManager().getCamera() };
     const uint32_t frameIdx = m_device->getCurrentFrameId();
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const RtCamera& logicalCamera = getSceneManager().getCamera();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameIdx)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
+      : logicalCamera;
 
-    constants.camera = camera.getShaderConstants();
+    constants.camera = renderCamera.getShaderConstants();
 
     // Set the Raytraced Render Target camera matrices
     auto const& renderTargetCamera { getSceneManager().getCameraManager().getCamera(CameraType::RenderToTexture) };
     constants.renderTargetCamera = renderTargetCamera.getShaderConstants(/*freecam =*/ false);
     constants.enableRaytracedRenderTarget = renderTargetCamera.isValid(m_device->getCurrentFrameId()) && RtxOptions::RaytracedRenderTarget::enable();
-    const CameraManager& cameraManager = getSceneManager().getCameraManager();
-
     const bool enablePortalVolumes = RtxGlobalVolumetrics::enableInPortals() &&
       cameraManager.isCameraValid(CameraType::Portal0) &&
       cameraManager.isCameraValid(CameraType::Portal1);
@@ -2135,7 +2137,7 @@ namespace dxvk {
     m_common->metaNeeCache().setRaytraceArgs(constants);
     // NEE uses one world-space hash grid shared by both VR eyes. Do not derive
     // its origin from cb.camera, which will differ between the left and right eye.
-    constants.neeCacheArgs.cacheCenter = vec4(camera.getPosition(), 0.0f);
+    constants.neeCacheArgs.cacheCenter = vec4(logicalCamera.getPosition(), 0.0f);
     constants.surfaceCount = getSceneManager().getAccelManager().getSurfaceCount();
 
     m_common->metaSparseRendering().setSparseRenderingArgs(*this, constants.sparseRenderingArgs);
@@ -2144,7 +2146,7 @@ namespace dxvk {
     constants.teleportationPortalIndex = cameraTeleportDirectionInfo ? cameraTeleportDirectionInfo->entryPortalInfo.portalIndex + 1 : 0;
 
     // Note: Use half of the vertical FoV for the main camera in radians divided by the vertical resolution to get the effective half angle of a single pixel.
-    constants.screenSpacePixelSpreadHalfAngle = getSceneManager().getCamera().getFov() / 2.0f / constants.camera.resolution.y;
+    constants.screenSpacePixelSpreadHalfAngle = renderCamera.getFov() / 2.0f / constants.camera.resolution.y;
 
     // Note: This value is assumed to be positive (specifically not have the sign bit set) as otherwise it will break Ray Interaction encoding.
     assert(std::signbit(constants.screenSpacePixelSpreadHalfAngle) == false);
