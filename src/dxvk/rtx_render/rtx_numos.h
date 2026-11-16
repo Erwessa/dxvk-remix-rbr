@@ -16,6 +16,7 @@
 // RaytraceArgs. Radiance NUMOS produces carries its pre-exposure (FrameOutputs::radianceScale); the
 // lights get it divided out here and the shaders through RaytraceArgs::skyRadianceUnscale.
 
+#include <array>
 #include <memory>
 
 #include "rtx_common_object.h"
@@ -68,6 +69,7 @@ namespace dxvk {
     // (RtxInitializer's shader prewarm). Only the selected cloud render variant is registered.
     void prewarmShaders();
 
+    void setActiveEyeIndex(uint32_t eyeIndex) { assert(eyeIndex < 2); m_activeEyeIndex = eyeIndex; }
     void beginFrame(RtxContext& ctx, RaytraceArgs& constants);
     void setMissLinearViewZ(float missLinearViewZ) { m_missLinearViewZ = missLinearViewZ; }
     void dispatchPostDepth(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput);
@@ -110,7 +112,8 @@ namespace dxvk {
     bool m_nightSkyLoaded = false;
     float m_missLinearViewZ = 0.0f;
     uint32_t m_frameIndex = 0;
-    uint32_t m_lastCameraCutFrame = 0;
+    std::array<uint32_t, 2> m_lastCameraCutFrame = {};  // NUMOS temporal histories are independent per eye.
+    uint32_t m_activeEyeIndex = 0;
     uint32_t m_lastWorldChangeCount = 0;  // rtx.skyProvider.worldChangeCount last seen
     bool m_hostSkyOverride = false;
     bool m_postDepthDone = false;  // dispatchPostDepth ran since this frame's beginFrame
