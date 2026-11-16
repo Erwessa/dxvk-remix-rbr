@@ -196,6 +196,9 @@ namespace dxvk {
 
     void bindCommonRayTracingResources(const Resources::RaytracingOutput& rtOutput);
 
+    // Selects the per-eye RaytraceArgs buffer used by constant uploads and common bindings.
+    void setActiveEyeIndex(uint32_t eyeIndex) { assert(eyeIndex < 2); m_activeEyeIndex = eyeIndex; }
+
     void bindResourceView(const uint32_t slot, const Rc<DxvkImageView>& imageView, const Rc<DxvkBufferView>& bufferView);
 
     void getDenoiseArgs(NrdArgs& outPrimaryDirectNrdArgs, NrdArgs& outPrimaryIndirectNrdArgs, NrdArgs& outSecondaryNrdArgs);
@@ -428,6 +431,8 @@ namespace dxvk {
     uint32_t m_preGatePoint = 0;
     // See getFrameFeatures().
     RtFrameFeatures m_frameFeatures;
+    // Mono uses slot 0; stereo selects 0 for left and 1 for right before each eye dispatch.
+    uint32_t m_activeEyeIndex = 0;
     // rtx.profile.detailedLogging
     RtxPerfLog m_perfLog;
     RtxPerfLog::CpuFrame m_perfCpu;
