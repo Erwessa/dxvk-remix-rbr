@@ -25,6 +25,7 @@
 #include <array>
 
 #include "dxvk_device.h"
+#include "../dxvk_openvr.h"
 #include "dxvk_cs.h"
 #include <algorithm>
 #include "dxvk_scoped_annotation.h"
