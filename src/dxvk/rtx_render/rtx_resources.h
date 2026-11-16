@@ -464,9 +464,9 @@ namespace dxvk
     bool needsRtxdiIlluminanceResources() const;
     bool areNrdDenoisingGuideResourcesAllocated() const { return m_nrdDenoisingGuideResourcesAllocated; }
     bool needsNrdDenoisingGuideResources() const;
-    void createNrdDenoisingGuideResources(Rc<DxvkContext>& ctx);
+    void createNrdDenoisingGuideResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
     bool needsPrimaryDenoisingNormal() const;
-    void createDlfgResourceQueues(Rc<DxvkContext>& ctx);
+    void createDlfgResourceQueues(Rc<DxvkContext>& ctx, RaytracingOutput& output);
 
     static RtxTextureFormatCompatibilityCategory getFormatCompatibilityCategory(const VkFormat format);
     static bool areFormatsCompatible(const VkFormat format1, const VkFormat format2);
@@ -540,12 +540,12 @@ namespace dxvk
     void createSharedResources();
     void createRaytracingOutput(Rc<DxvkContext>& ctx, const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent);
 
-    void createTargetResources(Rc<DxvkContext>& ctx);
+    void createTargetResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
 
-    void createNeuralRenderingOutput(Rc<DxvkContext>& ctx);
-    void updateDlssNeuralRenderingResources(Rc<DxvkContext>& ctx);
+    void createNeuralRenderingOutput(Rc<DxvkContext>& ctx, RaytracingOutput& output);
+    void updateDlssNeuralRenderingResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
 
-    void createDownscaledResources(Rc<DxvkContext>& ctx);
+    void createDownscaledResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
     bool areDownscaledResourcesCurrent() const;
   };
 
