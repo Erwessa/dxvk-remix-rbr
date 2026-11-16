@@ -512,7 +512,7 @@ namespace dxvk {
     return approximateDensity < fogDensityThrehold;
   }
 
-  VolumeArgs RtxGlobalVolumetrics::getVolumeArgs(CameraManager const& cameraManager, FogState const& fogState, bool enablePortalVolumes) const {
+  VolumeArgs RtxGlobalVolumetrics::getVolumeArgs(CameraManager const& cameraManager, FogState const& fogState, bool enablePortalVolumes, uint32_t eyeIndex) const {
     // Calculate the volumetric parameters from options and the fixed function fog state.
 
     // Note: Volumetric transmittance color option is in gamma space, so must be converted to linear for usage in the volumetric system.
@@ -606,7 +606,9 @@ namespace dxvk {
     };
     Vector3 const volumetricScatteringCoefficient{ volumetricAttenuationCoefficient * singleScatteringAlbedo() };
 
-    const RtCamera& mainCamera = cameraManager.getMainCamera();
+    const RtCamera& mainCamera = cameraManager.areVrEyeCamerasValid(m_device->getCurrentFrameId())
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(eyeIndex))
+      : cameraManager.getMainCamera();
 
     // Set Volumetric Arguments
 
@@ -731,7 +733,7 @@ namespace dxvk {
     return volumeArgs;
   }
 
-  void RtxGlobalVolumetrics::dispatch(RtxContext* ctx, const Resources::RaytracingOutput& rtOutput, uint32_t numActiveFroxelVolumes) {
+  void RtxGlobalVolumetrics::dispatch(RtxContext* ctx, const Resources::RaytracingOutput& rtOutput, uint32_t numActiveFroxelVolumes, uint32_t eyeIndex) {
     // isEnabled() is always true, so this is the only gate on the froxel passes.
     // getVolumeArgs zeroes the consumer gain on frames that skip them.
     if (!m_froxelCacheActive) {
@@ -746,16 +748,16 @@ namespace dxvk {
     // their UVW coordinates are not out of the [0, 1] range before looking up the value.
     Rc<DxvkSampler> linearSampler = ctx->getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
-    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_Y, getPreviousVolumeAccumulatedRadianceY().view, nullptr);
+    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_Y, getPreviousVolumeAccumulatedRadianceY(eyeIndex).view, nullptr);
     ctx->bindResourceSampler(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_Y, linearSampler);
-    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_CO_CG, getPreviousVolumeAccumulatedRadianceCoCg().view, nullptr);
+    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_CO_CG, getPreviousVolumeAccumulatedRadianceCoCg(eyeIndex).view, nullptr);
     ctx->bindResourceSampler(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_CO_CG, linearSampler);
-    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_AGE, getPreviousVolumeAccumulatedRadianceAge().view, nullptr);
+    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_AGE, getPreviousVolumeAccumulatedRadianceAge(eyeIndex).view, nullptr);
     ctx->bindResourceSampler(VOLUME_INTEGRATE_BINDING_PREV_ACCUMULATED_RADIANCE_INPUT_AGE, linearSampler);
 
-    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_ACCUMULATED_RADIANCE_OUTPUT_Y, getCurrentVolumeAccumulatedRadianceY().view, nullptr);
-    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_ACCUMULATED_RADIANCE_OUTPUT_CO_CG, getCurrentVolumeAccumulatedRadianceCoCg().view, nullptr);
-    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_ACCUMULATED_RADIANCE_OUTPUT_AGE, getCurrentVolumeAccumulatedRadianceAge().view, nullptr);
+    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_ACCUMULATED_RADIANCE_OUTPUT_Y, getCurrentVolumeAccumulatedRadianceY(eyeIndex).view, nullptr);
+    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_ACCUMULATED_RADIANCE_OUTPUT_CO_CG, getCurrentVolumeAccumulatedRadianceCoCg(eyeIndex).view, nullptr);
+    ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_ACCUMULATED_RADIANCE_OUTPUT_AGE, getCurrentVolumeAccumulatedRadianceAge(eyeIndex).view, nullptr);
 
     auto numRaysExtent = m_froxelVolumeExtent;
     numRaysExtent.width *= numActiveFroxelVolumes;
@@ -769,7 +771,7 @@ namespace dxvk {
       ctx->setFramePassStage(RtxFramePassStage::VolumeIntegrateRestirInitial);
       VkExtent3D workgroups = util::computeBlockCount(numRestirCellsExtent, VkExtent3D { 16, 8, 1 });
 
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getCurrentVolumeReservoirs().view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getCurrentVolumeReservoirs(eyeIndex).view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, VolumeRestirShaderInitial::getShader());
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
@@ -780,7 +782,7 @@ namespace dxvk {
       ctx->setFramePassStage(RtxFramePassStage::VolumeIntegrateRestirVisible);
       VkExtent3D workgroups = util::computeBlockCount(numRestirCellsExtent, VkExtent3D { 16, 8, 1 });
 
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getCurrentVolumeReservoirs().view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getCurrentVolumeReservoirs(eyeIndex).view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, VolumeRestirShaderVisibility::getShader());
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
@@ -791,8 +793,8 @@ namespace dxvk {
       ctx->setFramePassStage(RtxFramePassStage::VolumeIntegrateRestirTemporal);
       VkExtent3D workgroups = util::computeBlockCount(numRestirCellsExtent, VkExtent3D { 16, 8, 1 });
 
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_VOLUME_RESERVOIRS_INPUT, getPreviousVolumeReservoirs().view, nullptr);
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getCurrentVolumeReservoirs().view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_VOLUME_RESERVOIRS_INPUT, getPreviousVolumeReservoirs(eyeIndex).view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getCurrentVolumeReservoirs(eyeIndex).view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, VolumeRestirShaderTemporal::getShader());
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
@@ -803,8 +805,8 @@ namespace dxvk {
       ctx->setFramePassStage(RtxFramePassStage::VolumeIntegrateRestirSpatialResampling);
       VkExtent3D workgroups = util::computeBlockCount(numRestirCellsExtent, VkExtent3D { 16, 8, 1 });
 
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_VOLUME_RESERVOIRS_INPUT, getCurrentVolumeReservoirs().view, nullptr);
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getPreviousVolumeReservoirs().view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_PREV_VOLUME_RESERVOIRS_INPUT, getCurrentVolumeReservoirs(eyeIndex).view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getPreviousVolumeReservoirs(eyeIndex).view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, VolumeRestirShaderSpatialResampling::getShader());
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
@@ -816,7 +818,7 @@ namespace dxvk {
       ctx->setFramePassStage(RtxFramePassStage::VolumeIntegrateRaytracing);
       VkExtent3D workgroups = util::computeBlockCount(numRaysExtent, VkExtent3D { 16, 8, 1 });
 
-      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getPreviousVolumeReservoirs().view, nullptr);
+      ctx->bindResourceView(VOLUME_INTEGRATE_BINDING_VOLUME_RESERVOIRS_OUTPUT, getPreviousVolumeReservoirs(eyeIndex).view, nullptr);
 
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, VolumeIntegrateShader::getShader());
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
@@ -878,7 +880,8 @@ namespace dxvk {
 
     RtxPass::onFrameBegin(ctx, frameBeginCtx);
 
-    m_swapTextures = !m_swapTextures;
+    for (uint32_t eyeIndex = 0; eyeIndex < RtxEye::Count; eyeIndex++)
+      m_swapTextures[eyeIndex] = !m_swapTextures[eyeIndex];
 
     // New textures start cleared, and m_froxelCacheHistoryStale resets history on the first frame at the new size.
     if (m_rebuildFroxels || m_froxelTexturesFull != m_froxelCacheActive || m_froxelTexturesReduction != m_froxelCacheReduction) {
@@ -920,25 +923,29 @@ namespace dxvk {
       restirFroxelGridFullDimensions = VkExtent3D { 1, 1, 1 };
     }
 
-    m_volumeAccumulatedRadianceY[0] = Resources::createImageResource(ctx, "volume accumulated radiance SH(Y) 0", froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-    m_volumeAccumulatedRadianceY[1] = Resources::createImageResource(ctx, "volume accumulated radiance SH(Y) 1", froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-    m_volumeAccumulatedRadianceCoCg[0] = Resources::createImageResource(ctx, "volume accumulated radiance (Co, Cg) 0", froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-    m_volumeAccumulatedRadianceCoCg[1] = Resources::createImageResource(ctx, "volume accumulated radiance (Co, Cg) 1", froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-    m_volumeAccumulatedRadianceAge[0] = Resources::createImageResource(ctx, "volume accumulated radiance (Age) 0", froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-    m_volumeAccumulatedRadianceAge[1] = Resources::createImageResource(ctx, "volume accumulated radiance (Age) 1", froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-
-    m_volumeReservoirs[0] = Resources::createImageResource(ctx, "volume reservoir 0", restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-    m_volumeReservoirs[1] = Resources::createImageResource(ctx, "volume reservoir 1", restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+    for (uint32_t eyeIndex = 0; eyeIndex < RtxEye::Count; eyeIndex++) {
+      const char* eyeLabel = eyeIndex == RtxEye::Left ? "left" : "right";
+      m_volumeAccumulatedRadianceY[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance SH(Y) ", eyeLabel, " 0"), froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceY[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance SH(Y) ", eyeLabel, " 1"), froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceCoCg[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Co, Cg) ", eyeLabel, " 0"), froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceCoCg[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Co, Cg) ", eyeLabel, " 1"), froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceAge[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Age) ", eyeLabel, " 0"), froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceAge[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Age) ", eyeLabel, " 1"), froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeReservoirs[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume reservoir ", eyeLabel, " 0"), restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeReservoirs[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume reservoir ", eyeLabel, " 1"), restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+    }
 
     m_rebuildFroxels = false;
   }
 
   void RtxGlobalVolumetrics::releaseDownscaledResource() {
-    for (uint32_t i = 0; i < 2; i++) {
-      m_volumeAccumulatedRadianceY[i].reset();
-      m_volumeAccumulatedRadianceCoCg[i].reset();
-      m_volumeAccumulatedRadianceAge[i].reset();
-      m_volumeReservoirs[i].reset();
+    for (uint32_t eyeIndex = 0; eyeIndex < RtxEye::Count; eyeIndex++) {
+      for (uint32_t historyIndex = 0; historyIndex < 2; historyIndex++) {
+        m_volumeAccumulatedRadianceY[eyeIndex][historyIndex].reset();
+        m_volumeAccumulatedRadianceCoCg[eyeIndex][historyIndex].reset();
+        m_volumeAccumulatedRadianceAge[eyeIndex][historyIndex].reset();
+        m_volumeReservoirs[eyeIndex][historyIndex].reset();
+      }
     }
   }
 
