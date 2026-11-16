@@ -2104,7 +2104,9 @@ namespace dxvk {
       restirGISampleStealingMode = ReSTIRGISampleStealing::StealSample;
     }
     constants.enableReSTIRGI = restirGI.isActive();
-    constants.enableReSTIRGITemporalReuse = restirGI.useTemporalReuse();
+    // Do not carry reservoirs across camera/session history invalidation. Keep initial
+    // sampling and spatial reuse active so the current frame can seed fresh history.
+    constants.enableReSTIRGITemporalReuse = restirGI.useTemporalReuse() && !m_resetHistory;
     constants.enableReSTIRGISpatialReuse = restirGI.useSpatialReuse();
     constants.reSTIRGIMISMode = (uint32_t)restirGI.misMode();
     constants.enableReSTIRGIFinalVisibility = restirGI.useFinalVisibility();
