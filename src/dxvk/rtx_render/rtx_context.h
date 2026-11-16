@@ -197,7 +197,7 @@ namespace dxvk {
     void bindCommonRayTracingResources(const Resources::RaytracingOutput& rtOutput);
 
     // Selects the per-eye RaytraceArgs buffer used by constant uploads and common bindings.
-    void setActiveEyeIndex(uint32_t eyeIndex) { assert(eyeIndex < 2); m_activeEyeIndex = eyeIndex; }
+    void setActiveEyeIndex(uint32_t eyeIndex) { assert(eyeIndex < 2); m_activeEyeIndex = eyeIndex; getResourceManager().setActiveEyeIndex(eyeIndex); }
 
     void bindResourceView(const uint32_t slot, const Rc<DxvkImageView>& imageView, const Rc<DxvkBufferView>& bufferView);
 
