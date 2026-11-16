@@ -435,6 +435,41 @@ namespace dxvk {
   }
 
 
+  bool VrInstance::submitFrame(
+      const std::array<vr::VRVulkanTextureData_t, 2>& textures,
+      vr::EColorSpace colorSpace) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_compositor)
+      return false;
+
+    // Keep the Vulkan descriptors alive for both synchronous Submit calls.
+    auto vulkanTextures = textures;
+    constexpr std::array<vr::EVREye, 2> eyes = {
+      vr::Eye_Left,
+      vr::Eye_Right,
+    };
+
+    bool success = true;
+    for (size_t i = 0; i < eyes.size(); i++) {
+      vr::Texture_t texture = {
+        &vulkanTextures[i],
+        vr::TextureType_Vulkan,
+        colorSpace,
+      };
+
+      const auto error = m_compositor->Submit(eyes[i], &texture);
+      if (error != vr::VRCompositorError_None) {
+        Logger::warn(str::format(
+          "OpenVR: Submit failed for ", i == 0 ? "left" : "right",
+          " eye: ", static_cast<int>(error)));
+        success = false;
+      }
+    }
+
+    return success;
+  }
+
+
   bool VrInstance::waitGetPoses(
       std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
