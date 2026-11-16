@@ -191,7 +191,8 @@ namespace dxvk {
 
     // Invoked after the command list has been submitted.
     // The command queue must be the same one that was used to execute all the previous command lists
-    void onFrameEnd(Resources::RaytracingOutput& rtOutput);
+    // Ends the shared NRC logical frame once, after all rendered eye resolves.
+    void onFrameEnd();
 
     void showImguiSettings(DxvkContext& ctx);
 
