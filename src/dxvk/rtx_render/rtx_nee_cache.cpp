@@ -174,9 +174,9 @@ namespace dxvk {
     {
       ScopedGpuProfileZone(ctx, "UpdateNEECacheShader");
       ctx->bindCommonRayTracingResources(rtOutput);
-      ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_NEE_CACHE, DxvkBufferSlice(rtOutput.m_neeCache, 0, rtOutput.m_neeCache->info().size));
-      ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_NEE_CACHE_TASK, DxvkBufferSlice(rtOutput.m_neeCacheTask, 0, rtOutput.m_neeCacheTask->info().size));
-      ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_NEE_CACHE_SAMPLE, DxvkBufferSlice(rtOutput.m_neeCacheSample, 0, rtOutput.m_neeCacheSample->info().size));
+      ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_NEE_CACHE, DxvkBufferSlice(ctx->getResourceManager().getNeeCacheBuffer(), 0, ctx->getResourceManager().getNeeCacheBuffer()->info().size));
+      ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_NEE_CACHE_TASK, DxvkBufferSlice(ctx->getResourceManager().getNeeCacheTaskBuffer(), 0, ctx->getResourceManager().getNeeCacheTaskBuffer()->info().size));
+      ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_NEE_CACHE_SAMPLE, DxvkBufferSlice(ctx->getResourceManager().getNeeCacheSampleBuffer(), 0, ctx->getResourceManager().getNeeCacheSampleBuffer()->info().size));
       ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_PRIMITIVE_ID_PREFIX_SUM, DxvkBufferSlice(primitiveIDPrefixSumBuffer, 0, primitiveIDPrefixSumBuffer->info().size));
       ctx->bindResourceBuffer(UPDATE_NEE_CACHE_BINDING_LAST_PRIMITIVE_ID_PREFIX_SUM, DxvkBufferSlice(lastPrimitiveIDPrefixSumBuffer, 0, lastPrimitiveIDPrefixSumBuffer->info().size));
 
