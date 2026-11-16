@@ -132,28 +132,33 @@ VsOut main(uint vertexIdx : SV_VertexID)
   rng = createRNG(uvec2(vertexIdx & 0xFFFF, vertexIdx >> 16), cb.frameIdx, vertexIdx);
   
   GpuDustParticle particle = Particles[vertexIdx];
-  
-  if(shouldRespawn(particle))
+
+  // The first eye advances the shared simulation. Other eyes only render the resulting
+  // particle state from their own camera, without respawning or writing the buffer again.
+  if (particleCb.simulateParticles != 0)
   {
-    particle = respawn();
+    if(shouldRespawn(particle))
+    {
+      particle = respawn();
+    }
+
+    if(particleCb.useTurbulence)
+    {
+      particle.velocity += curlOfValueNoise(particle.position * particleCb.turbulenceFrequency, 0.f) * particleCb.turbulenceAmplitude * particleCb.deltaTimeSecs;
+    }
+
+    particle.velocity += particleCb.upDirection * particleCb.gravityForce * particleCb.deltaTimeSecs;
+
+    if(dot(particle.velocity, particle.velocity) > float16_t(0.f))
+    {
+      particle.velocity = min(particleCb.maxSpeed, length(particle.velocity)) * normalize(particle.velocity);
+    }
+
+    particle.position += particle.velocity * particleCb.deltaTimeSecs;
+    particle.timeToLive -= particleCb.deltaTimeSecs;
+
+    Particles[vertexIdx] = particle;
   }
-  
-  if(particleCb.useTurbulence)
-  {
-    particle.velocity += curlOfValueNoise(particle.position * particleCb.turbulenceFrequency, 0.f) * particleCb.turbulenceAmplitude * particleCb.deltaTimeSecs;
-  }
-  
-  particle.velocity += particleCb.upDirection * particleCb.gravityForce * particleCb.deltaTimeSecs;
-  
-  if(dot(particle.velocity, particle.velocity) > float16_t(0.f))
-  {
-    particle.velocity = min(particleCb.maxSpeed, length(particle.velocity)) * normalize(particle.velocity);
-  }
-  
-  particle.position += particle.velocity * particleCb.deltaTimeSecs;
-  particle.timeToLive -= particleCb.deltaTimeSecs;
-  
-  Particles[vertexIdx] = particle;
 
   float4 viewPos = mul(cb.camera.worldToView, float4(particle.position, 1.f));
   float4 projPos = mul(cb.camera.viewToProjection, viewPos);
