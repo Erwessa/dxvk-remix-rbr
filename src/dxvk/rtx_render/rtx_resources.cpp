@@ -454,26 +454,35 @@ namespace dxvk {
     const bool targetExtentChanged = m_targetExtent != targetExtent;
 
     if (downscaledExtentChanged || targetExtentChanged) {
-      m_raytracingOutput.m_neuralRenderingOutput.reset();
-      m_raytracingOutput.m_controlMask.reset();
+      for (RaytracingOutput& output : m_raytracingOutput) {
+        output.m_neuralRenderingOutput.reset();
+        output.m_controlMask.reset();
+      }
       m_dlssNeuralRenderingResourcesAllocated = false;
     }
 
-    if (downscaledExtentChanged || !areDownscaledResourcesCurrent()) {
+    const bool outputsNeedDownscaledResources =
+      !m_raytracingOutput[0].isReady() || !m_raytracingOutput[1].isReady();
+    if (downscaledExtentChanged || outputsNeedDownscaledResources || !areDownscaledResourcesCurrent()) {
       m_downscaledExtent = downscaledExtent;
 
-      createDownscaledResources(ctx, m_raytracingOutput);
+      for (uint32_t eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
+        createDownscaledResources(ctx, m_raytracingOutput[eyeIndex], eyeIndex == 0);
+      }
     }
 
     if (targetExtentChanged) {
       m_targetExtent = targetExtent;
 
-      createTargetResources(ctx, m_raytracingOutput);
+      for (uint32_t eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
+        createTargetResources(ctx, m_raytracingOutput[eyeIndex], eyeIndex == 0);
+      }
     }
   }
 
   bool Resources::validateRaytracingOutput(const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent) const {
-    if (!m_raytracingOutput.isReady() || m_targetExtent != targetExtent || m_downscaledExtent != downscaledExtent) {
+    if (!m_raytracingOutput[0].isReady() || !m_raytracingOutput[1].isReady() ||
+        m_targetExtent != targetExtent || m_downscaledExtent != downscaledExtent) {
       return false;
     }
 
