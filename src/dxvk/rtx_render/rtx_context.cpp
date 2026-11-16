@@ -834,27 +834,15 @@ namespace dxvk {
         dispatchPathTracingIntegration(rtOutput);
         frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
 
-        // Sky provider, post-depth slot: NUMOS's screen-space pass (the clouds) runs here,
-        // immediately after dispatchPathTracing and nowhere earlier, because it reads this frame's
-        // rtOutput.m_primaryLinearViewZ, which the G-buffer pass just finished writing.
-        m_common->metaNumos().dispatchPostDepth(*this, rtOutput);
-        recordGpuStageTiming("CloudScreen");
+        // Per-eye post-depth work must consume this eye's freshly written G-buffer.
+        dispatchPostDepthForEye(rtOutput);
 
-        // Neural Radiance Cache
-        // Training is shared by the logical frame; resolve is specific to this output.
-        // The stereo path can move training after both eyes have produced their query paths.
+        // Mono currently trains immediately; stereo will move this logical-frame operation
+        // after both eyes have generated their Integration query paths.
         m_common->metaNeuralRadianceCache().dispatchTraining(*this);
-        m_common->metaNeuralRadianceCache().dispatchResolveForEye(*this, rtOutput);
-        recordGpuStageTiming("NRC");
 
-        // RTXDI confidence
-        m_common->metaRtxdiRayQuery().dispatchConfidence(this, rtOutput);
-        recordGpuStageTiming("RTXDIConfidence");
-
-        // ReSTIR GI
-        m_common->metaReSTIRGIRayQuery().dispatch(this, rtOutput);
-        recordGpuStageTiming("ReSTIRGI");
-        midFrameFlush(8); // rtx.present.midFrameFlushes bit 8, before demodulate/denoise
+        // Resolve and the following reuse passes consume eye-local output resources.
+        dispatchPostNrcForEye(rtOutput);
         
         if (captureScreenImage && captureDebugImage) {
           takeScreenshot("baseReflectivity", rtOutput.m_primaryBaseReflectivity.image(Resources::AccessType::Read));
@@ -2759,6 +2747,24 @@ namespace dxvk {
 
     // Integration Raytracing produces the NRC query paths consumed by logical-frame training.
     dispatchIntegrate(rtOutput);
+  }
+
+  void RtxContext::dispatchPostDepthForEye(const Resources::RaytracingOutput& rtOutput) {
+    // NUMOS screen-space clouds read the linear depth written by this eye's G-buffer.
+    m_common->metaNumos().dispatchPostDepth(*this, rtOutput);
+    recordGpuStageTiming("CloudScreen");
+  }
+
+  void RtxContext::dispatchPostNrcForEye(const Resources::RaytracingOutput& rtOutput) {
+    m_common->metaNeuralRadianceCache().dispatchResolveForEye(*this, rtOutput);
+    recordGpuStageTiming("NRC");
+
+    m_common->metaRtxdiRayQuery().dispatchConfidence(this, rtOutput);
+    recordGpuStageTiming("RTXDIConfidence");
+
+    m_common->metaReSTIRGIRayQuery().dispatch(this, rtOutput);
+    recordGpuStageTiming("ReSTIRGI");
+    midFrameFlush(8); // rtx.present.midFrameFlushes bit 8, before demodulate/denoise
   }
 
 
