@@ -92,20 +92,16 @@ namespace dxvk {
   DxvkXeSS::DxvkXeSS(DxvkDevice* device) 
     : RtxPass(device),
       CommonDeviceObject(device),
-      m_initialized(false),
-      m_xessContext(nullptr),
-      m_targetExtent{0, 0, 0},
-      m_currentPreset(XeSSPreset::Balanced),
-      m_preset(XeSSPreset::Balanced),
+       m_preset(XeSSPreset::Balanced),
       m_actualPreset(XeSSPreset::Balanced),
       m_inputSize{0, 0},
       m_xessOutputSize{0, 0},
-      m_recreate(false),
-      m_lastResolutionScale(-1.0f) {
+       m_lastResolutionScale(-1.0f) {
   }
 
   DxvkXeSS::~DxvkXeSS() {
-    destroyXeSSContext();
+    for (auto& eye : m_eyeContexts)
+      destroyXeSSContext(eye);
   }
 
   // RtxPass interface implementations
@@ -120,16 +116,18 @@ namespace dxvk {
       return false;
     }
     
-    m_recreate = true; // Force recreation of context
+    for (auto& eye : m_eyeContexts)
+      eye.recreate = true; // Force recreation of both eye contexts
     Logger::info("XeSS: Activated successfully");
     return true;
   }
 
   void DxvkXeSS::onDeactivation() {
-    if (m_xessContext) {
-      destroyXeSSContext();
+    for (auto& eye : m_eyeContexts) {
+      destroyXeSSContext(eye);
+      eye.initialized = false;
+      eye.recreate = true;
     }
-    m_initialized = false;
   }
 
   bool DxvkXeSS::isXeSSLibraryAvailable() {
@@ -209,7 +207,8 @@ namespace dxvk {
   }
 
   VkExtent3D DxvkXeSS::getInputSize(const VkExtent3D& targetExtent) const {
-    if (!isActive() || !m_xessContext) {
+    xess_context_handle_t sizeContext = m_eyeContexts[0].context ? m_eyeContexts[0].context : m_eyeContexts[1].context;
+    if (!isActive()) {
       return targetExtent;
     }
 
@@ -231,14 +230,14 @@ namespace dxvk {
       xess_2d_t maxInputRes = { 0, 0 };
       
       xess_quality_settings_t quality = presetToQuality(currentPreset);
-      xess_result_t result = xessGetOptimalInputResolution(
-        m_xessContext, 
+      xess_result_t result = sizeContext ? xessGetOptimalInputResolution(
+        sizeContext, 
         &targetRes, 
         quality, 
         &optimalInputRes, 
         &minInputRes, 
         &maxInputRes
-      );
+      ) : XESS_RESULT_ERROR_UNSUPPORTED;
       
       if (result == XESS_RESULT_SUCCESS) {
         VkExtent3D inputExtent;
@@ -261,34 +260,35 @@ namespace dxvk {
     }
   }
 
-  void DxvkXeSS::initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent) {
+  void DxvkXeSS::initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent, uint32_t eyeIndex) {
+    assert(eyeIndex < m_eyeContexts.size());
+    EyeContext& eye = m_eyeContexts[eyeIndex];
     if (!isActive()) {
       return;
     }
 
     // Check if we need to recreate the context
     XeSSPreset currentPreset = XessOptions::preset();
-    if (m_initialized &&
-        m_targetExtent.width == targetExtent.width &&
-        m_targetExtent.height == targetExtent.height &&
-        m_currentPreset == currentPreset &&
-        m_initFlags == m_wantedInitFlags) {
+    if (eye.initialized &&
+        eye.targetExtent.width == targetExtent.width &&
+        eye.targetExtent.height == targetExtent.height &&
+        eye.currentPreset == currentPreset &&
+        eye.initFlags == eye.wantedInitFlags) {
       return; // Already initialized with correct settings
     }
 
     // Release existing context if any
-    if (m_xessContext) {
-      destroyXeSSContext();
-    }
+    if (eye.context)
+      destroyXeSSContext(eye);
 
-    m_targetExtent = targetExtent;
-    m_currentPreset = currentPreset;
+    eye.targetExtent = targetExtent;
+    eye.currentPreset = currentPreset;
 
-    createXeSSContext(targetExtent);
-    m_initialized = true;
+    createXeSSContext(targetExtent, eye);
+    eye.initialized = eye.context != nullptr;
   }
 
-  void DxvkXeSS::createXeSSContext(const VkExtent3D& targetExtent) {
+  void DxvkXeSS::createXeSSContext(const VkExtent3D& targetExtent, EyeContext& eye) {
     if (!device()) {
       Logger::err("XeSS: Cannot create context - no device available");
       return;
@@ -299,26 +299,26 @@ namespace dxvk {
       device()->instance()->handle(),
       device()->adapter()->handle(),
       device()->handle(),
-      &m_xessContext
+      &eye.context
     );
     
     if (result != XESS_RESULT_SUCCESS) {
       Logger::err(str::format("XeSS: Failed to create context: ", xessResultToString(result)));
-      m_xessContext = nullptr;
+      eye.context = nullptr;
       return;
     }
     
-    xess_quality_settings_t quality = presetToQuality(m_currentPreset);
+    xess_quality_settings_t quality = presetToQuality(eye.currentPreset);
     xess_init_flags_t preFlags = XESS_INIT_FLAG_NONE;
     
     // Trigger pre-build in background to reduce later initialization stalls
-    result = xessVKBuildPipelines(m_xessContext, VK_NULL_HANDLE, false, preFlags);
+    result = xessVKBuildPipelines(eye.context, VK_NULL_HANDLE, false, preFlags);
     if (result != XESS_RESULT_SUCCESS) {
       Logger::debug(str::format("XeSS: Pipeline pre-build failed, will compile during init: ", xessResultToString(result)));
     }
     
     // XeSS 2.1: Verify driver compatibility and warn if suboptimal
-    xess_result_t driverResult = xessIsOptimalDriver(m_xessContext);
+    xess_result_t driverResult = xessIsOptimalDriver(eye.context);
     if (driverResult == XESS_RESULT_WARNING_OLD_DRIVER) {
       Logger::warn("XeSS: Using older driver - update recommended for optimal performance and quality");
     } else if (driverResult != XESS_RESULT_SUCCESS) {
@@ -326,7 +326,7 @@ namespace dxvk {
     }
     
     // Always use KPSS network model (best quality)
-    result = xessSelectNetworkModel(m_xessContext, XESS_NETWORK_MODEL_KPSS);
+    result = xessSelectNetworkModel(eye.context, XESS_NETWORK_MODEL_KPSS);
     if (result != XESS_RESULT_SUCCESS) {
       Logger::warn(str::format("XeSS: Failed to select KPSS network model: ", xessResultToString(result)));
     }
@@ -334,7 +334,7 @@ namespace dxvk {
     // XeSS 2.1: Set responsive pixel mask clamp value if different from default
     float responsiveMaskClamp = DxvkXeSS::XessOptions::responsivePixelMaskClampValue();
     if (responsiveMaskClamp != 0.8f) { // Only set if different from XeSS default
-      result = xessSetMaxResponsiveMaskValue(m_xessContext, responsiveMaskClamp);
+      result = xessSetMaxResponsiveMaskValue(eye.context, responsiveMaskClamp);
       if (result != XESS_RESULT_SUCCESS) {
         Logger::warn(str::format("XeSS: Failed to set responsive pixel mask clamp value: ", xessResultToString(result)));
       }
@@ -344,11 +344,11 @@ namespace dxvk {
     xess_vk_init_params_t initParams = {};
     initParams.outputResolution.x = targetExtent.width;
     initParams.outputResolution.y = targetExtent.height;
-    initParams.qualitySetting = presetToQuality(m_currentPreset);
+    initParams.qualitySetting = presetToQuality(eye.currentPreset);
 
     // Low-resolution, unjittered pixel motion vectors and HDR color are XeSS's defaults.
     // The flags add inverted depth and the responsive mask when the frame has them.
-    initParams.initFlags = m_wantedInitFlags;
+    initParams.initFlags = eye.wantedInitFlags;
     
     initParams.creationNodeMask = 1;
     initParams.visibleNodeMask = 1;
@@ -358,17 +358,17 @@ namespace dxvk {
     initParams.textureHeapOffset = 0;
     initParams.pipelineCache = VK_NULL_HANDLE;
     
-    result = xessVKInit(m_xessContext, &initParams);
+    result = xessVKInit(eye.context, &initParams);
     if (result != XESS_RESULT_SUCCESS) {
       Logger::err(str::format("XeSS: Failed to initialize context: ", xessResultToString(result)));
-      xessDestroyContext(m_xessContext);
-      m_xessContext = nullptr;
+      xessDestroyContext(eye.context);
+      eye.context = nullptr;
       return;
     }
-    m_initFlags = m_wantedInitFlags;
+    eye.initFlags = eye.wantedInitFlags;
     Logger::info(str::format("[XeSS] context created: output=", targetExtent.width, "x", targetExtent.height,
-      " invertedDepth=", (m_initFlags & XESS_INIT_FLAG_INVERTED_DEPTH) != 0,
-      " responsiveMask=", (m_initFlags & XESS_INIT_FLAG_RESPONSIVE_PIXEL_MASK) != 0));
+      " invertedDepth=", (eye.initFlags & XESS_INIT_FLAG_INVERTED_DEPTH) != 0,
+      " responsiveMask=", (eye.initFlags & XESS_INIT_FLAG_RESPONSIVE_PIXEL_MASK) != 0));
   }
 
   uint32_t DxvkXeSS::calcRecommendedJitterSequenceLength() const {
@@ -409,13 +409,14 @@ namespace dxvk {
     }
   }
 
-  void DxvkXeSS::destroyXeSSContext() {
-    if (m_xessContext) {
-      xess_result_t result = xessDestroyContext(m_xessContext);
+  void DxvkXeSS::destroyXeSSContext(EyeContext& eye) {
+    if (eye.context) {
+      xess_result_t result = xessDestroyContext(eye.context);
       if (result != XESS_RESULT_SUCCESS) {
         Logger::warn(str::format("XeSS: Warning during context destruction: ", xessResultToString(result)));
       }
-      m_xessContext = nullptr;
+      eye.context = nullptr;
+      eye.initialized = false;
     }
   }
 
@@ -423,7 +424,10 @@ namespace dxvk {
     Rc<DxvkContext> renderContext,
     DxvkBarrierSet& barriers,
     const Resources::RaytracingOutput& rtOutput,
-    bool resetHistory) {
+    bool resetHistory,
+    uint32_t eyeIndex) {
+    assert(eyeIndex < m_eyeContexts.size());
+    EyeContext& eye = m_eyeContexts[eyeIndex];
     
     if (!isActive()) {
       // Fallback: just copy input to output
@@ -450,19 +454,19 @@ namespace dxvk {
 
     DecomposeProjectionParams projection;
     decomposeProjection(camera.getViewToProjectionf(), projection);
-    m_wantedInitFlags = XESS_INIT_FLAG_NONE;
+    eye.wantedInitFlags = XESS_INIT_FLAG_NONE;
     if (projection.isReverseZ) {
-      m_wantedInitFlags |= XESS_INIT_FLAG_INVERTED_DEPTH;
+      eye.wantedInitFlags |= XESS_INIT_FLAG_INVERTED_DEPTH;
     }
     if (responsiveView != nullptr) {
-      m_wantedInitFlags |= XESS_INIT_FLAG_RESPONSIVE_PIXEL_MASK;
+      eye.wantedInitFlags |= XESS_INIT_FLAG_RESPONSIVE_PIXEL_MASK;
     }
-    if (m_initialized && m_wantedInitFlags != m_initFlags) {
-      m_recreate = true;
+    if (eye.initialized && eye.wantedInitFlags != eye.initFlags) {
+      eye.recreate = true;
     }
 
     // Initialize XeSS if needed (similar to DLSS pattern)
-    if (m_recreate || !m_initialized) {
+    if (eye.recreate || !eye.initialized) {
       // Use the target extent that was already calculated in setSetting()
       // If setSetting() hasn't been called yet (e.g., Auto preset on first load), 
       // fall back to the actual output texture resolution
@@ -481,12 +485,12 @@ namespace dxvk {
           1
         };
       }
-      initialize(renderContext, targetExtent);
-      m_recreate = false;
+      initialize(renderContext, targetExtent, eyeIndex);
+      eye.recreate = eye.context == nullptr;
       resetHistory = true;
     }
 
-    if (!m_initialized || !m_xessContext) {
+    if (!eye.initialized || !eye.context) {
       // Fallback: just copy input to output
       renderContext->copyImage(
         rtOutput.m_finalOutput.resource(Resources::AccessType::Write).image,
@@ -631,9 +635,9 @@ namespace dxvk {
       Logger::info(str::format("[XeSS] dispatches=600 resets=", m_resets,
         " input=", m_inputSize.width, "x", m_inputSize.height,
         " output=", outputView->imageInfo().extent.width, "x", outputView->imageInfo().extent.height,
-        " preset=", xessPresetToString(m_currentPreset),
+        " preset=", xessPresetToString(eye.currentPreset),
         " jitter=", jitterOffset[0], ",", jitterOffset[1], " mvScale=1,1",
-        " invertedDepth=", (m_initFlags & XESS_INIT_FLAG_INVERTED_DEPTH) != 0,
+        " invertedDepth=", (eye.initFlags & XESS_INIT_FLAG_INVERTED_DEPTH) != 0,
         " responsiveMask=", responsiveView != nullptr,
         " exposureScale=", execParams.exposureScale, " exposure=", safeExposure,
         " preExposure=", PreExposure::get()));
@@ -642,7 +646,7 @@ namespace dxvk {
 
     // Execute XeSS
     VkCommandBuffer cmdBuffer = renderContext->getCommandList()->getCmdBuffer(DxvkCmdBuffer::ExecBuffer);
-    xess_result_t result = xessVKExecute(m_xessContext, cmdBuffer, &execParams);
+    xess_result_t result = xessVKExecute(eye.context, cmdBuffer, &execParams);
 
     // XeSS reads its inputs in SHADER_READ_ONLY_OPTIMAL, but the rest of the frame binds them in the layout DXVK tracks.
     for (auto input : inputs) {
@@ -726,7 +730,8 @@ namespace dxvk {
     }
     
     m_actualPreset = actualPreset;
-    m_recreate = true;
+    for (auto& eye : m_eyeContexts)
+      eye.recreate = true;
     m_preset = preset;
     
     if (m_preset == XeSSPreset::NativeAA) {
@@ -747,8 +752,9 @@ namespace dxvk {
       bool useFallbackScaling = false;
 
       // Use XeSS SDK to get optimal input resolution
-      if (m_xessContext) {
-        xess_result_t result = xessGetOptimalInputResolution(m_xessContext, &outputRes, quality, &inputRes, nullptr, nullptr);
+      xess_context_handle_t sizeContext = m_eyeContexts[0].context ? m_eyeContexts[0].context : m_eyeContexts[1].context;
+      if (sizeContext) {
+        xess_result_t result = xessGetOptimalInputResolution(sizeContext, &outputRes, quality, &inputRes, nullptr, nullptr);
         if (result == XESS_RESULT_SUCCESS) {
           m_inputSize.width = outRenderSize[0] = inputRes.x;
           m_inputSize.height = outRenderSize[1] = inputRes.y;

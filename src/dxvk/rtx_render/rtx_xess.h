@@ -22,6 +22,7 @@
 #pragma once
 
 #include "rtx_resources.h"
+#include <array>
 #include "rtx_options.h"
 #include "rtx_common_object.h"
 
@@ -65,7 +66,7 @@ namespace dxvk {
 
     ~DxvkXeSS();
 
-    void initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent);
+    void initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent, uint32_t eyeIndex = 0);
 
     VkExtent3D getInputSize(const VkExtent3D& targetExtent) const;
     
@@ -73,7 +74,8 @@ namespace dxvk {
       Rc<DxvkContext> renderContext,
       DxvkBarrierSet& barriers,
       const Resources::RaytracingOutput& rtOutput,
-      bool resetHistory);
+      bool resetHistory,
+      uint32_t eyeIndex);
 
     // Public methods needed by RTX context
     void setSetting(const uint32_t displaySize[2], const XeSSPreset preset, uint32_t outRenderSize[2]);
@@ -92,8 +94,17 @@ namespace dxvk {
   private:
     float calcUpscaleFactor() const;
     float getUpscaleFactor(xess_quality_settings_t quality) const;
-    void createXeSSContext(const VkExtent3D& targetExtent);
-    void destroyXeSSContext();
+    struct EyeContext {
+      bool initialized = false;
+      xess_context_handle_t context = nullptr;
+      VkExtent3D targetExtent{0, 0, 0};
+      XeSSPreset currentPreset = XeSSPreset::Balanced;
+      bool recreate = false;
+      uint32_t initFlags = 0;
+      uint32_t wantedInitFlags = 0;
+    };
+    void createXeSSContext(const VkExtent3D& targetExtent, EyeContext& eye);
+    void destroyXeSSContext(EyeContext& eye);
     bool validateXeSSSupport(DxvkDevice* device);
     
     // Additional methods needed by implementation
@@ -105,22 +116,14 @@ namespace dxvk {
     static bool isXeSSLibraryAvailable();
 
     // Member variables - organized after methods per style guide
-    bool m_initialized;
-    xess_context_handle_t m_xessContext;
-    VkExtent3D m_targetExtent;
-    XeSSPreset m_currentPreset;
+    std::array<EyeContext, 2> m_eyeContexts;
 
     // Additional member variables needed by implementation
     XeSSPreset m_preset;
     XeSSPreset m_actualPreset;
     VkExtent2D m_inputSize;
     VkExtent2D m_xessOutputSize;
-    bool m_recreate;
-    float m_lastResolutionScale; // Track resolution scale changes for Custom preset
-
-    // The init flags of the current context, and the ones this frame's inputs need.
-    uint32_t m_initFlags = 0;
-    uint32_t m_wantedInitFlags = 0;
+        float m_lastResolutionScale; // Track resolution scale changes for Custom preset
 
     // Interval counters for the [XeSS] log line.
     uint64_t m_dispatches = 0;
@@ -132,7 +135,7 @@ namespace dxvk {
     DxvkXeSS(DxvkDevice* device) : RtxPass(device), CommonDeviceObject(device) {
     }
 
-    void initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent) {
+    void initialize(Rc<DxvkContext> renderContext, const VkExtent3D& targetExtent, uint32_t eyeIndex = 0) {
     }
 
     VkExtent3D getInputSize(const VkExtent3D& targetExtent) const {
@@ -143,7 +146,8 @@ namespace dxvk {
       Rc<DxvkContext> renderContext,
       DxvkBarrierSet& barriers,
       const Resources::RaytracingOutput& rtOutput,
-      bool resetHistory) {
+      bool resetHistory,
+      uint32_t eyeIndex) {
     }
 
     // Public methods needed by RTX context

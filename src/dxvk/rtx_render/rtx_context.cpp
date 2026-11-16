@@ -3004,7 +3004,7 @@ namespace dxvk {
     ScopedGpuProfileZone(this, "XeSS");
     setFramePassStage(RtxFramePassStage::XeSS);
     DxvkXeSS& xess = m_common->metaXeSS();
-    xess.dispatch(this, m_execBarriers, rtOutput, m_resetHistory);
+    xess.dispatch(this, m_execBarriers, rtOutput, m_resetHistory, getActiveEyeIndex());
   }
 
   void RtxContext::dispatchTemporalAA(const Resources::RaytracingOutput& rtOutput) {
