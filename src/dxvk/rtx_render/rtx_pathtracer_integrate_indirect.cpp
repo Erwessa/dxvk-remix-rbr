@@ -1354,65 +1354,65 @@ namespace dxvk {
     ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_SHARED_MATERIAL_DATA1_INPUT, rtOutput.m_sharedMaterialData1.view, nullptr);
     sharc.bindResources(*ctx);
 
-    // Sparse update: one path per tile of the render target.
-    bool deferredFlush = false;
-    {
-      ScopedGpuProfileZone(ctx, "SHARC: Update");
-
-      const uint32_t tileSize = std::max(1u, sharc.getUpdateTileSize());
-      const VkExtent3D updateDims = {
-        (rayDims.width + tileSize - 1) / tileSize,
-        (rayDims.height + tileSize - 1) / tileSize,
-        1
-      };
-
-      // A deposited primary vertex occupies a propagation slot of its own, so the compact shader
-      // then covers three bounces rather than four.
-      const uint32_t primarySlot = (rtOutput.m_raytraceArgs.sharcArgs.flags & SHARC_FLAG_UPDATE_PRIMARY_VERTEX) ? 1u : 0u;
-      const bool depth4 = sharc.getUpdateBounces() + primarySlot <= 4;
-      // rtx.sharc.deferredFlush. Falls back to the inline flush where no _df variant exists or the
-      // vertex buffer cannot be allocated; the flush below runs only when the update bound a _df variant.
-      deferredFlush = sharcDeferredFlushPossible(ommEnabled, wboitEnabled)
-        && sharc.prepareDeferredFlush(*ctx, rtOutput.m_raytraceArgs, depth4 ? 4u : 8u);
-      if (deferredFlush) {
-        sharc.bindDeferredResources(*ctx);
-      }
+    // SHARC is a shared world-space cache. Update and resolve it once per logical frame,
+    // then let each eye query the same resolved state. Resolving between eyes would make the
+    // second eye observe more current-frame deposits than the first.
+    if (sharc.beginSharedUpdateFrame(ctx->getDevice()->getCurrentFrameId())) {
+      // Sparse update: one path per tile of the render target.
+      bool deferredFlush = false;
       {
-        SlimLevel updateSlimLevel = selectSharcSlimLevel(ctx, rtOutput, ommEnabled, includePortals, wboitEnabled);
-        // rtx.shader.variantTables picks the level; the rule above still runs as the check.
-        if (RtxOptions::Shader::variantTables()) {
-          updateSlimLevel = selectSharcVariantLevel(ctx, SlimPass::SharcUpdate, updateSlimLevel);
-        }
-        noteSlimLevel(SlimPass::SharcUpdate, updateSlimLevel);
-        // The same update through TraceRay with SER, where the variants exist:
-        // the deferred flush is bound, a Full / Slim / Lean level (the POM-kept levels keep the inline update), and for Full no
-        // POM this frame, or rtx.integrateIndirect.sharcUpdateSerWithPom with indirect hits that ignore POM (its hit shader has
-        // no POM, like the query hit while POM is off). Everything else: the RayQuery update.
-        const bool updateSer = deferredFlush &&
-          sharcUpdateSerPossible(serEnabled, ommEnabled, wboitEnabled, includePortals) &&
-          (updateSlimLevel == SlimLevel::Slim || updateSlimLevel == SlimLevel::Lean ||
-           (updateSlimLevel == SlimLevel::Full && (!ctx->getFrameFeatures().has(RtFrameFeatures::kScenePom) ||
-             (sharcUpdateSerWithPom() && !RtxOptions::Displacement::enableIndirectHit()))));
-        ctx->bindRaytracingPipelineShaders(updateSer
-          ? getSharcUpdateSerPipelineShaders(depth4, ommEnabled, updateSlimLevel)
-          : getSharcUpdatePipelineShaders(depth4, ommEnabled, wboitEnabled, updateSlimLevel, deferredFlush));
-        ctx->traceRays(updateDims.width, updateDims.height, updateDims.depth);
-      }
-    }
-    // Reverse propagation and deposits of the deferred update, before the resolve reads the accumulation. Barriers come
-    // from the declared accesses: vertex buffer update -> flush (RAW), accumulation flush -> resolve (RAW), resolved
-    // flush -> resolve (WAR). Timed inside IndirectSharcUpdate, so that pass compares like with like against the inline
-    // flush.
-    if (deferredFlush) {
-      sharc.dispatchDeferredFlush(*ctx, rtOutput);
-    }
-    // Split the SHARC sequence in [PerfGpu]; "IndirectIntegration" is then the
-    // query pass alone (old IndirectIntegration = IndirectSharcUpdate + IndirectSharcResolve + it).
-    ctx->recordGpuStageTiming("IndirectSharcUpdate");
+        ScopedGpuProfileZone(ctx, "SHARC: Update");
 
-    // Turn the samples accumulated this frame into readable cells before anything looks one up.
-    sharc.dispatchResolve(*ctx, rtOutput);
-    ctx->recordGpuStageTiming("IndirectSharcResolve");
+        const uint32_t tileSize = std::max(1u, sharc.getUpdateTileSize());
+        const VkExtent3D updateDims = {
+          (rayDims.width + tileSize - 1) / tileSize,
+          (rayDims.height + tileSize - 1) / tileSize,
+          1
+        };
+
+        // A deposited primary vertex occupies a propagation slot of its own, so the compact shader
+        // then covers three bounces rather than four.
+        const uint32_t primarySlot = (rtOutput.m_raytraceArgs.sharcArgs.flags & SHARC_FLAG_UPDATE_PRIMARY_VERTEX) ? 1u : 0u;
+        const bool depth4 = sharc.getUpdateBounces() + primarySlot <= 4;
+        // rtx.sharc.deferredFlush. Falls back to the inline flush where no _df variant exists or the
+        // vertex buffer cannot be allocated; the flush below runs only when the update bound a _df variant.
+        deferredFlush = sharcDeferredFlushPossible(ommEnabled, wboitEnabled)
+          && sharc.prepareDeferredFlush(*ctx, rtOutput.m_raytraceArgs, depth4 ? 4u : 8u);
+        if (deferredFlush) {
+          sharc.bindDeferredResources(*ctx);
+        }
+        {
+          SlimLevel updateSlimLevel = selectSharcSlimLevel(ctx, rtOutput, ommEnabled, includePortals, wboitEnabled);
+          // rtx.shader.variantTables picks the level; the rule above still runs as the check.
+          if (RtxOptions::Shader::variantTables()) {
+            updateSlimLevel = selectSharcVariantLevel(ctx, SlimPass::SharcUpdate, updateSlimLevel);
+          }
+          noteSlimLevel(SlimPass::SharcUpdate, updateSlimLevel);
+          // The same update through TraceRay with SER, where the variants exist:
+          // the deferred flush is bound, a Full / Slim / Lean level (the POM-kept levels keep the inline update), and for Full no
+          // POM this frame, or rtx.integrateIndirect.sharcUpdateSerWithPom with indirect hits that ignore POM (its hit shader has
+          // no POM, like the query hit while POM is off). Everything else: the RayQuery update.
+          const bool updateSer = deferredFlush &&
+            sharcUpdateSerPossible(serEnabled, ommEnabled, wboitEnabled, includePortals) &&
+            (updateSlimLevel == SlimLevel::Slim || updateSlimLevel == SlimLevel::Lean ||
+             (updateSlimLevel == SlimLevel::Full && (!ctx->getFrameFeatures().has(RtFrameFeatures::kScenePom) ||
+               (sharcUpdateSerWithPom() && !RtxOptions::Displacement::enableIndirectHit()))));
+          ctx->bindRaytracingPipelineShaders(updateSer
+            ? getSharcUpdateSerPipelineShaders(depth4, ommEnabled, updateSlimLevel)
+            : getSharcUpdatePipelineShaders(depth4, ommEnabled, wboitEnabled, updateSlimLevel, deferredFlush));
+          ctx->traceRays(updateDims.width, updateDims.height, updateDims.depth);
+        }
+      }
+      // Reverse propagation and deposits of the deferred update, before the resolve reads the accumulation.
+      if (deferredFlush) {
+        sharc.dispatchDeferredFlush(*ctx, rtOutput);
+      }
+      ctx->recordGpuStageTiming("IndirectSharcUpdate");
+
+      // Turn the samples accumulated this frame into readable cells before either eye looks them up.
+      sharc.dispatchResolve(*ctx, rtOutput);
+      ctx->recordGpuStageTiming("IndirectSharcResolve");
+    }
 
     // Full-resolution query, the pass that produces the indirect output.
     {

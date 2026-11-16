@@ -51,6 +51,8 @@ namespace dxvk {
     void setRaytraceArgs(RtxContext& ctx, RaytraceArgs& args);
     void bindResources(RtxContext& ctx) const;
     void dispatchResolve(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput);
+    // Shared world-space cache update/resolve runs once, before both eyes query it.
+    bool beginSharedUpdateFrame(uint32_t frame);
     void showImguiSettings();
     void setQualityPreset(QualityPreset preset);
 
@@ -164,6 +166,7 @@ namespace dxvk {
     uint32_t m_cacheAge = 0;
     // SHARC is a shared world-space cache; capture its camera anchor once per logical frame.
     uint32_t m_cameraArgsFrame = ~0u;
+    uint32_t m_sharedUpdateFrame = ~0u;
     int32_t m_cacheLog2P = 0;  // the pre-exposure the cache's radiance is stored at
     uint32_t m_lastFrame = ~0u;
     bool m_clearedThisFrame = true;

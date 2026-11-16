@@ -295,6 +295,14 @@ namespace dxvk {
     m_status = "Active";
   }
 
+  bool RtxSharc::beginSharedUpdateFrame(uint32_t frame) {
+    if (m_sharedUpdateFrame == frame) {
+      return false;
+    }
+    m_sharedUpdateFrame = frame;
+    return true;
+  }
+
   void RtxSharc::setRaytraceArgs(RtxContext& ctx, RaytraceArgs& args) {
     // SHARC is a shared world-space cache, not an eye-local history. Capture its camera anchor
     // from the first (logical left) eye once per device frame; a second eye must not become the
