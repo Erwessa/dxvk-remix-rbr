@@ -263,7 +263,8 @@ namespace dxvk {
         eye.targetExtent.width == targetExtent.width &&
         eye.targetExtent.height == targetExtent.height &&
         eye.currentPreset == currentPreset &&
-        eye.initFlags == eye.wantedInitFlags) {
+        eye.initFlags == eye.wantedInitFlags &&
+        !eye.recreate) {
       return; // Already initialized with correct settings
     }
 
