@@ -407,7 +407,11 @@ namespace dxvk {
     return true;
   }
 
-  void TransientLane::collect(RtCamera& camera, bool antiCullingSupported) {
+  void TransientLane::collect(
+      RtCamera& camera,
+      bool antiCullingSupported,
+      RtCamera* leftEyeCamera,
+      RtCamera* rightEyeCamera) {
     // Assets changed on the frame being collected: the next frame's draws were compared against them already.
     m_assetGlobalEpoch = m_scene.m_pReplacer->getExternalAssetGlobalEpoch();
     if (m_entries.empty()) {
@@ -415,7 +419,8 @@ namespace dxvk {
     }
     const uint32_t frame = m_scene.device()->getCurrentFrameId();
     const bool forceCollect = m_entries.size() >= RtxOptions::AntiCulling::Object::numObjectsToKeep();
-    translator::LifetimeFrame lifetime = translator::LifetimeFrame::read(camera, antiCullingSupported, forceCollect);
+    translator::LifetimeFrame lifetime = translator::LifetimeFrame::read(
+        camera, antiCullingSupported, forceCollect, leftEyeCamera, rightEyeCamera);
     lifetime.currentFrame = frame;
     lifetime.keptCutFrame = m_scene.m_lastKeptCutFrame;
     std::vector<uint64_t> dead;
