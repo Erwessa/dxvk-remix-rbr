@@ -356,6 +356,8 @@ namespace dxvk {
     void dispatchPathTracingIntegration(const Resources::RaytracingOutput& rtOutput);
     // Split preparation from integration so stereo can finish both eyes before the shared NRC barrier.
     void dispatchEyePathTracingPreparation(Resources::RaytracingOutput& rtOutput);
+    void prepareEyeRaytraceArgs(Resources::RaytracingOutput& rtOutput, uint32_t eyeIndex,
+                               const VkExtent3D& downscaledExtent, const VkExtent3D& renderExtent);
     void dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput);
     // Shared consumers that require query paths from every rendered eye run at this barrier.
     void dispatchLogicalFramePostPathTracing();

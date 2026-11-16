@@ -850,22 +850,7 @@ namespace dxvk {
 
         getCommonObjects()->getTextureManager().prepareSamplerFeedback(this);
 
-        // Generate ray tracing constant buffer
-        updateRaytraceArgsConstantBuffer(rtOutput, downscaledExtent, renderExtent);
-        // The frame feature mask, after the TLAS build and the light upload, before every pass that reads it.
-        m_frameFeatures[m_activeEyeIndex] = computeFrameFeatures(*this, rtOutput.m_raytraceArgs);
-        if (m_frameFeaturesEyeMask == 0) {
-          m_logicalFrameFeatures = m_frameFeatures[m_activeEyeIndex];
-        } else {
-          // Shader validation observes the OR of feature-use bits from both eyes.
-          // Preserve the first eye's diagnostic counts/variant while unioning the selectors.
-          m_logicalFrameFeatures.scene |= m_frameFeatures[m_activeEyeIndex].scene;
-          m_logicalFrameFeatures.mode |= m_frameFeatures[m_activeEyeIndex].mode;
-          m_logicalFrameFeatures.lightTypes |= m_frameFeatures[m_activeEyeIndex].lightTypes;
-        }
-        m_frameFeaturesEyeMask |= 1u << m_activeEyeIndex;
-        logFrameFeatures(m_frameFeatures[m_activeEyeIndex]);
-        recordGpuStageTiming("RaytraceArgsAfterAtmosphere");
+        prepareEyeRaytraceArgs(rtOutput, m_activeEyeIndex, downscaledExtent, renderExtent);
         preGateFlush(2);
 
         // Update the world-space NEE cache once per logical frame, before any eye integrates.
@@ -2752,6 +2737,30 @@ namespace dxvk {
 
     frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
     m_common->metaNeuralRadianceCache().dispatchTraining(*this);
+  }
+
+  void RtxContext::prepareEyeRaytraceArgs(
+      Resources::RaytracingOutput& rtOutput,
+      uint32_t eyeIndex,
+      const VkExtent3D& downscaledExtent,
+      const VkExtent3D& renderExtent) {
+    setActiveEyeIndex(eyeIndex);
+
+    // Generate this eye's ray tracing constant buffer before any pass reads it.
+    updateRaytraceArgsConstantBuffer(rtOutput, downscaledExtent, renderExtent);
+    m_frameFeatures[eyeIndex] = computeFrameFeatures(*this, rtOutput.m_raytraceArgs);
+    if (m_frameFeaturesEyeMask == 0) {
+      m_logicalFrameFeatures = m_frameFeatures[eyeIndex];
+    } else {
+      // Shader validation observes the OR of feature-use bits from both eyes.
+      // Preserve the first eye's diagnostic counts/variant while unioning the selectors.
+      m_logicalFrameFeatures.scene |= m_frameFeatures[eyeIndex].scene;
+      m_logicalFrameFeatures.mode |= m_frameFeatures[eyeIndex].mode;
+      m_logicalFrameFeatures.lightTypes |= m_frameFeatures[eyeIndex].lightTypes;
+    }
+    m_frameFeaturesEyeMask |= 1u << eyeIndex;
+    logFrameFeatures(m_frameFeatures[eyeIndex]);
+    recordGpuStageTiming("RaytraceArgsAfterAtmosphere");
   }
 
   void RtxContext::dispatchEyePathTracingPreparation(Resources::RaytracingOutput& rtOutput) {
