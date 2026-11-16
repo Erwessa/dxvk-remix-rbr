@@ -1060,6 +1060,10 @@ namespace dxvk {
     m_settings = refSettings;
   }
 
+  void NRDContext::copyConfigurationFrom(const NrdSettings& source) {
+    m_settings.copyConfigurationFrom(source);
+  }
+
   void NRDContext::release() {
     destroyResources();
     destroyPipelines();

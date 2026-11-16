@@ -78,6 +78,7 @@ namespace dxvk {
 
     void initialize(const nrd::LibraryDesc& libraryDesc, const dxvk::Config& config, DenoiserType type);
     void showImguiSettings();
+    void copyConfigurationFrom(const NrdSettings& source);
 
     void updateAdaptiveAccumulation(float frameTimeMs);
 

@@ -268,6 +268,33 @@ namespace dxvk {
     m_relaxInternalBlurRadius.specularPrepassBlurRadius = m_relaxSettings.specularPrepassBlurRadius;
   }
 
+  void NrdSettings::copyConfigurationFrom(const NrdSettings& source) {
+    // Keep the NRD instance identity and per-eye temporal CommonSettings local.
+    m_denoiserDesc.denoiser = source.m_denoiserDesc.denoiser;
+
+    m_commonSettings.enableValidation = source.m_commonSettings.enableValidation;
+    m_commonSettings.debug = source.m_commonSettings.debug;
+    m_commonSettings.denoisingRange = source.m_commonSettings.denoisingRange;
+    m_commonSettings.disocclusionThreshold = source.m_commonSettings.disocclusionThreshold;
+    m_commonSettings.disocclusionThresholdAlternate = source.m_commonSettings.disocclusionThresholdAlternate;
+    m_commonSettings.splitScreen = source.m_commonSettings.splitScreen;
+
+    m_relaxSettings = source.m_relaxSettings;
+    m_reblurSettings = source.m_reblurSettings;
+    m_referenceSettings = source.m_referenceSettings;
+    m_reblurSettingsPreset = source.m_reblurSettingsPreset;
+    m_relaxSettingsPreset = source.m_relaxSettingsPreset;
+    m_adaptiveMinAccumulatedFrameNum = source.m_adaptiveMinAccumulatedFrameNum;
+    m_adaptiveAccumulationLengthMs = source.m_adaptiveAccumulationLengthMs;
+    m_showAdvancedSettings = source.m_showAdvancedSettings;
+    m_groupedSettings = source.m_groupedSettings;
+    m_reblurInternalBlurRadius = source.m_reblurInternalBlurRadius;
+    m_relaxInternalBlurRadius = source.m_relaxInternalBlurRadius;
+
+    // Propagate a pending reset request, but never copy temporal frame data.
+    m_resetHistory |= source.m_resetHistory;
+  }
+
   void NrdSettings::showImguiSettings() {
 
     const ImGuiSliderFlags sliderFlags = ImGuiSliderFlags_AlwaysClamp;

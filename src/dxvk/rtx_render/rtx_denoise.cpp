@@ -68,6 +68,7 @@ namespace dxvk {
 
   void DxvkDenoise::showImguiSettings() {
     m_nrdContexts[0]->showImguiSettings();
+    m_nrdContexts[1]->copyConfigurationFrom(m_nrdContexts[0]->getNrdSettings());
   }
 
   NrdArgs DxvkDenoise::getNrdArgs(uint32_t eyeIndex) const {
