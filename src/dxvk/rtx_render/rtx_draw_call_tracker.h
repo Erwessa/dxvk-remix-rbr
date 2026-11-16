@@ -95,7 +95,9 @@ public:
       RtCamera& camera,
       bool isAntiCullingSupported,
       bool parallelScan = false,   // rtx.parallelScenePrepScans
-      uint32_t keptCutFrame = ~0u); // SceneManager::m_lastKeptCutFrame (rtx.scene.d3d9CutAsEvent / noImplicitClears)
+      uint32_t keptCutFrame = ~0u,  // SceneManager::m_lastKeptCutFrame (rtx.scene.d3d9CutAsEvent / noImplicitClears)
+      RtCamera* leftEyeCamera = nullptr,
+      RtCamera* rightEyeCamera = nullptr);
   // The same once its inputs are read (lifetime.currentFrame and forceCollect are filled in here); the identity-trace
   // replay calls it with a LifetimeFrame from the trace.
   void collectReplacementInstances(const translator::LifetimeFrame& lifetimeIn, bool parallelScan = false);
