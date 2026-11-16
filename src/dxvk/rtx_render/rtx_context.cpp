@@ -448,19 +448,21 @@ namespace dxvk {
       mainCamera.isViewHistoryInvalidated(frameId) ||
       leftEyeCamera.isViewHistoryInvalidated(frameId) ||
       rightEyeCamera.isViewHistoryInvalidated(frameId);
+    const bool leftEyeCameraCut = mainCamera.isCameraCut() || leftEyeCamera.isCameraCut();
+    const bool rightEyeCameraCut = mainCamera.isCameraCut() || rightEyeCamera.isCameraCut();
 
     // Call onFrameBegin callbacks for RtxPases
     // Note: this needs to be called after resetScreenResolution() call in a frame
     // since an RtxPass may alias some of its resources with the ones created in createRaytracingOutput().
     // The first eye owns logical-frame callbacks; its camera cut is used for shared state.
     getResourceManager().onFrameBegin(this, getCommonObjects()->getTextureManager(), getSceneManager(), downscaledExtent,
-                                      upscaledExtent, m_resetHistory, leftEyeCamera.isCameraCut(),
+                                      upscaledExtent, m_resetHistory, leftEyeCameraCut,
                                       getResourceManager().getRaytracingOutput(), true);
 
     // Prepare the second eye's output-local aliases and temporal resources as well.
     // Pass callbacks and logical-frame synchronization are shared and must run only once.
     getResourceManager().onFrameBegin(this, getCommonObjects()->getTextureManager(), getSceneManager(), downscaledExtent,
-                                      upscaledExtent, m_resetHistory, rightEyeCamera.isCameraCut(),
+                                      upscaledExtent, m_resetHistory, rightEyeCameraCut,
                                       getResourceManager().getRaytracingOutput(1), false);
 
     // Force history reset on integrate indirect mode change to discard incompatible history 
