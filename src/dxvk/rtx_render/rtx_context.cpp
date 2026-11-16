@@ -869,38 +869,17 @@ namespace dxvk {
         recordGpuStageTiming("FeedbackAndPicking");
         midFrameFlush(16); // rtx.present.midFrameFlushes bit 16, before upscaling
 
-        // Upscaling if DLSS/NIS enabled, or the Composition Pass will do upscaling
-        if (m_currentUpscaler == InternalUpscaler::DLSS) {
-          // xxxnsubtil: the DLSS indicator reads our exposure texture even with DLSS autoexposure on
-          // make sure it has been created, otherwise we run into trouble on the first frame
+        // Auto-exposure resources are shared by the logical frame; initialize them once before
+        // dispatching the eye-local upscaler.
+        if (m_currentUpscaler == InternalUpscaler::DLSS ||
+            m_currentUpscaler == InternalUpscaler::DLSS_RR ||
+            m_currentUpscaler == InternalUpscaler::XeSS ||
+            m_currentUpscaler == InternalUpscaler::FSR) {
+          // The DLSS indicator reads the exposure texture even with DLSS auto exposure enabled.
           m_common->metaAutoExposure().createResources(this);
-          dispatchDLSS(rtOutput);
-        } else if (m_currentUpscaler == InternalUpscaler::DLSS_RR) {
-          m_common->metaAutoExposure().createResources(this);
-          dispatchRayReconstruction(rtOutput);
-        } else if (m_currentUpscaler == InternalUpscaler::XeSS) {
-          m_common->metaAutoExposure().createResources(this);
-          dispatchXeSS(rtOutput);
-        } else if (m_currentUpscaler == InternalUpscaler::FSR) {
-          m_common->metaAutoExposure().createResources(this);
-          fork_hooks::dispatchFsrUpscale(*this, rtOutput);
-        } else if (m_currentUpscaler == InternalUpscaler::NIS) {
-          dispatchNIS(rtOutput);
-        } else if (m_currentUpscaler == InternalUpscaler::TAAU){
-          dispatchTemporalAA(rtOutput);
-        } else {
-          copyImage(
-            rtOutput.m_finalOutput.resource(Resources::AccessType::Write).image,
-            { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
-            { 0, 0, 0 },
-            rtOutput.m_compositeOutput.image(Resources::AccessType::Read),
-            { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
-            { 0, 0, 0 },
-            rtOutput.m_compositeOutputExtent);
         }
-        fork_hooks::dispatchRcasSharpening(*this, rtOutput);
+        dispatchEyeUpscaling(rtOutput);
         m_previousUpscaler = m_currentUpscaler;
-        recordGpuStageTiming("UpscalingOrRayReconstruction");
 
         RtxDustParticles& dust = m_common->metaDustParticles();
         dust.simulateAndDraw(this, m_state, rtOutput);
@@ -2947,6 +2926,36 @@ namespace dxvk {
 
       runDenoising(denoiser2, referenceDenoiserSecondLobe2, denoiseInput, denoiseOutput);
     }
+  }
+
+  // Eye-local upscaling/reconstruction. Shared auto-exposure resource initialization stays
+  // in injectRTX so a future stereo loop does not repeat logical-frame setup.
+  void RtxContext::dispatchEyeUpscaling(const Resources::RaytracingOutput& rtOutput) {
+    if (m_currentUpscaler == InternalUpscaler::DLSS) {
+      dispatchDLSS(rtOutput);
+    } else if (m_currentUpscaler == InternalUpscaler::DLSS_RR) {
+      dispatchRayReconstruction(rtOutput);
+    } else if (m_currentUpscaler == InternalUpscaler::XeSS) {
+      dispatchXeSS(rtOutput);
+    } else if (m_currentUpscaler == InternalUpscaler::FSR) {
+      fork_hooks::dispatchFsrUpscale(*this, rtOutput);
+    } else if (m_currentUpscaler == InternalUpscaler::NIS) {
+      dispatchNIS(rtOutput);
+    } else if (m_currentUpscaler == InternalUpscaler::TAAU) {
+      dispatchTemporalAA(rtOutput);
+    } else {
+      copyImage(
+        rtOutput.m_finalOutput.resource(Resources::AccessType::Write).image,
+        { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+        { 0, 0, 0 },
+        rtOutput.m_compositeOutput.image(Resources::AccessType::Read),
+        { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+        { 0, 0, 0 },
+        rtOutput.m_compositeOutputExtent);
+    }
+
+    fork_hooks::dispatchRcasSharpening(*this, rtOutput);
+    recordGpuStageTiming("UpscalingOrRayReconstruction");
   }
 
   void RtxContext::dispatchDLSS(const Resources::RaytracingOutput& rtOutput) {
