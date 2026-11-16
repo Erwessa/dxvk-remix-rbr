@@ -134,7 +134,10 @@ public:
   void clear();
   void clearFromUIThread();
 
-  void garbageCollection(RtCamera& camera);
+  void garbageCollection(
+      RtCamera& camera,
+      RtCamera* leftEyeCamera = nullptr,
+      RtCamera* rightEyeCamera = nullptr);
 
   void dynamicLightMatching();
 
