@@ -277,8 +277,9 @@ namespace dxvk {
     // Query path data 0 is only allocated when include direct lighting is disabled,
     // which is not the default behavior, so there's no real need to have to alias it.
     Resources::Resource           m_queryPathData0;
-    Resources::AliasedResource    m_queryPathData1;
-    Resources::AliasedResource    m_trainingPathData1;
+    // Path-data aliases must follow the active eye's output resources.
+    Resources::AliasedResource    m_queryPathData1[2];
+    Resources::AliasedResource    m_trainingPathData1[2];
 
     nrc_uint2              m_activeTrainingDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
     std::atomic<bool>       m_isActiveForStats = false;
