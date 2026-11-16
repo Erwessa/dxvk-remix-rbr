@@ -519,19 +519,22 @@ namespace dxvk {
     const bool queueIsNeeded = ctx->isDLFGEnabled() || ctx->isFSRFGEnabled();
     const Resource& firstDepth = output.m_primaryDepthQueue[0];
 
-    // Toggling frame generation reallocates only the queues rather than every render resolution resource.
-    if (queueIsNeeded == m_dlfgResourceQueueAllocated && firstDepth.isValid() &&
-        firstDepth.image->info().extent == m_downscaledExtent) {
+    // Check the queue shape on this output, not a Resources-wide flag: each eye owns
+    // independent frame-generation inputs and may be rebuilt at a different time.
+    const bool hasAdditionalQueue = output.m_primaryDepthQueue[1].isValid() &&
+                                    output.m_primaryScreenSpaceMotionVectorQueue[1].isValid();
+    if (queueIsNeeded == hasAdditionalQueue && firstDepth.isValid() &&
+        output.m_primaryScreenSpaceMotionVectorQueue[0].isValid() &&
+        firstDepth.image->info().extent == m_downscaledExtent &&
+        output.m_primaryScreenSpaceMotionVectorQueue[0].image->info().extent == m_downscaledExtent) {
       return;
     }
-
-    m_dlfgResourceQueueAllocated = queueIsNeeded;
 
     for (uint32_t queueIndex = 0; queueIndex < kDLFGMaxGPUFramesInFlight; ++queueIndex) {
       Resource& primaryDepth = output.m_primaryDepthQueue[queueIndex];
       Resource& motionVector = output.m_primaryScreenSpaceMotionVectorQueue[queueIndex];
 
-      if (queueIndex == 0 || m_dlfgResourceQueueAllocated) {
+      if (queueIndex == 0 || queueIsNeeded) {
         primaryDepth = createImageResource(ctx, std::string("primary depth " + std::to_string(queueIndex)).c_str(), m_downscaledExtent, VK_FORMAT_R32_SFLOAT);
         motionVector = createImageResource(ctx, std::string("primary screen space motion vector " + std::to_string(queueIndex)).c_str(), m_downscaledExtent, VK_FORMAT_R16G16_SFLOAT);
       } else {
