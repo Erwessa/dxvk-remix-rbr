@@ -830,7 +830,8 @@ namespace dxvk {
         dispatchGBuffer(rtOutput);
         preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
         midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
-        dispatchPathTracingAfterGBuffer(rtOutput);
+        dispatchPathTracingPreparationAfterGBuffer(rtOutput);
+        dispatchPathTracingIntegration(rtOutput);
         frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
 
         // Sky provider, post-depth slot: NUMOS's screen-space pass (the clouds) runs here,
@@ -2736,7 +2737,7 @@ namespace dxvk {
     recordGpuStageTiming("GBuffer");
   }
 
-  void RtxContext::dispatchPathTracingAfterGBuffer(const Resources::RaytracingOutput& rtOutput) {
+  void RtxContext::dispatchPathTracingPreparationAfterGBuffer(const Resources::RaytracingOutput& rtOutput) {
     // Sparse Rendering: sampling rates + active-pixel mask + compaction.
     // Runs after Gbuffer so the active-pixel mask can read current-frame SharedFlags.
     m_common->metaSparseRendering().dispatch(*this, rtOutput);
@@ -2750,11 +2751,13 @@ namespace dxvk {
     if (dispatchLightBvhSelectPass(this, rtOutput)) {
       recordGpuStageTiming("LightBVHSelect");
     }
+  }
 
+  void RtxContext::dispatchPathTracingIntegration(const Resources::RaytracingOutput& rtOutput) {
     // The logical-frame NEE cache update was dispatched before eye rendering.
     midFrameFlush(2); // rtx.present.midFrameFlushes bit 2, before direct integration
 
-    // Integration Raytracing
+    // Integration Raytracing produces the NRC query paths consumed by logical-frame training.
     dispatchIntegrate(rtOutput);
   }
 
