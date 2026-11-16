@@ -10,6 +10,7 @@
 #include "../dxvk_openvr.h"
 #include "../../util/log/log.h"
 #include "../../util/util_string.h"
+#include "../../util/util_defer.h"
 
 namespace dxvk {
 
@@ -52,9 +53,12 @@ namespace dxvk {
     }
 
     // WaitGetPoses may use the Vulkan queue, so it runs inside the device's submission gate.
-    device.lockSubmission();
-    m_valid = VrInstance::s_instance.acquireFrame(*m_pFrame);
-    device.unlockSubmission();
+    // Keep the gate exception-safe and release it before processing or logging the latched frame.
+    {
+      device.lockSubmission();
+      DEFER(unlockSubmission, device.unlockSubmission());
+      m_valid = VrInstance::s_instance.acquireFrame(*m_pFrame);
+    }
 
     if (!m_valid) {
       return;
