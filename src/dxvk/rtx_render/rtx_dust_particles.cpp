@@ -229,7 +229,11 @@ namespace dxvk {
     pushArgs.renderResolution.y = resourceManager.getTargetDimensions().height;
 
     // Precalculate some variables to help with uniform distribution within a frustum
-    const RtCamera& camera = ctx->getSceneManager().getCamera();
+    const CameraManager& cameraManager = ctx->getSceneManager().getCameraManager();
+    const uint32_t frameIdx = ctx->getDevice()->getCurrentFrameId();
+    const RtCamera& camera = cameraManager.areVrEyeCamerasValid(frameIdx)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(ctx->getActiveEyeIndex()))
+      : ctx->getSceneManager().getCamera();
 
     const float minDistance = minSpawnDistance() + camera.getNearPlane();
     const float maxDistance = maxSpawnDistance() + camera.getNearPlane();
@@ -289,9 +293,9 @@ namespace dxvk {
     Rc<DxvkSampler> linearSampler = resourceManager.getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
     const RtxGlobalVolumetrics& globalVolumetrics = ctx->getCommonObjects()->metaGlobalVolumetrics();
-    ctx->bindResourceView(DUST_PARTICLES_BINDING_FILTERED_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY().view, nullptr);
+    ctx->bindResourceView(DUST_PARTICLES_BINDING_FILTERED_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(DUST_PARTICLES_BINDING_FILTERED_RADIANCE_Y_INPUT, linearSampler);
-    ctx->bindResourceView(DUST_PARTICLES_BINDING_FILTERED_RADIANCE_CO_CG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg().view, nullptr);
+    ctx->bindResourceView(DUST_PARTICLES_BINDING_FILTERED_RADIANCE_CO_CG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(DUST_PARTICLES_BINDING_FILTERED_RADIANCE_CO_CG_INPUT, linearSampler);
     ctx->bindResourceBuffer(DUST_PARTICLES_BINDING_PARTICLES_BUFFER_INOUT, DxvkBufferSlice(m_particles));
     ctx->bindResourceView(DUST_PARTICLES_BINDING_DEPTH_INPUT, rtOutput.m_primaryDepth.view, nullptr);
