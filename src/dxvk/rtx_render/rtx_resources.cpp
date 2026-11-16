@@ -615,7 +615,7 @@ namespace dxvk {
 
     executeFrameBeginEventList(m_onFrameBegin, ctx, frameBeginCtx);
 
-    updateDlssNeuralRenderingResources(ctx);
+    updateDlssNeuralRenderingResources(ctx, m_raytracingOutput);
 
     if (ctx->isDLFGEnabled()) {
       const uint32_t currentFrameId = ctx->getDevice()->getCurrentFrameId();
