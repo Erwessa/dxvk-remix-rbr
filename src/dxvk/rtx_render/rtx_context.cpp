@@ -889,7 +889,7 @@ namespace dxvk {
         m_previousUpscaler = m_currentUpscaler;
 
         RtxDustParticles& dust = m_common->metaDustParticles();
-        dust.simulateAndDraw(this, m_state, rtOutput);
+        dust.simulateAndDraw(this, m_state, rtOutput, m_activeEyeIndex == 0);
         recordGpuStageTiming("DustParticles");
 
         // Auto exposure is shared by the logical frame. The left eye owns its update;
