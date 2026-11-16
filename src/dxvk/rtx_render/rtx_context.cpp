@@ -2690,7 +2690,6 @@ namespace dxvk {
     m_common->metaPathtracerIntegrateDirect().dispatch(this, rtOutput);
     // A separate [PerfGpu] label, so LightBVH direct lighting is not averaged with RTXDI frames.
     recordGpuStageTiming(LightBvh::active() ? "DirectIntegrationLightBVH" : "DirectIntegration");
-    lightSamplingStatsAfterDirect(this); // [LightSamplingStats] readback when enabled
     midFrameFlush(4); // rtx.present.midFrameFlushes bit 4, after direct integration
 
     // RTXDI Gradient pass
@@ -2740,6 +2739,10 @@ namespace dxvk {
       return;
     }
     m_logicalPostPathTracingDispatched = true;
+
+    // Light-sampling counters are shared by both eye integrations. Read and clear them
+    // only after the last eye has finished writing, so one logical frame is one sample.
+    lightSamplingStatsAfterDirect(this);
 
     frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
     m_common->metaNeuralRadianceCache().dispatchTraining(*this);
