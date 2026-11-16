@@ -132,7 +132,7 @@ namespace dxvk {
     // Does nothing when neither kind of overlay is set.
     // Requires friend access to RtxContext (see rtx_context.h).
     // Implementation in rtx_fork_overlay.cpp.
-    void dispatchScreenOverlay(RtxContext& ctx, Resources::RaytracingOutput& rtOutput);
+    void dispatchScreenOverlay(RtxContext& ctx, Resources::RaytracingOutput& rtOutput, bool consumeFrameData);
 
     // Implements GameCapturer::captureMaterial for D3D9 and API-submitted materials.
     // A D3D9 material exports its color texture directly.
