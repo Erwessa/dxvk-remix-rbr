@@ -110,6 +110,8 @@ namespace dxvk {
 
   void RtxVrFrame::updateEyeCameras(CameraManager& cameraManager, uint32_t frameId) {
     if (!m_valid) {
+      // Do not keep applying the last headset pose after a failed pose acquisition or session shutdown.
+      cameraManager.clearVrHeadPose();
       return;
     }
 
