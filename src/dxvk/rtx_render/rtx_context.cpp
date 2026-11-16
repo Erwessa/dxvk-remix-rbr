@@ -931,18 +931,8 @@ namespace dxvk {
 
         dispatchFrameInterpolation(srcImage);
 
-        // Blit to the game target
-        {
-          ScopedGpuProfileZone(this, "Blit to Game");
-          
-          // The VR eye render extent may differ from the game's backbuffer extent.
-          const bool extentsMatch = srcImage->info().extent == targetImage->info().extent;
-          blitImageHelper(this, srcImage, targetImage,
-                          extentsMatch ? VkFilter::VK_FILTER_NEAREST : VkFilter::VK_FILTER_LINEAR);
-        }
-
-        // Thumbnails are of the frame without the game's interface, which is drawn after this.
-        m_common->metaScreenshot().captureThumbnail(this, targetImage);
+        // Mirror one completed eye to the game target and capture one logical-frame thumbnail.
+        dispatchGameMirror(srcImage, targetImage);
 
         // Log stats when an image is taken
         if (captureScreenImage) {
@@ -3270,6 +3260,23 @@ namespace dxvk {
         takeScreenshot("rtxImageDebugView", srcImage);
       }
     }
+  }
+
+  void RtxContext::dispatchGameMirror(const Rc<DxvkImage>& srcImage, const Rc<DxvkImage>& targetImage) {
+    ScopedCpuProfileZone();
+
+    // This is a logical-frame presentation operation, not an eye-local pass.
+    // In VR the caller chooses the mirror eye after both eye images are complete.
+    {
+      ScopedGpuProfileZone(this, "Blit to Game");
+
+      const bool extentsMatch = srcImage->info().extent == targetImage->info().extent;
+      blitImageHelper(this, srcImage, targetImage,
+                      extentsMatch ? VkFilter::VK_FILTER_NEAREST : VkFilter::VK_FILTER_LINEAR);
+    }
+
+    // Thumbnails are of the frame without the game's interface, which is drawn after this.
+    m_common->metaScreenshot().captureThumbnail(this, targetImage);
   }
 
   void RtxContext::dispatchReplaceCompositeWithDebugView(const Resources::RaytracingOutput& rtOutput) {
