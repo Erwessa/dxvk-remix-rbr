@@ -607,8 +607,8 @@ namespace dxvk {
       || m_delayedEnableCustomNetworkConfig != NrcCtxOptions::enableCustomNetworkConfig()
       // [REMIX-3810] WAR to fully recreate NRC when resolution changes to avoid occasional corruption
       // when changing resolutions
-      || frameBeginCtx.downscaledExtent.width != m_eyeFrameDimensions.x
-      || frameBeginCtx.downscaledExtent.height != m_eyeFrameDimensions.y;
+      || frameBeginCtx.downscaledExtent.width * (m_useStereoAtlas ? 2u : 1u) != m_nrcCtxSettings->frameDimensions.x
+      || frameBeginCtx.downscaledExtent.height != m_nrcCtxSettings->frameDimensions.y;
 
     if (reinitializeNrcContext) {
 
