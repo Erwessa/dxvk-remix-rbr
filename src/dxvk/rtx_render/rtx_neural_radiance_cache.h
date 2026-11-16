@@ -307,6 +307,7 @@ namespace dxvk {
     Resources::AliasedResource    m_trainingPathData1[2];
 
     // SDK dimensions span a horizontal two-eye atlas; these remain eye-local for dispatch and resources.
+    bool                   m_useStereoAtlas = false;
     nrc_uint2              m_eyeFrameDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
     nrc_uint2              m_eyeTrainingDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
     nrc_uint2              m_activeTrainingDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
