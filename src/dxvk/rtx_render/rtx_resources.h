@@ -540,12 +540,12 @@ namespace dxvk
     void createSharedResources();
     void createRaytracingOutput(Rc<DxvkContext>& ctx, const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent);
 
-    void createTargetResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
+    void createTargetResources(Rc<DxvkContext>& ctx, RaytracingOutput& output, bool notifyResizeEvents = true);
 
     void createNeuralRenderingOutput(Rc<DxvkContext>& ctx, RaytracingOutput& output);
     void updateDlssNeuralRenderingResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
 
-    void createDownscaledResources(Rc<DxvkContext>& ctx, RaytracingOutput& output);
+    void createDownscaledResources(Rc<DxvkContext>& ctx, RaytracingOutput& output, bool notifyResizeEvents = true);
     bool areDownscaledResourcesCurrent() const;
   };
 
