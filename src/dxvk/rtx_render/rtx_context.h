@@ -281,6 +281,7 @@ namespace dxvk {
     void reportCpuSimdSupport();
 
     void takeScreenshot(std::string imageName, Rc<DxvkImage> image);
+    void takeEyeScreenshot(std::string imageName, Rc<DxvkImage> image);
 
     void checkOpacityMicromapSupport();
     void checkShaderExecutionReorderingSupport();

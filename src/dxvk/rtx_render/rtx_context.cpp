@@ -123,6 +123,15 @@ namespace dxvk {
     exporter.dumpImageToFile(this, path, str::format(imageName, "_", tm.tm_mday, tm.tm_mon, tm.tm_year, "-", tm.tm_hour, tm.tm_min, tm.tm_sec, ".dds"), image);
   }
 
+
+  void RtxContext::takeEyeScreenshot(std::string imageName, Rc<DxvkImage> image) {
+    // Keep mono screenshot names stable while avoiding Left/Right filename collisions in VR.
+    if (VrInstance::s_instance.isSceneSessionActive()) {
+      imageName += m_activeEyeIndex == 0 ? "_left" : "_right";
+    }
+    takeScreenshot(imageName, image);
+  }
+
   void RtxContext::blitImageHelper(Rc<DxvkContext> ctx, const Rc<DxvkImage>& srcImage, const Rc<DxvkImage>& dstImage, VkFilter filter) {
     const DxvkFormatInfo* dstFormatInfo = imageFormatInfo(dstImage->info().format);
     const DxvkFormatInfo* srcFormatInfo = imageFormatInfo(srcImage->info().format);
@@ -867,9 +876,9 @@ namespace dxvk {
         dispatchPostNrcForEye(rtOutput);
         
         if (captureScreenImage && captureDebugImage) {
-          takeScreenshot("baseReflectivity", rtOutput.m_primaryBaseReflectivity.image(Resources::AccessType::Read));
-          takeScreenshot("sharedSubsurfaceData", rtOutput.m_sharedSubsurfaceData.image);
-          takeScreenshot("sharedSubsurfaceDiffusionProfileData", rtOutput.m_sharedSubsurfaceDiffusionProfileData.image);
+          takeEyeScreenshot("baseReflectivity", rtOutput.m_primaryBaseReflectivity.image(Resources::AccessType::Read));
+          takeEyeScreenshot("sharedSubsurfaceData", rtOutput.m_sharedSubsurfaceData.image);
+          takeEyeScreenshot("sharedSubsurfaceDiffusionProfileData", rtOutput.m_sharedSubsurfaceDiffusionProfileData.image);
         }
 
         dispatchEyeDenoisingAndComposition(rtOutput, captureScreenImage, captureDebugImage);
@@ -2721,14 +2730,14 @@ namespace dxvk {
 
     if (captureScreenImage) {
       if (m_common->metaDebugView().debugViewIdx() == DEBUG_VIEW_DISABLED) {
-        takeScreenshot("rtxImagePostTonemapping", rtOutput.m_finalOutput.resource(Resources::AccessType::Read).image);
+        takeEyeScreenshot("rtxImagePostTonemapping", rtOutput.m_finalOutput.resource(Resources::AccessType::Read).image);
       }
 
       if (captureDebugImage) {
-        takeScreenshot("albedo", rtOutput.m_primaryAlbedo.image);
-        takeScreenshot("worldNormals", rtOutput.m_primaryWorldShadingNormal.image);
-        takeScreenshot("worldMotion", rtOutput.m_primaryVirtualMotionVector.image(Resources::AccessType::Read));
-        takeScreenshot("linearZ", rtOutput.m_primaryLinearViewZ.image);
+        takeEyeScreenshot("albedo", rtOutput.m_primaryAlbedo.image);
+        takeEyeScreenshot("worldNormals", rtOutput.m_primaryWorldShadingNormal.image);
+        takeEyeScreenshot("worldMotion", rtOutput.m_primaryVirtualMotionVector.image(Resources::AccessType::Read));
+        takeEyeScreenshot("linearZ", rtOutput.m_primaryLinearViewZ.image);
       }
     }
 
@@ -2813,8 +2822,8 @@ namespace dxvk {
 
     // Primary direct diffuse/specular radiance is noisy and demodulated at this point.
     if (captureScreenImage && captureDebugImage) {
-      takeScreenshot("noisyDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
-      takeScreenshot("noisySpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
+      takeEyeScreenshot("noisyDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
+      takeEyeScreenshot("noisySpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
     }
 
     // Denoising
@@ -2823,8 +2832,8 @@ namespace dxvk {
 
     // Primary direct diffuse/specular radiance is denoised but remains demodulated.
     if (captureScreenImage && captureDebugImage) {
-      takeScreenshot("denoisedDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
-      takeScreenshot("denoisedSpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
+      takeEyeScreenshot("denoisedDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
+      takeEyeScreenshot("denoisedSpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
     }
 
     // Composition
@@ -2835,7 +2844,7 @@ namespace dxvk {
     dispatchReplaceCompositeWithDebugView(rtOutput);
 
     if (captureScreenImage && captureDebugImage) {
-      takeScreenshot("rtxImagePostComposite", rtOutput.m_compositeOutput.resource(Resources::AccessType::Read).image);
+      takeEyeScreenshot("rtxImagePostComposite", rtOutput.m_compositeOutput.resource(Resources::AccessType::Read).image);
     }
   }
 
@@ -3321,7 +3330,7 @@ namespace dxvk {
       if (debugView.getOverlayOnTopOfRenderOutput()) {
         takeScreenshot("rtxImagePostTonemapping", srcImage);
       } else {
-        takeScreenshot("rtxImageDebugView", srcImage);
+        takeEyeScreenshot("rtxImageDebugView", srcImage);
       }
     }
   }
