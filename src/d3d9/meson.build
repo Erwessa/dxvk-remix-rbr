@@ -103,10 +103,7 @@ d3d9_src = [
 unified_src = d3d9_src + frontend_d3d9_src
 unified_deps = [ dxso_dep, dxvk_dep, util_dep, sentry_dep ]
 unified_shaders = [ glsl_generator.process(d3d9_shaders) ]
-# The D3D11 and DXGI exports exist only when those frontends are compiled in, so the module definition follows the option.
-d3d9_def_name = 'd3d9'
 if get_option('enable_d3d11')
-  d3d9_def_name = 'd3d9_unified'
   unified_src += dxgi_src + d3d11_src + d3d10_src
   unified_deps += [ lib_dxgi, dxbc_dep ]
   unified_shaders += [ d3d11_compiled_shaders ]
@@ -120,8 +117,8 @@ d3d9_dll = shared_library('d3d9', unified_src, dxvk_version, unified_shaders, d3
   link_args           : [ usd_plugin_delay_load_args, fsr3_delay_load_args ],
   dependencies        : unified_deps,
   include_directories : [ dxvk_include_path, dxvk_shader_include_path, usd_include_paths, remix_api_include_path, include_directories('../dxvk'), include_directories('../dxgi') ],
-  objects             : not dxvk_is_msvc ? d3d9_def_name + def_spec_ext : [],
-  vs_module_defs      : d3d9_def_name + def_spec_ext,
+  objects             : not dxvk_is_msvc ? 'd3d9' + def_spec_ext : [],
+  vs_module_defs      : 'd3d9'+def_spec_ext,
   override_options    : ['cpp_std='+dxvk_cpp_std],
   install: true
   )
