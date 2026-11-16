@@ -356,9 +356,12 @@ namespace dxvk {
       rtxdiIlluminanceAllocated
       ? rtOutput.getCurrentRtxdiIlluminance().view(Resources::AccessType::Write)
       : nullptr, nullptr);
-    ctx->bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NEE_CACHE, DxvkBufferSlice(rtOutput.m_neeCache, 0, rtOutput.m_neeCache->info().size));
-    ctx->bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NEE_CACHE_SAMPLE, DxvkBufferSlice(rtOutput.m_neeCacheSample, 0, rtOutput.m_neeCacheSample->info().size));
-    ctx->bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NEE_CACHE_TASK, DxvkBufferSlice(rtOutput.m_neeCacheTask, 0, rtOutput.m_neeCacheTask->info().size));
+    const Rc<DxvkBuffer> neeCache = ctx->getResourceManager().getNeeCacheBuffer();
+    const Rc<DxvkBuffer> neeCacheSample = ctx->getResourceManager().getNeeCacheSampleBuffer();
+    const Rc<DxvkBuffer> neeCacheTask = ctx->getResourceManager().getNeeCacheTaskBuffer();
+    ctx->bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NEE_CACHE, DxvkBufferSlice(neeCache, 0, neeCache->info().size));
+    ctx->bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NEE_CACHE_SAMPLE, DxvkBufferSlice(neeCacheSample, 0, neeCacheSample->info().size));
+    ctx->bindResourceBuffer(INTEGRATE_DIRECT_BINDING_NEE_CACHE_TASK, DxvkBufferSlice(neeCacheTask, 0, neeCacheTask->info().size));
     ctx->bindResourceView(INTEGRATE_DIRECT_BINDING_NEE_CACHE_THREAD_TASK, rtOutput.m_neeCacheThreadTask.view, nullptr);
 
     ctx->bindResourceView(INTEGRATE_DIRECT_BINDING_INDIRECT_RAY_ORIGIN_DIRECTION_OUTPUT, rtOutput.m_indirectRayOriginDirection.view(Resources::AccessType::Write), nullptr);

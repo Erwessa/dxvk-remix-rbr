@@ -1472,9 +1472,9 @@ namespace dxvk {
     ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_PREV_WORLD_POSITION_INPUT, rtOutput.getPreviousPrimaryWorldPositionWorldTriangleNormal().view(Resources::AccessType::Read, rtOutput.getPreviousPrimaryWorldPositionWorldTriangleNormal().matchesWriteFrameIdx(frameIdx - 1)), nullptr);
 
     const RtxGlobalVolumetrics& globalVolumetrics = ctx->getCommonObjects()->metaGlobalVolumetrics();
-    ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_VOLUME_FILTERED_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY().view, nullptr);
+    ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_VOLUME_FILTERED_RADIANCE_Y_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceY(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(INTEGRATE_INDIRECT_BINDING_VOLUME_FILTERED_RADIANCE_Y_INPUT, linearClampSampler);
-    ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_VOLUME_FILTERED_RADIANCE_CO_CG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg().view, nullptr);
+    ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_VOLUME_FILTERED_RADIANCE_CO_CG_INPUT, globalVolumetrics.getCurrentVolumeAccumulatedRadianceCoCg(ctx->getActiveEyeIndex()).view, nullptr);
     ctx->bindResourceSampler(INTEGRATE_INDIRECT_BINDING_VOLUME_FILTERED_RADIANCE_CO_CG_INPUT, linearClampSampler);
 
     ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_PRIMARY_HIT_DISTANCE_INPUT, rtOutput.m_primaryHitDistance.view, nullptr);
@@ -1482,9 +1482,9 @@ namespace dxvk {
 
     const DxvkReSTIRGIRayQuery& restirGI = ctx->getCommonObjects()->metaReSTIRGIRayQuery();
     if (restirGI.isActive()) {
-      const uint32_t isLastCompositeOutputValid = restirGI.getLastCompositeOutput().matchesWriteFrameIdx(frameIdx - 1);
+      const uint32_t isLastCompositeOutputValid = restirGI.getLastCompositeOutput(ctx->getActiveEyeIndex()).matchesWriteFrameIdx(frameIdx - 1);
       assert(isLastCompositeOutputValid == rtOutput.m_raytraceArgs.isLastCompositeOutputValid && "Last composite state changed since CB was initialized");
-      ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_LAST_COMPOSITE_INPUT, restirGI.getLastCompositeOutput().view(Resources::AccessType::Read, isLastCompositeOutputValid), nullptr);
+      ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_LAST_COMPOSITE_INPUT, restirGI.getLastCompositeOutput(ctx->getActiveEyeIndex()).view(Resources::AccessType::Read, isLastCompositeOutputValid), nullptr);
     } else {
       ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_LAST_COMPOSITE_INPUT, nullptr, nullptr);
     }
@@ -1501,10 +1501,13 @@ namespace dxvk {
 
     // Output resources
 
-    ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NEE_CACHE, DxvkBufferSlice(rtOutput.m_neeCache, 0, rtOutput.m_neeCache->info().size));
-    ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NEE_CACHE_SAMPLE, DxvkBufferSlice(rtOutput.m_neeCacheSample, 0, rtOutput.m_neeCacheSample->info().size));
+    const Rc<DxvkBuffer> neeCache = ctx->getResourceManager().getNeeCacheBuffer();
+    const Rc<DxvkBuffer> neeCacheSample = ctx->getResourceManager().getNeeCacheSampleBuffer();
+    const Rc<DxvkBuffer> neeCacheTask = ctx->getResourceManager().getNeeCacheTaskBuffer();
+    ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NEE_CACHE, DxvkBufferSlice(neeCache, 0, neeCache->info().size));
+    ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NEE_CACHE_SAMPLE, DxvkBufferSlice(neeCacheSample, 0, neeCacheSample->info().size));
     ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_PRIMITIVE_ID_PREFIX_SUM, DxvkBufferSlice(primitiveIDPrefixSumBuffer, 0, primitiveIDPrefixSumBuffer->info().size));
-    ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NEE_CACHE_TASK, DxvkBufferSlice(rtOutput.m_neeCacheTask, 0, rtOutput.m_neeCacheTask->info().size));
+    ctx->bindResourceBuffer(INTEGRATE_INDIRECT_BINDING_NEE_CACHE_TASK, DxvkBufferSlice(neeCacheTask, 0, neeCacheTask->info().size));
     ctx->bindResourceView(INTEGRATE_INDIRECT_BINDING_NEE_CACHE_THREAD_TASK, rtOutput.m_neeCacheThreadTask.view, nullptr);
 
     // Aliased resources
@@ -1601,14 +1604,14 @@ namespace dxvk {
     const Resources::AliasedResource& primaryBaseReflectivity;
     const Resources::AliasedResource& primaryIndirectDiffuseRadiance;
     const Resources::AliasedResource& primaryIndirectSpecularRadiance;
-    const Rc<DxvkBuffer>& neeCache;
-    const Rc<DxvkBuffer>& neeCacheTask;
-    const Rc<DxvkBuffer>& neeCacheSample;
+    const Rc<DxvkBuffer> neeCache;
+    const Rc<DxvkBuffer> neeCacheTask;
+    const Rc<DxvkBuffer> neeCacheSample;
     const Resources::Resource& neeCacheThreadTask;
     const VkExtent3D& finalOutputExtent;
     const Resources::AliasedResource& primaryWorldPosition;
 
-    explicit AssemblyResources(const Resources::RaytracingOutput& rtOutput)
+    AssemblyResources(const Resources::RaytracingOutput& rtOutput, const Resources& resourceManager)
       : compositeOutputExtent(rtOutput.m_compositeOutputExtent)
       , sharedFlags(rtOutput.m_sharedFlags)
       , sharedMaterialData0(rtOutput.m_sharedMaterialData0)
@@ -1630,9 +1633,9 @@ namespace dxvk {
       , primaryBaseReflectivity(rtOutput.m_primaryBaseReflectivity)
       , primaryIndirectDiffuseRadiance(rtOutput.m_primaryIndirectDiffuseRadiance)
       , primaryIndirectSpecularRadiance(rtOutput.m_primaryIndirectSpecularRadiance)
-      , neeCache(rtOutput.m_neeCache)
-      , neeCacheTask(rtOutput.m_neeCacheTask)
-      , neeCacheSample(rtOutput.m_neeCacheSample)
+      , neeCache(resourceManager.getNeeCacheBuffer())
+      , neeCacheTask(resourceManager.getNeeCacheTaskBuffer())
+      , neeCacheSample(resourceManager.getNeeCacheSampleBuffer())
       , neeCacheThreadTask(rtOutput.m_neeCacheThreadTask)
       , finalOutputExtent(rtOutput.m_finalOutputExtent)
       , primaryWorldPosition(rtOutput.getCurrentPrimaryWorldPositionWorldTriangleNormal()) { }
@@ -1660,7 +1663,7 @@ namespace dxvk {
       assemblySlimLevel = selectAssemblyVariantLevel(ctx, assemblySlimLevel);
     }
     noteSlimLevel(SlimPass::Assembly, assemblySlimLevel);
-    dispatchNEE(ctx, AssemblyResources(rtOutput), assemblySlimLevel);
+    dispatchNEE(ctx, AssemblyResources(rtOutput, ctx->getResourceManager()), assemblySlimLevel);
     ctx->recordGpuStageTiming("IndirectAssembly");
 
     logSlimLevels(ctx->getDevice()->getCurrentFrameId());
