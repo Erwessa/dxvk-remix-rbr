@@ -180,10 +180,15 @@ namespace dxvk {
 
     void prewarmShaders(DxvkPipelineManager& pipelineManager) const;
 
-    // Run the shared NRC SDK training step after all eye query paths have been produced.
+    // Run the shared NRC SDK training step once per logical frame.
+    // IMPORTANT: NRC query/path buffers are currently owned by NeuralRadianceCache and shared,
+    // not double-buffered per eye. A stereo renderer must not dispatch both eyes into these
+    // bindings sequentially and assume both query sets survive; per-eye capture/aggregation
+    // must be implemented before moving this call after two eye integrations.
     void dispatchTraining(RtxContext& ctx);
 
     // Resolve the shared NRC query results into one eye's output after dispatchTraining().
+    // This is an eye-local output pass, but it does not make the upstream query buffers per-eye.
     void dispatchResolveForEye(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput);
 
     // Mono/legacy convenience path: train and resolve one output.
