@@ -82,6 +82,11 @@ namespace dxvk {
       float tracedOptions[6] = {};
       uint32_t framesSinceTrace = 0;
 
+      // Rain-map geometry is world-space and shared by both eyes. Latch preparation
+      // and tracing to the logical frame so a stereo loop cannot advance or rebuild it twice.
+      uint32_t preparedFrameId = UINT32_MAX;
+      uint32_t dispatchedFrameId = UINT32_MAX;
+
       // The host's road mask (game value "__wet.roadMask", documentation/RemixWetAPI.md): one byte per cell, 255 = road.
       Resources::Resource roadMask;
       std::string roadMaskValue;
@@ -185,40 +190,47 @@ namespace dxvk {
 
   void ForkRainMap::prepare(RtxContext& ctx, RaytraceArgs& constants) {
     State& s = state();
-    // Only while something can be wet: no wetness, no map, no pass
-    s.enabled = WetnessOptions::puddleQuality() >= 2 && WetnessOptions::globalWetness() > 0.0f;
-    if (s.enabled) {
-      readRoadMask(s);
-    }
-
+    const uint32_t frameId = ctx.getDevice()->getCurrentFrameId();
     const uint32_t res = requestedResolution();
     const float extent = std::max(WetnessOptions::mapExtent(), 8.0f);
     const float texel = extent / float(res);
 
-    // The window lies in the plane perpendicular to the scene up axis; "up" is the trace axis
-    const Vector3 camera = ctx.getSceneManager().getCamera().getPosition();
-    const bool zUp = RtxOptions::zUp();
-    const float planeU = camera.x;
-    const float planeV = zUp ? camera.y : camera.z;
-    const float camUp = zUp ? camera.z : camera.y;
+    // The map is shared world-space data, not an eye-local screen-space resource.
+    // Use the logical camera and update its window only once per logical frame.
+    if (s.preparedFrameId != frameId) {
+      s.preparedFrameId = frameId;
 
-    const float options[6] = { float(res), extent, WetnessOptions::mapTraceAbove(), WetnessOptions::mapTraceBelow(),
-                               WetnessOptions::occlusionMinHeight(), WetnessOptions::occlusionFeather() };
-    const float updateDistance = WetnessOptions::mapUpdateDistance();
-    const Vector3 moved = camera - s.tracedCamera;
+      // Only while something can be wet: no wetness, no map, no pass
+      s.enabled = WetnessOptions::puddleQuality() >= 2 && WetnessOptions::globalWetness() > 0.0f;
+      if (s.enabled) {
+        readRoadMask(s);
+      }
 
-    s.traceThisFrame = !s.traced || updateDistance <= 0.0f || memcmp(options, s.tracedOptions, sizeof(options)) != 0 ||
-      dot(moved, moved) >= updateDistance * updateDistance || ++s.framesSinceTrace >= kMaxFramesBetweenTraces;
+      // The window lies in the plane perpendicular to the scene up axis; "up" is the trace axis
+      const Vector3 camera = ctx.getSceneManager().getCamera().getPosition();
+      const bool zUp = RtxOptions::zUp();
+      const float planeU = camera.x;
+      const float planeV = zUp ? camera.y : camera.z;
+      const float camUp = zUp ? camera.z : camera.y;
 
-    if (s.traceThisFrame) {
-      // Snapped to the texel grid so the map does not swim with the camera
-      s.originU = std::floor(planeU / texel) * texel - extent * 0.5f;
-      s.originV = std::floor(planeV / texel) * texel - extent * 0.5f;
-      s.traceTop = camUp + std::max(WetnessOptions::mapTraceAbove(), 1.0f);
-      s.traceBottom = camUp - std::max(WetnessOptions::mapTraceBelow(), 1.0f);
-      s.tracedCamera = camera;
-      memcpy(s.tracedOptions, options, sizeof(options));
-      s.framesSinceTrace = 0;
+      const float options[6] = { float(res), extent, WetnessOptions::mapTraceAbove(), WetnessOptions::mapTraceBelow(),
+                                 WetnessOptions::occlusionMinHeight(), WetnessOptions::occlusionFeather() };
+      const float updateDistance = WetnessOptions::mapUpdateDistance();
+      const Vector3 moved = camera - s.tracedCamera;
+
+      s.traceThisFrame = !s.traced || updateDistance <= 0.0f || memcmp(options, s.tracedOptions, sizeof(options)) != 0 ||
+        dot(moved, moved) >= updateDistance * updateDistance || ++s.framesSinceTrace >= kMaxFramesBetweenTraces;
+
+      if (s.traceThisFrame) {
+        // Snapped to the texel grid so the map does not swim with the camera
+        s.originU = std::floor(planeU / texel) * texel - extent * 0.5f;
+        s.originV = std::floor(planeV / texel) * texel - extent * 0.5f;
+        s.traceTop = camUp + std::max(WetnessOptions::mapTraceAbove(), 1.0f);
+        s.traceBottom = camUp - std::max(WetnessOptions::mapTraceBelow(), 1.0f);
+        s.tracedCamera = camera;
+        memcpy(s.tracedOptions, options, sizeof(options));
+        s.framesSinceTrace = 0;
+      }
     }
 
     constants.wetPuddleQuality = uint32_t(std::clamp(WetnessOptions::puddleQuality(), 0, 2));
@@ -237,6 +249,12 @@ namespace dxvk {
 
   void ForkRainMap::dispatch(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput) {
     State& s = state();
+    const uint32_t frameId = ctx.getDevice()->getCurrentFrameId();
+    if (s.dispatchedFrameId == frameId) {
+      return;
+    }
+    s.dispatchedFrameId = frameId;
+
     if (!s.enabled) {
       s.traced = false;
       return;
