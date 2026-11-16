@@ -665,13 +665,12 @@ namespace dxvk {
     // TODO: We should automatically assign available resources at run-time instead of manually figure it out.
     //       There are numerous option combinations, which makes it easy to miss some. Review this part of the code if the AliasedResource WAR hazard is triggered.
     bool isConditionalAliasingsShareSameView = true;
-    static bool cachedIsRayReconstructionEnabled = RtxOptions::isRayReconstructionEnabled();
     if (RtxOptions::isRayReconstructionEnabled()) {
       // Reset aliasing for m_primaryRtxdiTemporalPosition only when the RR setting is toggled between enabled and disabled.
       // Its host goes unallocated while nothing reads either of them, see needsPrimaryDenoisingNormal.
       if (m_raytracingOutput.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising.empty()) {
         m_raytracingOutput.m_primaryRtxdiTemporalPosition.reset();
-      } else if (cachedIsRayReconstructionEnabled != RtxOptions::isRayReconstructionEnabled() || m_raytracingOutput.m_primaryRtxdiTemporalPosition.empty()) {
+      } else if (m_raytracingOutput.m_rayReconstructionEnabled != RtxOptions::isRayReconstructionEnabled() || m_raytracingOutput.m_primaryRtxdiTemporalPosition.empty()) {
         m_raytracingOutput.m_primaryRtxdiTemporalPosition = AliasedResource(m_raytracingOutput.m_primaryVirtualWorldShadingNormalPerceptualRoughnessDenoising, ctx, m_downscaledExtent, VK_FORMAT_R32_UINT, "primary rtxdi temporal position", true);
       }
 
@@ -686,14 +685,14 @@ namespace dxvk {
       }
     } else {
       // Reset aliasing for m_primaryRtxdiTemporalPosition only when the RR setting is toggled between enabled and disabled
-      if (cachedIsRayReconstructionEnabled != RtxOptions::isRayReconstructionEnabled() || m_raytracingOutput.m_primaryRtxdiTemporalPosition.empty()) {
+      if (m_raytracingOutput.m_rayReconstructionEnabled != RtxOptions::isRayReconstructionEnabled() || m_raytracingOutput.m_primaryRtxdiTemporalPosition.empty()) {
         m_raytracingOutput.m_primaryRtxdiTemporalPosition = AliasedResource(m_raytracingOutput.m_primaryDepthDLSSRR, ctx, m_downscaledExtent, VK_FORMAT_R32_UINT, "primary rtxdi temporal position", true);
       }
       m_raytracingOutput.m_indirectRadianceHitDistance = AliasedResource(m_raytracingOutput.m_primaryWorldShadingNormalDLSSRR, ctx, m_downscaledExtent, VK_FORMAT_R16G16B16A16_SFLOAT, "Indirect Radiance Hit Distance", true);
 
       isConditionalAliasingsShareSameView = m_raytracingOutput.m_indirectRadianceHitDistance.sharesTheSameView(m_raytracingOutput.m_primaryWorldShadingNormalDLSSRR);
     }
-    cachedIsRayReconstructionEnabled = RtxOptions::isRayReconstructionEnabled();
+    m_raytracingOutput.m_rayReconstructionEnabled = RtxOptions::isRayReconstructionEnabled();
 
     assert(
       (!m_rtxdiGradientResourcesAllocated ||
