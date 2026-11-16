@@ -314,10 +314,15 @@ enum class FroxelConsumerCacheQuality : int {
     VkExtent3D m_restirFroxelVolumeExtent;
     uint32_t m_numFroxelVolumes;
 
+    // These histories are currently shared by the logical frame, not owned by an eye.
+    // A stereo render loop must not dispatch the volumetric temporal passes independently
+    // for both eyes until these resources (including the ReSTIR reservoirs) are made
+    // eye-local and the camera-specific VolumeArgs are selected per eye.
     Resources::Resource m_volumeReservoirs[2];
     Resources::Resource m_volumeAccumulatedRadianceY[2];
     Resources::Resource m_volumeAccumulatedRadianceCoCg[2];
     Resources::Resource m_volumeAccumulatedRadianceAge[2];
+    // This ping-pong index advances once per logical frame; it is not an eye index.
     bool m_swapTextures = false;
     bool m_rebuildFroxels = false;
     // Whether the froxel cache passes run this frame, latched in onFrameBegin.
