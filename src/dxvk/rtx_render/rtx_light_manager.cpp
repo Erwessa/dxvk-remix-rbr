@@ -248,34 +248,49 @@ namespace dxvk {
     }
   }
 
-  void LightManager::garbageCollection(RtCamera& camera) {
+  void LightManager::garbageCollection(
+      RtCamera& camera,
+      RtCamera* leftEyeCamera,
+      RtCamera* rightEyeCamera) {
     if (!m_lightDebugUILock.owns_lock()) {
       m_lightDebugUILock.lock();
     }
     if (RtxOptions::AntiCulling::isLightAntiCullingEnabled()) {
-      cFrustum& cameraLightAntiCullingFrustum = camera.getLightAntiCullingFrustum();
-      for (auto& [lightHash, rtLight] : getLightTable()) {
-        bool isLightInsideFrustum = true;
+      const bool useStereoFrustums =
+          leftEyeCamera != nullptr && rightEyeCamera != nullptr;
 
-        // We have 3 situations for a light Anti-Culling:
-        // 1. Game Light: We only need to check sphere light (directional light will not be culled)
-        // 2. Light replaces original light: Same as 1, we only need to care about light that the ORIGINAL type is sphere
-        // 3. Light replaces mesh: the light's own sphere, at the mesh's centroid
-        switch (rtLight.getLightAntiCullingType()) {
+      const auto intersectsLightFrustum = [&](
+          RtCamera& viewCamera,
+          const RtLight& light) {
+        cFrustum& frustum = viewCamera.getLightAntiCullingFrustum();
+
+        switch (light.getLightAntiCullingType()) {
         case RtLightAntiCullingType::GameLight:
-          isLightInsideFrustum = sphereIntersectsFrustum(
-            cameraLightAntiCullingFrustum, rtLight.getSphereLightReplacementOriginalPosition(), rtLight.getSphereLightReplacementOriginalRadius());
-          break;
+          return sphereIntersectsFrustum(
+              frustum,
+              light.getSphereLightReplacementOriginalPosition(),
+              light.getSphereLightReplacementOriginalRadius());
+
         case RtLightAntiCullingType::MeshReplacement:
-          // In view only when its mesh surely is: a centroid in view means the mesh is, and one just outside may still have
-          // a part the game drew. The light frustum is used because the object anti-culling one is only set up when object
-          // anti-culling is on.
-          isLightInsideFrustum = sphereIntersectsFrustum(cameraLightAntiCullingFrustum, rtLight.getPosition(),
-                                                         rtLight.getType() == RtLightType::Sphere ? rtLight.getSphereLight().getRadius() : 0.f);
-          break;
+          return sphereIntersectsFrustum(
+              frustum,
+              light.getPosition(),
+              light.getType() == RtLightType::Sphere
+                  ? light.getSphereLight().getRadius()
+                  : 0.f);
+
         case RtLightAntiCullingType::Ignore:
-          break;
+          return true;
         }
+
+        return true;
+      };
+
+      for (auto& [lightHash, rtLight] : getLightTable()) {
+        const bool isLightInsideFrustum = useStereoFrustums
+            ? intersectsLightFrustum(*leftEyeCamera, rtLight)
+                || intersectsLightFrustum(*rightEyeCamera, rtLight)
+            : intersectsLightFrustum(camera, rtLight);
 
         if (isLightInsideFrustum) {
           rtLight.markAsInsideFrustum();
