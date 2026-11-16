@@ -45,6 +45,7 @@ namespace dxvk {
 
     void showImguiSettings();
 
+    void beginFrame(bool resetHistory, const uvec2& resolution);
     void setRaytraceArgs(RaytraceArgs& raytraceArgs, bool resetHistory) const;
 
     RTX_OPTION_ARGS("rtx.neeCache", bool, enable, true, "Enable NEE cache. The integrator will perform NEE on emissive triangles, which usually have significant light contributions, stored in the cache.",
@@ -82,5 +83,8 @@ namespace dxvk {
 
     Rc<vk::DeviceFn> m_vkd;
     mutable bool m_resetCacheRequested = false;
+    bool m_frameResetCacheRequested = false;
+    bool m_frameClearCache = false;
+    uvec2 m_previousResolution { 0, 0 };
   };
 } // namespace dxvk
