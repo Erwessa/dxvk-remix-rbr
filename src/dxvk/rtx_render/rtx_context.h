@@ -352,6 +352,7 @@ namespace dxvk {
     void dispatchGBuffer(const Resources::RaytracingOutput& rtOutput);
     void dispatchPathTracingPreparationAfterGBuffer(const Resources::RaytracingOutput& rtOutput);
     void dispatchPathTracingIntegration(const Resources::RaytracingOutput& rtOutput);
+    void dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput);
     void dispatchPostDepthForEye(const Resources::RaytracingOutput& rtOutput);
     void dispatchPostNrcForEye(const Resources::RaytracingOutput& rtOutput);
     void dispatchDemodulate(const Resources::RaytracingOutput& rtOutput);
