@@ -892,9 +892,13 @@ namespace dxvk {
         dust.simulateAndDraw(this, m_state, rtOutput);
         recordGpuStageTiming("DustParticles");
 
+        // Auto exposure is shared by the logical frame. The left eye owns its update;
+        // subsequent eyes reuse the same exposure texture instead of advancing it twice.
+        const bool updateAutoExposure = m_activeEyeIndex == 0;
+
         // DLSS-NR stays outside the ordered post-processing stack. It must see linear HDR before any
         // stack member runs, it dispatches auto exposure itself, and "Post FX Enabled" must not gate it.
-        const bool dlssNrEnabled = dispatchDlssNR(rtOutput);
+        const bool dlssNrEnabled = dispatchDlssNR(rtOutput, updateAutoExposure);
         recordGpuStageTiming("DlssNR");
         m_perfCpu.dlssNr = dlssNrEnabled;
 
@@ -905,7 +909,7 @@ namespace dxvk {
         const bool performSRGBConversion = !captureScreenImage && g_allowSrgbConversionForOutput;
         // DLSS-NR already dispatched auto exposure above, so the tonemapper must not dispatch it again.
         fork_hooks::dispatchPostProcessingStack(
-          this, rtOutput, performSRGBConversion, /* updateAutoExposure */ !dlssNrEnabled);
+          this, rtOutput, performSRGBConversion, /* updateAutoExposure */ !dlssNrEnabled && updateAutoExposure);
         recordGpuStageTiming("PostProcessing");
 
         // Composite the Remix C API screen overlay after tone mapping and display encoding,
