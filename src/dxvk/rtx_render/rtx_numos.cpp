@@ -333,7 +333,7 @@ namespace dxvk {
         l.coneSoftness = shaping->getConeSoftness();
         l.focusExponent = shaping->getFocusExponent();
       }
-      m_impl->localLights.push_back(l);
+      m_impl->eyes[m_activeEyeIndex]->localLights.push_back(l);
     }
   }
 
@@ -342,8 +342,8 @@ namespace dxvk {
     constants.skyRadianceUnscale = 1.0f;
     constants.skyArgsProbe = 0u;
     if (!m_impl->eyes[m_activeEyeIndex]->argsCleared) {
-      ctx.clearBuffer(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, m_argsBuffer->info().size, 0);
-      m_argsCleared = true;
+      ctx.clearBuffer(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, m_impl->eyes[m_activeEyeIndex]->argsBuffer->info().size, 0);
+      m_impl->eyes[m_activeEyeIndex]->argsCleared = true;
     }
 
     const bool shadersLoaded = active();
@@ -358,10 +358,10 @@ namespace dxvk {
       }
       if (m_impl->eyes[m_activeEyeIndex]->rendering) {
         dropLights();
-        m_rendering = false;
+        m_impl->eyes[m_activeEyeIndex]->rendering = false;
         LightBvh::setSkyProviderRendering(false);
       }
-      *m_impl->eyes[m_activeEyeIndex]->gpu.endFrame();
+      m_impl->eyes[m_activeEyeIndex]->gpu->endFrame();
       return;
     }
 
@@ -384,7 +384,7 @@ namespace dxvk {
     holdBackUncompiledPasses(ctx, settings);
     m_impl->eyes[m_activeEyeIndex]->renderer.setSettings(settings);
 
-    m_impl->gpu.beginFrame(dxvkCtx, deviceFrame);
+    m_impl->eyes[m_activeEyeIndex]->gpu->beginFrame(dxvkCtx, deviceFrame);
 
     SceneManager& scene = ctx.getSceneManager();
     const CameraManager& cameraManager = scene.getCameraManager();
@@ -400,9 +400,9 @@ namespace dxvk {
     in.deltaSeconds = GlobalTime::get().deltaTime();
     in.cameraCut = cameraManager.getLastCameraCutFrameId() + 1u >= deviceFrame;
     if (in.cameraCut) {
-      m_impl->eyes[m_activeEyeIndex]->lastCameraCutFrame = m_frameIndex;
+      m_impl->eyes[m_activeEyeIndex]->lastCameraCutFrame = m_impl->eyes[m_activeEyeIndex]->frameIndex;
     }
-    in.lastCameraCutFrame = m_lastCameraCutFrame[m_activeEyeIndex];
+    in.lastCameraCutFrame = m_impl->eyes[m_activeEyeIndex]->lastCameraCutFrame;
     if (!m_impl->worldChangeFrameValid || m_impl->worldChangeFrameId != deviceFrame) {
       m_impl->worldChangedThisFrame = worldChangeCount() != m_lastWorldChangeCount;
       m_lastWorldChangeCount = worldChangeCount();
@@ -450,12 +450,12 @@ namespace dxvk {
     in.outputWidth = outputExtent.width;
     in.outputHeight = outputExtent.height;
 
-    in.opaqueTlas = m_impl->gpu.setExternalAccel(resources.getTLAS(Tlas::Opaque).accelStructure);
-    in.blueNoise = m_impl->gpu.setExternalView(kBlueNoiseView, resources.getBlueNoiseTexture(dxvkCtx));
+    in.opaqueTlas = m_impl->eyes[m_activeEyeIndex]->gpu->setExternalAccel(resources.getTLAS(Tlas::Opaque).accelStructure);
+    in.blueNoise = m_impl->eyes[m_activeEyeIndex]->gpu->setExternalView(kBlueNoiseView, resources.getBlueNoiseTexture(dxvkCtx));
 
     gatherLocalLights(ctx);
-    in.localLights = m_impl->localLights.data();
-    in.localLightCount = uint32_t(m_impl->localLights.size());
+    in.localLights = m_impl->eyes[m_activeEyeIndex]->localLights.data();
+    in.localLightCount = uint32_t(m_impl->eyes[m_activeEyeIndex]->localLights.size());
     in.hostSkyOverride = scene.getLightManager().getDomeLightArgs().active;
     m_impl->eyes[m_activeEyeIndex]->hostSkyOverride = in.hostSkyOverride;
     in.volumetricsHandoffWorldUnits = RtxGlobalVolumetrics::enable()
@@ -464,20 +464,24 @@ namespace dxvk {
     in.debugViewActive = ctx.getCommonObjects()->metaDebugView().getDebugViewIndex() != DEBUG_VIEW_DISABLED;
     in.weather = nullptr;
 
-    m_impl->renderer.beginFrame(m_impl->gpu, in);
-    ++m_frameIndex;
+    m_impl->eyes[m_activeEyeIndex]->renderer.beginFrame(*m_impl->eyes[m_activeEyeIndex]->gpu, in);
+    ++m_impl->eyes[m_activeEyeIndex]->frameIndex;
 
-    const numos::FrameOutputs& out = m_impl->renderer.outputs();
+    const numos::FrameOutputs& out = m_impl->eyes[m_activeEyeIndex]->renderer.outputs();
     // A partial write (the buffer has a tail pad): DXVK updates it in place in the command stream,
     // ordered before this frame's readers, instead of renaming it under bindings already taken.
-    ctx.writeToBuffer(m_argsBuffer, 0, sizeof(numos::AtmosphereArgs), &out.args);
-    syncLights(ctx, out);
+    ctx.writeToBuffer(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, sizeof(numos::AtmosphereArgs), &out.args);
+    if (!m_impl->lightsFrameValid || m_impl->lightsFrameId != deviceFrame) {
+      syncLights(ctx, out);
+      m_impl->lightsFrameId = deviceFrame;
+      m_impl->lightsFrameValid = true;
+    }
 
     // NUMOS's radiance carries its own pre-exposure R; the renderer's is P (rtx_pre_exposure.h).
     const float radianceScale = out.radianceScale > 0.0f ? out.radianceScale : 1.0f;
     constants.skyRadianceUnscale = PreExposure::get() / radianceScale;
     constants.skyArgsProbe = argsProbe() ? (out.args.cloudRenderFrameIdx | 0x80000000u) : 0u;
-    m_rendering = true;
+    m_impl->eyes[m_activeEyeIndex]->rendering = true;
     LightBvh::setSkyProviderRendering(true);
   }
 
@@ -535,16 +539,16 @@ namespace dxvk {
 
   void RtxNumos::dispatchPostDepth(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput) {
     m_activeEyeIndex = ctx.getActiveEyeIndex();
-    if (!m_rendering) {
+    if (!m_impl->eyes[m_activeEyeIndex]->rendering) {
       return;
     }
-    const numos::GpuHandle linearViewZ = m_impl->gpu.setExternalView(kLinearViewZView, rtOutput.m_primaryLinearViewZ.view);
-    m_impl->renderer.dispatchPostDepth(m_impl->gpu, linearViewZ, m_missLinearViewZ);
-    m_postDepthDone = true;
+    const numos::GpuHandle linearViewZ = m_impl->eyes[m_activeEyeIndex]->gpu->setExternalView(kLinearViewZView, rtOutput.m_primaryLinearViewZ.view);
+    m_impl->eyes[m_activeEyeIndex]->renderer.dispatchPostDepth(*m_impl->eyes[m_activeEyeIndex]->gpu, linearViewZ, m_missLinearViewZ);
+    m_impl->eyes[m_activeEyeIndex]->postDepthDone = true;
     // NUMOS republishes its args after the cloud pass (whether it ran, its history state): the
     // composite reads those. Same partial, in-place write as in beginFrame.
-    ctx.writeToBuffer(m_argsBuffer, 0, sizeof(numos::AtmosphereArgs), &m_impl->renderer.outputs().args);
-    m_impl->gpu.endFrame();
+    ctx.writeToBuffer(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, sizeof(numos::AtmosphereArgs), &m_impl->eyes[m_activeEyeIndex]->renderer.outputs().args);
+    m_impl->eyes[m_activeEyeIndex]->gpu->endFrame();
   }
 
   void RtxNumos::bindCommonResources(RtxContext& ctx) {
@@ -554,17 +558,17 @@ namespace dxvk {
     const Rc<DxvkSampler> fallbackSampler =
       resources.getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
-    auto view = [&](numos::GpuHandle h) { return o ? m_impl->gpu.view(h) : Rc<DxvkImageView>(); };
+    auto view = [&](numos::GpuHandle h) { return o ? m_impl->eyes[m_activeEyeIndex]->gpu->view(h) : Rc<DxvkImageView>(); };
     auto sampler = [&](numos::GpuHandle h) {
-      Rc<DxvkSampler> s = o ? m_impl->gpu.sampler(h) : Rc<DxvkSampler>();
+      Rc<DxvkSampler> s = o ? m_impl->eyes[m_activeEyeIndex]->gpu->sampler(h) : Rc<DxvkSampler>();
       return s != nullptr ? s : fallbackSampler;
     };
     auto buffer = [&](numos::GpuHandle h) {
-      Rc<DxvkBuffer> b = o ? m_impl->gpu.buffer(h) : Rc<DxvkBuffer>();
+      Rc<DxvkBuffer> b = o ? m_impl->eyes[m_activeEyeIndex]->gpu->buffer(h) : Rc<DxvkBuffer>();
       return b != nullptr ? DxvkBufferSlice(b) : DxvkBufferSlice();
     };
 
-    ctx.bindResourceBuffer(BINDING_SKY_ARGS, DxvkBufferSlice(m_argsBuffer, 0, sizeof(numos::AtmosphereArgs)));
+    ctx.bindResourceBuffer(BINDING_SKY_ARGS, DxvkBufferSlice(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, sizeof(numos::AtmosphereArgs)));
     ctx.bindResourceView(BINDING_ATMOSPHERE_TRANSMITTANCE_LUT, view(o ? o->transmittanceLut : 0), nullptr);
     ctx.bindResourceView(BINDING_ATMOSPHERE_MULTISCATTERING_LUT, view(o ? o->multiscatteringLut : 0), nullptr);
     ctx.bindResourceView(BINDING_ATMOSPHERE_SKY_VIEW_LUT, view(o ? o->skyViewLut : 0), nullptr);
@@ -589,12 +593,12 @@ namespace dxvk {
     skyWorldUnitsPerKm = o ? o->args.worldUnitsPerKm : 1000.0f * RtxOptions::getMeterToWorldUnitScale();
     // The composite takes the pre-exposed (x P) image into NUMOS's scale (x R) and back.
     skyRadianceScale = (o && o->radianceScale > 0.0f ? o->radianceScale : 1.0f) * PreExposure::inverse();
-    skyHostSkyOverride = m_hostSkyOverride ? 1u : 0u;
+    skyHostSkyOverride = m_impl->eyes[m_activeEyeIndex]->hostSkyOverride ? 1u : 0u;
 
     Resources& resources = ctx.getResourceManager();
     const Rc<DxvkSampler> fallbackSampler =
       resources.getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-    NumosGpu& gpu = m_impl->gpu;
+    NumosGpu& gpu = *m_impl->eyes[m_activeEyeIndex]->gpu;
     auto view = [&](numos::GpuHandle h) { return o ? gpu.view(h) : Rc<DxvkImageView>(); };
     auto sampler = [&](numos::GpuHandle h) {
       Rc<DxvkSampler> s = o ? gpu.sampler(h) : Rc<DxvkSampler>();
@@ -605,10 +609,10 @@ namespace dxvk {
       return b != nullptr ? DxvkBufferSlice(b) : DxvkBufferSlice();
     };
 
-    ctx.bindResourceBuffer(COMPOSITE_SKY_ARGS, DxvkBufferSlice(m_argsBuffer, 0, sizeof(numos::AtmosphereArgs)));
+    ctx.bindResourceBuffer(COMPOSITE_SKY_ARGS, DxvkBufferSlice(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, sizeof(numos::AtmosphereArgs)));
     const Rc<DxvkImageView> cloudRender = view(o ? o->cloudRender : 0);
     const Rc<DxvkImageView> cloudDepth = view(o ? o->cloudDepth : 0);
-    skyCloudsValid = (m_postDepthDone && o && o->args.cloudRenderRTEnable != 0u && cloudRender != nullptr &&
+    skyCloudsValid = (m_impl->eyes[m_activeEyeIndex]->postDepthDone && o && o->args.cloudRenderRTEnable != 0u && cloudRender != nullptr &&
                       cloudDepth != nullptr) ? 1u : 0u;
     ctx.bindResourceView(COMPOSITE_SKY_CLOUD_RENDER_INPUT, cloudRender, nullptr);
     ctx.bindResourceView(COMPOSITE_SKY_CLOUD_DEPTH_INPUT, cloudDepth, nullptr);
