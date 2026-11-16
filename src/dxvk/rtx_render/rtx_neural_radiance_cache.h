@@ -213,7 +213,10 @@ namespace dxvk {
     void bindIntegrateDirectPathTracingResources(RtxContext& ctx, const bool deferredNrcTrainingSetup);
     void bindIntegrateIndirectPathTracingResources(RtxContext& ctx);
 
-    const Resources::Resource& getTrainingQueryReservoir() const { return m_trainingQueryReservoir; }
+    const Resources::Resource& getTrainingQueryReservoir(uint32_t eyeIndex) const {
+      assert(eyeIndex < 2);
+      return m_trainingQueryReservoir[eyeIndex];
+    }
 
     const Vector2& getNumQueryPixelsPerTrainingPixel() const;
     bool isUpdateResolveModeActive() const;
@@ -269,14 +272,14 @@ namespace dxvk {
     // Resources for integrated surface radiance for training path rays in GBuffer pass.
     // These are reloaded on path continuation in indirect pass since NRC library interaction
     // is initiated at that point
-    Resources::Resource    m_trainingGBufferSurfaceRadianceRG;
-    Resources::Resource    m_trainingGBufferSurfaceRadianceB;
-
-    Resources::Resource    m_trainingQueryReservoir;
+    // These images carry per-view training data between GBuffer and Integration.
+    Resources::Resource    m_trainingGBufferSurfaceRadianceRG[2];
+    Resources::Resource    m_trainingGBufferSurfaceRadianceB[2];
+    Resources::Resource    m_trainingQueryReservoir[2];
 
     // Query path data 0 is only allocated when include direct lighting is disabled,
     // which is not the default behavior, so there's no real need to have to alias it.
-    Resources::Resource           m_queryPathData0;
+    Resources::Resource           m_queryPathData0[2];
     // Path-data aliases must follow the active eye's output resources.
     Resources::AliasedResource    m_queryPathData1[2];
     Resources::AliasedResource    m_trainingPathData1[2];
