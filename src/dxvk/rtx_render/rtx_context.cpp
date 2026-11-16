@@ -2959,15 +2959,15 @@ namespace dxvk {
 
     DxvkTemporalAA& taa = m_common->metaTAA();
     RtCamera& mainCamera = getSceneManager().getCamera();
-    const bool isViewHistoryInvalidated = mainCamera.isViewHistoryInvalidated(m_device->getCurrentFrameId());
+    const bool isViewHistoryInvalidated = renderCamera.isViewHistoryInvalidated(frameId);
 
     if (taa.isActive() && !isViewHistoryInvalidated) {
       float jitterOffset[2];
-      mainCamera.getJittering(jitterOffset);
+      renderCamera.getJittering(jitterOffset);
 
       taa.dispatch(this,
         getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
-        mainCamera.getShaderConstants().resolution,
+        renderCamera.getShaderConstants().resolution,
         jitterOffset,
         rtOutput.m_compositeOutput.resource(Resources::AccessType::Read),
         rtOutput.m_primaryScreenSpaceMotionVector,
@@ -3087,7 +3087,11 @@ namespace dxvk {
   void RtxContext::dispatchPostFxMotionBlur(Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
     DxvkPostFx& postFx = m_common->metaPostFx();
-    const RtCamera& mainCamera = getSceneManager().getCamera();
+    const uint32_t frameId = m_device->getCurrentFrameId();
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
+      : getSceneManager().getCamera();
     if (!postFx.enable()) {
       return;
     }
@@ -3095,27 +3099,35 @@ namespace dxvk {
     postFx.dispatchMotionBlur(this,
       getResourceManager().getSampler(VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
       getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
-      mainCamera.getShaderConstants().resolution,
+      renderCamera.getShaderConstants().resolution,
       RtxOptions::rngSeedWithFrameIndex() ? m_device->getCurrentFrameId() : 0,
       rtOutput,
-      mainCamera.isViewHistoryInvalidated(m_device->getCurrentFrameId()));
+      renderCamera.isViewHistoryInvalidated(frameId));
   }
 
   void RtxContext::dispatchPostFxNtsc(Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
     DxvkPostFx& postFx = m_common->metaPostFx();
-    const RtCamera& mainCamera = getSceneManager().getCamera();
+    const uint32_t frameId = m_device->getCurrentFrameId();
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
+      : getSceneManager().getCamera();
 
     postFx.dispatchNtsc(this,
       getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
-      mainCamera.getShaderConstants().resolution,
+      renderCamera.getShaderConstants().resolution,
       rtOutput);
   }
 
   void RtxContext::dispatchPostFxDof(Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
     DxvkPostFx& postFx = m_common->metaPostFx();
-    const RtCamera& mainCamera = getSceneManager().getCamera();
+    const uint32_t frameId = m_device->getCurrentFrameId();
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
+      : getSceneManager().getCamera();
     if (!postFx.enable()) {
       return;
     }
@@ -3127,25 +3139,29 @@ namespace dxvk {
 
     postFx.dispatchDof(this,
       getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
-      mainCamera.getShaderConstants().resolution,
+      renderCamera.getShaderConstants().resolution,
       RtxOptions::rngSeedWithFrameIndex() ? m_device->getCurrentFrameId() : 0,
       primaryDirectNrdArgs.missLinearViewZ,
       rtOutput,
       GlobalTime::get().deltaTimeMs(),
-      mainCamera.isViewHistoryInvalidated(m_device->getCurrentFrameId()));
+      renderCamera.isViewHistoryInvalidated(frameId));
   }
 
   void RtxContext::dispatchPostFxLensEffects(Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
     DxvkPostFx& postFx = m_common->metaPostFx();
-    const RtCamera& mainCamera = getSceneManager().getCamera();
+    const uint32_t frameId = m_device->getCurrentFrameId();
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameId)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
+      : getSceneManager().getCamera();
     if (!postFx.enable()) {
       return;
     }
 
     postFx.dispatchLensEffects(this,
       getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
-      mainCamera.getShaderConstants().resolution,
+      renderCamera.getShaderConstants().resolution,
       RtxOptions::rngSeedWithFrameIndex() ? m_device->getCurrentFrameId() : 0,
       rtOutput);
   }
