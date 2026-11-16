@@ -21,6 +21,8 @@
 */
 #include "rtx_context.h"
 #include "rtx_postFx.h"
+
+#include <cassert>
 #include "dxvk_device.h"
 #include "dxvk_scoped_annotation.h"
 #include "rtx_render/rtx_shader_manager.h"
@@ -574,16 +576,19 @@ namespace dxvk {
       return;
     }
     if (!isDofEnabled()) {
-      // Keep the state reset armed so enabling DoF/Auto Focus cannot consume
+      // Keep both eye histories reset so enabling DoF/Auto Focus cannot consume
       // stale state from a previous scene or an unwritten first frame.
-      m_dofFocusStateReset = true;
+      m_dofFocusStateReset = { true, true };
       // ~25 MB of half resolution working set at 1600p; there is no reason to
       // hold it while the effect is switched off.
       releaseDofResources();
       return;
     }
 
-    if (!m_dofFocusState.isValid()) {
+    const uint32_t eyeIndex = ctx->getActiveEyeIndex();
+    assert(eyeIndex < m_dofFocusState.size());
+
+    if (!m_dofFocusState[eyeIndex].isValid()) {
       DxvkImageCreateInfo desc;
       desc.type = VK_IMAGE_TYPE_1D;
       desc.flags = 0;
@@ -606,14 +611,14 @@ namespace dxvk {
       viewInfo.format = desc.format = VK_FORMAT_R32_SFLOAT;
       viewInfo.usage = desc.usage = VK_IMAGE_USAGE_STORAGE_BIT;
 
-      m_dofFocusState.image = ctx->getDevice()->createImage(
+      m_dofFocusState[eyeIndex].image = ctx->getDevice()->createImage(
         desc,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         DxvkMemoryStats::Category::RTXRenderTarget,
         "dof auto focus state");
-      m_dofFocusState.view = ctx->getDevice()->createImageView(m_dofFocusState.image, viewInfo);
-      ctx->changeImageLayout(m_dofFocusState.image, VK_IMAGE_LAYOUT_GENERAL);
-      m_dofFocusStateReset = true;
+      m_dofFocusState[eyeIndex].view = ctx->getDevice()->createImageView(m_dofFocusState[eyeIndex].image, viewInfo);
+      ctx->changeImageLayout(m_dofFocusState[eyeIndex].image, VK_IMAGE_LAYOUT_GENERAL);
+      m_dofFocusStateReset[eyeIndex] = true;
     }
 
     ScopedGpuProfileZone(ctx, "PostFx Depth of Field");
@@ -720,14 +725,14 @@ namespace dxvk {
         : fallbackMs;
       autoFocusArgs.deltaTimeSecs = effectiveFrameTimeMs * 0.001f;
       autoFocusArgs.tauSeconds = autoFocusTau();
-      autoFocusArgs.forceReset = (m_dofFocusStateReset || cameraCutDetected) ? 1 : 0;
+      autoFocusArgs.forceReset = (m_dofFocusStateReset[eyeIndex] || cameraCutDetected) ? 1 : 0;
       autoFocusArgs.regionRadius = autoFocusRegionRadius();
       autoFocusArgs.deadZone = autoFocusDeadZone();
       autoFocusArgs.farTauScale = autoFocusFarTauScale();
 
       ctx->pushConstants(0, sizeof(autoFocusArgs), &autoFocusArgs);
       ctx->bindResourceView(POST_FX_DOF_AF_PRIMARY_LINEAR_VIEW_Z_INPUT, rtOutput.m_primaryLinearViewZ.view, nullptr);
-      ctx->bindResourceView(POST_FX_DOF_AF_FOCUS_STATE_INPUT_OUTPUT, m_dofFocusState.view, nullptr);
+      ctx->bindResourceView(POST_FX_DOF_AF_FOCUS_STATE_INPUT_OUTPUT, m_dofFocusState[eyeIndex].view, nullptr);
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, PostFxDofAutoFocusShader::getShader());
       ctx->dispatch(1, 1, 1);
     }
@@ -747,7 +752,7 @@ namespace dxvk {
       ctx->bindResourceView(POST_FX_DOF_PREPARE_PRIMARY_LINEAR_VIEW_Z_INPUT, rtOutput.m_primaryLinearViewZ.view, nullptr);
       ctx->bindResourceView(POST_FX_DOF_PREPARE_COLOR_COC_OUTPUT, m_dofHalfColorCoC.view, nullptr);
       ctx->bindResourceView(POST_FX_DOF_PREPARE_TILE_OUTPUT, m_dofTile.view, nullptr);
-      ctx->bindResourceView(POST_FX_DOF_PREPARE_FOCUS_STATE_INPUT, m_dofFocusState.view, nullptr);
+      ctx->bindResourceView(POST_FX_DOF_PREPARE_FOCUS_STATE_INPUT, m_dofFocusState[eyeIndex].view, nullptr);
       // The unfiltered flags, not the dilated copy motion blur builds for
       // itself: this wants the exact view model silhouette.
       ctx->bindResourceView(POST_FX_DOF_PREPARE_PRIMARY_SURFACE_FLAGS_INPUT, rtOutput.m_primarySurfaceFlags.view, nullptr);
@@ -781,7 +786,7 @@ namespace dxvk {
       ctx->bindResourceView(POST_FX_DOF_RESOLVE_FAR_INPUT, m_dofHalfFar.view, nullptr);
       ctx->bindResourceView(POST_FX_DOF_RESOLVE_OUTPUT, rtOutput.m_postFxIntermediateTexture.view(Resources::AccessType::Write), nullptr);
       ctx->bindResourceSampler(POST_FX_DOF_RESOLVE_LINEAR_SAMPLER, linearSampler);
-      ctx->bindResourceView(POST_FX_DOF_RESOLVE_FOCUS_STATE_INPUT, m_dofFocusState.view, nullptr);
+      ctx->bindResourceView(POST_FX_DOF_RESOLVE_FOCUS_STATE_INPUT, m_dofFocusState[eyeIndex].view, nullptr);
       ctx->bindResourceView(POST_FX_DOF_RESOLVE_PRIMARY_SURFACE_FLAGS_INPUT, rtOutput.m_primarySurfaceFlags.view, nullptr);
       ctx->bindShader(VK_SHADER_STAGE_COMPUTE_BIT, PostFxDofResolveShader::getShader());
       ctx->dispatch(fullWorkgroups.width, fullWorkgroups.height, fullWorkgroups.depth);
@@ -798,7 +803,7 @@ namespace dxvk {
 
     // Keep reset armed while Auto Focus is disabled so the next enable starts
     // from the current target instead of blending from stale state.
-    m_dofFocusStateReset = !isDofAutoFocusEnabled();
+    m_dofFocusStateReset[eyeIndex] = !isDofAutoFocusEnabled();
   }
 
   void DxvkPostFx::releaseDofResources() {

@@ -21,6 +21,8 @@
 */
 #pragma once
 
+#include <array>
+
 #include "dxvk_format.h"
 #include "dxvk_include.h"
 #include "dxvk_context.h"
@@ -104,7 +106,8 @@ namespace dxvk {
     inline bool isDofAutoFocusEnabled() const { return isDofEnabled() && autoFocusEnable(); }
     inline bool isChromaticAberrationEnabled() const { return enable() && enableLensEffects() && enableChromaticAberration() && chromaticAberrationAmount() > 0.0f; }
     inline bool isVignetteEnabled() const { return enable() && enableLensEffects() && enableVignette() && vignetteIntensity() > 0.0f; }
-    inline const Resources::Resource& getDofFocusState() const { return m_dofFocusState; }
+    inline const Resources::Resource& getDofFocusState() const { return m_dofFocusState[0]; }
+    inline const Resources::Resource& getDofFocusState(uint32_t eyeIndex) const { return m_dofFocusState[eyeIndex]; }
 
     RTX_OPTION_ARGS("rtx.postfx", bool, enable, true, "Enables optional post-processing effects in the stack.",
                     args.environment = "RTX_POST_FX_ENABLE",
@@ -205,7 +208,7 @@ namespace dxvk {
   private:
     Rc<vk::DeviceFn> m_vkd;
     Rc<DxvkBuffer> m_highlightingValues;
-    Resources::Resource m_dofFocusState;
+    std::array<Resources::Resource, 2> m_dofFocusState;
     // Half resolution depth-of-field working set. DxvkPostFx is not an RtxPass,
     // so it has no createTargetResource/releaseTargetResource hook: these are
     // created on demand in dispatchDof, rebuilt when the output extent changes,
@@ -216,7 +219,7 @@ namespace dxvk {
     Resources::Resource m_dofHalfFar;        // defocused base layer
     Resources::Resource m_dofTile;           // rg = (max |CoC| radius, max near radius)
     VkExtent3D m_dofHalfExtent = { 0, 0, 0 };
-    bool m_dofFocusStateReset = true;
+    std::array<bool, 2> m_dofFocusStateReset = { true, true };
 
     void releaseDofResources();
 
