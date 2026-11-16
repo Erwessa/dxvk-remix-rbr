@@ -786,6 +786,11 @@ namespace dxvk {
         recordGpuStageTiming("RaytraceArgsAfterAtmosphere");
         preGateFlush(2);
 
+        // Update the world-space NEE cache once per logical frame, before any eye integrates.
+        // The update consumes scene prefix-sum/light data and frame constants, not eye G-buffer data.
+        dispatchNeeCache(rtOutput);
+        recordGpuStageTiming("NEECache");
+
         // Volumetric Lighting
         dispatchVolumetrics(rtOutput);
         recordGpuStageTiming("Volumetrics");
@@ -2704,9 +2709,7 @@ namespace dxvk {
       recordGpuStageTiming("LightBVHSelect");
     }
 
-    // NEE Cache
-    dispatchNeeCache(rtOutput);
-    recordGpuStageTiming("NEECache");
+    // The logical-frame NEE cache update was dispatched before eye rendering.
     midFrameFlush(2); // rtx.present.midFrameFlushes bit 2, before direct integration
 
     // Integration Raytracing
