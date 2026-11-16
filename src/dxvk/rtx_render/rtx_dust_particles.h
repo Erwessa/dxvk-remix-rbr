@@ -60,6 +60,6 @@ namespace dxvk {
     
     void showImguiSettings();
 
-    void simulateAndDraw(RtxContext* ctx, DxvkContextState& dxvkCtxState, const Resources::RaytracingOutput& rtOutput);
+    void simulateAndDraw(RtxContext* ctx, DxvkContextState& dxvkCtxState, const Resources::RaytracingOutput& rtOutput, bool simulateParticles);
   };
 }
