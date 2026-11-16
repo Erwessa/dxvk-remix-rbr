@@ -350,7 +350,8 @@ namespace dxvk {
     void logPerfSummary(const char* when);
 
     void dispatchGBuffer(const Resources::RaytracingOutput& rtOutput);
-    void dispatchPathTracingAfterGBuffer(const Resources::RaytracingOutput& rtOutput);
+    void dispatchPathTracingPreparationAfterGBuffer(const Resources::RaytracingOutput& rtOutput);
+    void dispatchPathTracingIntegration(const Resources::RaytracingOutput& rtOutput);
     void dispatchDemodulate(const Resources::RaytracingOutput& rtOutput);
     void dispatchNeeCache(const Resources::RaytracingOutput& rtOutput);
     void dispatchDLSS(const Resources::RaytracingOutput& rtOutput);
