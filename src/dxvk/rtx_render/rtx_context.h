@@ -237,7 +237,7 @@ namespace dxvk {
 
     // This frame's feature mask, computed once right after updateRaytraceArgsConstantBuffer. The slim
     // selectors of the G-buffer, direct and indirect passes read it (rtx_fork_frame_features.h).
-    const RtFrameFeatures& getFrameFeatures() const { return m_frameFeatures; }
+    const RtFrameFeatures& getFrameFeatures() const { return m_frameFeatures[m_activeEyeIndex]; }
 
     // Whether binding `shader` (compute) would find its pipeline compiled for the current compute state,
     // without waiting for a compile in progress. Defined in rtx_fork_variant_tables.cpp.
@@ -445,7 +445,7 @@ namespace dxvk {
     // rtx.present.presentWaitPreGateFlush point resolved for the frame being recorded (0 = no split).
     uint32_t m_preGatePoint = 0;
     // See getFrameFeatures().
-    RtFrameFeatures m_frameFeatures;
+    std::array<RtFrameFeatures, 2> m_frameFeatures;
     // Mono uses slot 0; stereo selects 0 for left and 1 for right before each eye dispatch.
     uint32_t m_activeEyeIndex = 0;
     // rtx.profile.detailedLogging
