@@ -296,15 +296,18 @@ namespace dxvk {
   }
 
   void RtxSharc::setRaytraceArgs(RtxContext& ctx, RaytraceArgs& args) {
-    // The grid levels are measured from the camera, and the resolve pass reprojects a cell age
-    // against where the camera was last frame, so both positions live with the cache rather than
-    // being derived from args.
-    const Vector3 position = ctx.getSceneManager().getCamera().getPosition();
-
-    m_args.cameraPositionPrev = m_clearedThisFrame
-      ? vec3(position.x, position.y, position.z)
-      : m_args.cameraPosition;
-    m_args.cameraPosition = vec3(position.x, position.y, position.z);
+    // SHARC is a shared world-space cache, not an eye-local history. Capture its camera anchor
+    // from the first (logical left) eye once per device frame; a second eye must not become the
+    // previous-frame camera position for the same logical frame.
+    const uint32_t frame = m_device->getCurrentFrameId();
+    if (m_cameraArgsFrame != frame) {
+      const Vector3 position = ctx.getSceneManager().getCamera().getPosition();
+      m_args.cameraPositionPrev = m_clearedThisFrame
+        ? vec3(position.x, position.y, position.z)
+        : m_args.cameraPosition;
+      m_args.cameraPosition = vec3(position.x, position.y, position.z);
+      m_cameraArgsFrame = frame;
+    }
 
     args.sharcArgs = m_args;
   }
