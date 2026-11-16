@@ -3010,7 +3010,7 @@ namespace dxvk {
       rtOutput, settings);
   }
 
-  bool RtxContext::dispatchDlssNR(const Resources::RaytracingOutput& rtOutput) {
+  bool RtxContext::dispatchDlssNR(const Resources::RaytracingOutput& rtOutput, bool updateAutoExposure) {
     ScopedCpuProfileZone();
 
     auto& dlssNr = m_common->metaDlssNeuralRendering();
@@ -3020,10 +3020,14 @@ namespace dxvk {
 
     DxvkToneMapping& toneMapper = m_common->metaToneMapping();
     DxvkAutoExposure& autoExposure = m_common->metaAutoExposure();
-    autoExposure.dispatch(this,
-      getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER),
-      rtOutput, GlobalTime::get().deltaTimeMs());
-    recordGpuStageTiming("AutoExposureHaloMeter");
+    // Auto exposure is a logical-frame resource, while DLSS-NR input/output is eye-local.
+    // A stereo caller updates exposure once, then reuses the resulting texture for the other eye.
+    if (updateAutoExposure) {
+      autoExposure.dispatch(this,
+        getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER),
+        rtOutput, GlobalTime::get().deltaTimeMs());
+      recordGpuStageTiming("AutoExposureHaloMeter");
+    }
 
     // DLSS-NR operates in SDR space; inverse tone mapping restores HDR for downstream post-processing.
     toneMapper.dispatchFastToneMapping(
