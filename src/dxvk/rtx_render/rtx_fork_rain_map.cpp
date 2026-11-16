@@ -84,8 +84,8 @@ namespace dxvk {
 
       // Rain-map geometry is world-space and shared by both eyes. Latch preparation
       // and tracing to the logical frame so a stereo loop cannot advance or rebuild it twice.
-      uint32_t preparedFrameId = UINT32_MAX;
-      uint32_t dispatchedFrameId = UINT32_MAX;
+      uint32_t preparedFrameId = ~uint32_t(0);
+      uint32_t dispatchedFrameId = ~uint32_t(0);
 
       // The host's road mask (game value "__wet.roadMask", documentation/RemixWetAPI.md): one byte per cell, 255 = road.
       Resources::Resource roadMask;
