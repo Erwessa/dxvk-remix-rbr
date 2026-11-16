@@ -368,8 +368,8 @@ namespace dxvk {
 
     RemixGui::DragInt("Number of Frames To Smooth Training Dimensions (0 ~ Disabled)", &NrcOptions::numFramesToSmoothOutTrainingDimensionsObject(), 1.f, 0, 1024, "%d", ImGuiSliderFlags_AlwaysClamp);
 
-    ImGui::Text("Training Dimension Width Active (Max): %u (%u)", m_activeTrainingDimensions.x, m_nrcCtxSettings->trainingDimensions.x);
-    ImGui::Text("Training Dimension Height Active (Max): %u (%u)", m_activeTrainingDimensions.y, m_nrcCtxSettings->trainingDimensions.y);
+    ImGui::Text("Training Dimension Width Active (Max): %u (%u)", m_activeTrainingDimensions.x, m_eyeTrainingDimensions.x);
+    ImGui::Text("Training Dimension Height Active (Max): %u (%u)", m_activeTrainingDimensions.y, m_eyeTrainingDimensions.y);
   }
 
   static bool checkIsSupported(const DxvkDevice* device) {
@@ -428,13 +428,14 @@ namespace dxvk {
     return NrcOptions::targetNumTrainingIterations() * kNumTrainingRecordsPerIteration;
   }
 
-  void NeuralRadianceCache::setRaytraceArgs(RaytraceArgs& constants) {
+  void NeuralRadianceCache::setRaytraceArgs(RaytraceArgs& constants, uint32_t eyeIndex) {
     if (!isActive()) {
       return;
     }
 
     NrcArgs& nrcArgs = constants.nrcArgs;
     m_nrcCtx->populateShaderConstants(nrcArgs.nrcConstants);
+    nrcArgs.eyeIndex = eyeIndex;
 
     nrcArgs.updatePathMaxBounces = calculateTrainingMaxPathBounces();
 
@@ -442,13 +443,13 @@ namespace dxvk {
     nrcArgs.updateAllowRussianRoulette = false;
 
     const uint numUpdatePixels = m_activeTrainingDimensions.x * m_activeTrainingDimensions.y;
-    nrcArgs.numRowsForUpdate = divCeil(numUpdatePixels, m_nrcCtxSettings->frameDimensions.x);
+    nrcArgs.numRowsForUpdate = divCeil(numUpdatePixels, m_eyeFrameDimensions.x);
 
     // Note: last training path may have query space pixel coordinates outside of valid query resolution bounds.
     // Such paths will be skipped.
     m_numQueryPixelsPerTrainingPixel = Vector2 {
-      m_nrcCtxSettings->frameDimensions.x / static_cast<float>(m_activeTrainingDimensions.x),
-      m_nrcCtxSettings->frameDimensions.y / static_cast<float>(m_activeTrainingDimensions.y) };
+      m_eyeFrameDimensions.x / static_cast<float>(m_activeTrainingDimensions.x),
+      m_eyeFrameDimensions.y / static_cast<float>(m_activeTrainingDimensions.y) };
 
     nrcArgs.activeTrainingDimensions = vec2 {
       static_cast<float>(m_activeTrainingDimensions.x),
@@ -473,8 +474,8 @@ namespace dxvk {
     const double epsilon = 0.001;  // A slight bump to bounds to guard more against boundary trailing aliasing
     const double halfPixel = 0.5 + epsilon;
     Vector2Base<double> trainingPixelInnerBounds = Vector2Base<double> {
-      (halfPixel / m_nrcCtxSettings->frameDimensions.x) * m_activeTrainingDimensions.x,
-      (halfPixel / m_nrcCtxSettings->frameDimensions.y) * m_activeTrainingDimensions.y };
+      (halfPixel / m_eyeFrameDimensions.x) * m_activeTrainingDimensions.x,
+      (halfPixel / m_eyeFrameDimensions.y) * m_activeTrainingDimensions.y };
 
     if (NrcOptions::jitterSequenceLength()) {
       uvec2 numQueryPixelsPerTrainingPixel = uvec2 {
@@ -560,11 +561,11 @@ namespace dxvk {
     // them not using Russian Roulette. This along with using NRC update/query SER coherence hint makes it faster.
 
     const uint numUpdatePixels = m_activeTrainingDimensions.x * m_activeTrainingDimensions.y;
-    const uint numRowsForUpdate = divCeil(numUpdatePixels, m_nrcCtxSettings->frameDimensions.x);
+    const uint numRowsForUpdate = divCeil(numUpdatePixels, m_eyeFrameDimensions.x);
 
     return VkExtent3D {
-      m_nrcCtxSettings->frameDimensions.x,
-      m_nrcCtxSettings->frameDimensions.y + numRowsForUpdate,
+      m_eyeFrameDimensions.x,
+      m_eyeFrameDimensions.y + numRowsForUpdate,
       1 };
   }
 
@@ -603,8 +604,8 @@ namespace dxvk {
       || m_delayedEnableCustomNetworkConfig != NrcCtxOptions::enableCustomNetworkConfig()
       // [REMIX-3810] WAR to fully recreate NRC when resolution changes to avoid occasional corruption
       // when changing resolutions
-      || frameBeginCtx.downscaledExtent.width != m_nrcCtxSettings->frameDimensions.x
-      || frameBeginCtx.downscaledExtent.height != m_nrcCtxSettings->frameDimensions.y;
+      || frameBeginCtx.downscaledExtent.width != m_eyeFrameDimensions.x
+      || frameBeginCtx.downscaledExtent.height != m_eyeFrameDimensions.y;
 
     if (reinitializeNrcContext) {
 
@@ -656,34 +657,39 @@ namespace dxvk {
 
       // Calculate NRC resolution limits
       {
-        m_nrcCtxSettings->frameDimensions = nrc_uint2 {
+        m_eyeFrameDimensions = nrc_uint2 {
           frameBeginCtx.downscaledExtent.width,
           frameBeginCtx.downscaledExtent.height
         };
+        m_nrcCtxSettings->frameDimensions = nrc_uint2 {
+          m_eyeFrameDimensions.x * 2,
+          m_eyeFrameDimensions.y
+        };
 
-        // Calculate an upper bound for training dimensions where we have N path vertices per pixel on average
-        const nrc_uint2 prevTrainingDimensions = m_nrcCtxSettings->trainingDimensions;
-        m_nrcCtxSettings->trainingDimensions = nrc::ComputeIdealTrainingDimensions(m_nrcCtxSettings->frameDimensions, NrcOptions::targetNumTrainingIterations(), NrcOptions::averageTrainingBouncesPerPath());
+        // Compute the training grid for one eye, then expose both grids in the SDK atlas.
+        const nrc_uint2 prevTrainingDimensions = m_eyeTrainingDimensions;
+        m_eyeTrainingDimensions = nrc::ComputeIdealTrainingDimensions(m_eyeFrameDimensions, NrcOptions::targetNumTrainingIterations(), NrcOptions::averageTrainingBouncesPerPath());
 
         // Constrain the dimensions to the RT output resolution because training resolution cannot be larger 
         // due to primary rays being aliased for both query and training
-        if (m_nrcCtxSettings->trainingDimensions.x > m_nrcCtxSettings->frameDimensions.x ||
-            m_nrcCtxSettings->trainingDimensions.y > m_nrcCtxSettings->frameDimensions.y) {
+        if (m_eyeTrainingDimensions.x > m_eyeFrameDimensions.x ||
+            m_eyeTrainingDimensions.y > m_eyeFrameDimensions.y) {
           ONCE(Logger::warn(str::format("[RTX Neural Radiance Cache] Requested NRC training resolution was clamped by active pathtracing resolution. NRC may update slower because of that.\n",
-                                        "Requested: (", m_nrcCtxSettings->trainingDimensions.x, ", ", m_nrcCtxSettings->trainingDimensions.y,")\n",
-                                        "Clamped: (", m_nrcCtxSettings->frameDimensions.x, ", ", m_nrcCtxSettings->frameDimensions.y, ")")));
-          m_nrcCtxSettings->trainingDimensions = nrc_uint2 {
-            std::min(m_nrcCtxSettings->trainingDimensions.x, m_nrcCtxSettings->frameDimensions.x),
-            std::min(m_nrcCtxSettings->trainingDimensions.y, m_nrcCtxSettings->frameDimensions.y),
+                                        "Requested: (", m_eyeTrainingDimensions.x, ", ", m_eyeTrainingDimensions.y,")\n",
+                                        "Clamped: (", m_eyeFrameDimensions.x, ", ", m_eyeFrameDimensions.y, ")")));
+          m_eyeTrainingDimensions = nrc_uint2 {
+            std::min(m_eyeTrainingDimensions.x, m_eyeFrameDimensions.x),
+            std::min(m_eyeTrainingDimensions.y, m_eyeFrameDimensions.y),
           };
         }
 
         // Integrator expects the width of training dimensions not to be larger than that of target resolution. 
         // In practice, this should always be the case unless in case of contrived tiny frame dimensions.
         // Therefore we clamp it to ensure the constraint
-        m_nrcCtxSettings->trainingDimensions.x = std::min(m_nrcCtxSettings->trainingDimensions.x, m_nrcCtxSettings->frameDimensions.x);
+        m_eyeTrainingDimensions.x = std::min(m_eyeTrainingDimensions.x, m_eyeFrameDimensions.x);
+        m_nrcCtxSettings->trainingDimensions = nrc_uint2 { m_eyeTrainingDimensions.x * 2, m_eyeTrainingDimensions.y };
 
-        const bool haveMaxTrainingDimensionsChanged = memcmp(&m_nrcCtxSettings->trainingDimensions, &prevTrainingDimensions, sizeof(prevTrainingDimensions)) != 0;
+        const bool haveMaxTrainingDimensionsChanged = memcmp(&m_eyeTrainingDimensions, &prevTrainingDimensions, sizeof(prevTrainingDimensions)) != 0;
       
         calculateActiveTrainingDimensions(frameBeginCtx.frameTimeMilliseconds, haveMaxTrainingDimensionsChanged);
       }
@@ -738,7 +744,7 @@ namespace dxvk {
       nrcFrameSettings.resolveMode = NrcOptions::enableDebugResolveMode() ? NrcOptions::debugResolveMode() : NrcResolveMode::AddQueryResultToOutput;
       nrcFrameSettings.trainTheCache = NrcOptions::trainCache();
 
-      nrcFrameSettings.usedTrainingDimensions = m_activeTrainingDimensions;
+      nrcFrameSettings.usedTrainingDimensions = nrc_uint2 { m_activeTrainingDimensions.x * 2, m_activeTrainingDimensions.y };
 
       nrcFrameSettings.proportionPrimarySegmentsToTrainOn = NrcOptions::proportionPrimarySegmentsToTrainOn();
       nrcFrameSettings.proportionTertiaryPlusSegmentsToTrainOn = NrcOptions::proportionTertiaryPlusSegmentsToTrainOn();
@@ -760,7 +766,7 @@ namespace dxvk {
       // Allocate query path data only when include direct lighting option is disabled. 
       // In this case queryPathData resolved in gbuffer is needed in indirect pass (i.e. direct lighting is resolved).
       // Note: this is done here since indirect lighting option can change after createDownscaledResource() was called
-      const VkExtent3D trainingExtent = VkExtent3D { m_nrcCtxSettings->trainingDimensions.x, m_nrcCtxSettings->trainingDimensions.y, 1 };
+      const VkExtent3D trainingExtent = VkExtent3D { m_eyeTrainingDimensions.x, m_eyeTrainingDimensions.y, 1 };
 
       // Deferred setup stores surface radiance per pixel rather than per training cell, so it needs the render extent.
       const VkExtent3D surfaceRadianceExtent = sparseRenderingResamplesTrainingPaths ? downscaledExtent : trainingExtent;
@@ -1012,8 +1018,8 @@ namespace dxvk {
       // will boost NRC convergence.
       // The active training dimensions will converge on a target targetNumTrainingIterations in NrcOptions::numFramesToSmoothOutTrainingDimensions() + kMaxFramesInFlight frames.
       m_activeTrainingDimensions = nrc_uint2 {
-        static_cast<uint32_t>(m_nrcCtxSettings->trainingDimensions.x),
-        static_cast<uint32_t>(m_nrcCtxSettings->trainingDimensions.y) };
+        static_cast<uint32_t>(m_eyeTrainingDimensions.x),
+        static_cast<uint32_t>(m_eyeTrainingDimensions.y) };
 
       // Note: this is noop but called here to check and print out a warning should the NRC with sparse rendering be asking for 
       // training resolution larger than supported.
@@ -1056,9 +1062,9 @@ namespace dxvk {
 
         nrc_uint2 newActiveTrainingDimensions = nrc_uint2 {
           std::min(static_cast<uint32_t>(ceil(rcpPerDimensionWorkloadScale * m_activeTrainingDimensions.x)),
-                    m_nrcCtxSettings->trainingDimensions.x),
+                    m_eyeTrainingDimensions.x),
           std::min(static_cast<uint32_t>(ceil(rcpPerDimensionWorkloadScale * m_activeTrainingDimensions.y)),
-                    m_nrcCtxSettings->trainingDimensions.y),
+                    m_eyeTrainingDimensions.y),
         };
 
         clampTrainingDimensionsToReservoirOffsetRange(newActiveTrainingDimensions);
@@ -1085,10 +1091,10 @@ namespace dxvk {
     }
 
     const nrc_uint2 minTrainingDimensions = nrc_uint2 {
-      divCeil(m_nrcCtxSettings->frameDimensions.x, NRC_MAX_QUERY_PIXELS_PER_TRAINING_PIXEL_PER_AXIS),
-      divCeil(m_nrcCtxSettings->frameDimensions.y, NRC_MAX_QUERY_PIXELS_PER_TRAINING_PIXEL_PER_AXIS) };
+      divCeil(m_eyeFrameDimensions.x, NRC_MAX_QUERY_PIXELS_PER_TRAINING_PIXEL_PER_AXIS),
+      divCeil(m_eyeFrameDimensions.y, NRC_MAX_QUERY_PIXELS_PER_TRAINING_PIXEL_PER_AXIS) };
 
-    const nrc_uint2& maxTrainingDimensions = m_nrcCtxSettings->trainingDimensions;
+    const nrc_uint2& maxTrainingDimensions = m_eyeTrainingDimensions;
 
     if (minTrainingDimensions.x > maxTrainingDimensions.x || minTrainingDimensions.y > maxTrainingDimensions.y) {
       ONCE(Logger::warn(str::format("[RTX Neural Radiance Cache] NRC cannot train at (", minTrainingDimensions.x,
@@ -1243,8 +1249,8 @@ namespace dxvk {
 
     // Dispatch
     const VkExtent3D& numRaysExtent = VkExtent3D {
-      m_nrcCtxSettings->frameDimensions.x,
-      m_nrcCtxSettings->frameDimensions.y,
+      m_eyeFrameDimensions.x,
+      m_eyeFrameDimensions.y,
       1 };
     VkExtent3D workgroups = util::computeBlockCount(numRaysExtent, VkExtent3D { NRC_RESOLVE_THREADS_DISPATCH_WIDTH, NRC_RESOLVE_THREADS_DISPATCH_HEIGHT, 1 });
 
