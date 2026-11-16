@@ -1163,7 +1163,7 @@ namespace dxvk {
     if (NrcOptions::enableDebugResolveMode()) {
 
       // Run NRC's resolve
-      if (debugView.getDebugOutput() != nullptr) {
+      if (!m_useStereoAtlas && debugView.getDebugOutput() != nullptr) {
         m_nrcCtx->resolve(ctx, debugView.getDebugOutput());
       }
     }
@@ -1241,7 +1241,7 @@ namespace dxvk {
       m_numFramesAccumulatedForResolveMode = 0;
     }
 
-    pushArgs.useNrcResolvedRadianceResult = NrcOptions::enableNrcResolver();
+    pushArgs.useNrcResolvedRadianceResult = NrcOptions::enableNrcResolver() && !m_useStereoAtlas;
 
     if (pushArgs.useNrcResolvedRadianceResult) {
       m_nrcCtx->resolve(ctx, rtOutput.m_indirectRadianceHitDistance.view(Resources::AccessType::ReadWrite));
