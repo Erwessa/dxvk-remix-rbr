@@ -813,6 +813,8 @@ namespace dxvk {
         VkExtent3D downscaledExtent = onInjectRtxFrameBegin(renderExtent);
         // Publish external-effect reloads once at the logical-frame boundary, before any eye work.
         fork_hooks::preparePostProcessingStack(this);
+        // GPU print readback consumes and invalidates one shared ring-buffer element; do it once per frame.
+        dispatchGpuPrint();
         RtxSessionLog::noteExtents(renderExtent, downscaledExtent);
         recordGpuStageTiming("FrameResourcePreparation");
         m_perfCpu.renderW = downscaledExtent.width;
