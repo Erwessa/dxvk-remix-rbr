@@ -428,6 +428,9 @@ namespace dxvk
       assert(eyeIndex < 2);
       m_activeEyeIndex = eyeIndex;
     }
+    uint32_t getActiveEyeIndex() const {
+      return m_activeEyeIndex;
+    }
 
     Rc<DxvkBuffer> getNeeCacheBuffer() const { return m_neeCache; }
     Rc<DxvkBuffer> getNeeCacheTaskBuffer() const { return m_neeCacheTask; }
