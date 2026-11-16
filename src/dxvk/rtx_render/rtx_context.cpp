@@ -1873,6 +1873,10 @@ namespace dxvk {
     const uint32_t frameIdx = m_device->getCurrentFrameId();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
     const RtCamera& logicalCamera = getSceneManager().getCamera();
+    // This constant buffer is eye-specific: camera.resolution and every camera-derived
+    // projection value below must match the active RaytracingOutput. A stereo frame must
+    // select the eye before calling this function and regenerate that eye's constants;
+    // reusing the first eye's buffer for the second would also corrupt NRC query indexing.
     const RtCamera& renderCamera = cameraManager.areVrEyeCamerasValid(frameIdx)
       ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(m_activeEyeIndex))
       : logicalCamera;
