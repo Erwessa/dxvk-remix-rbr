@@ -67,7 +67,7 @@ namespace dxvk {
       Resources::RaytracingOutput& rtOutput,
       bool performSRGBConversion,
       bool updateAutoExposure);
-    void dispatchScreenOverlay(RtxContext&, Resources::RaytracingOutput&);
+    void dispatchScreenOverlay(RtxContext&, Resources::RaytracingOutput&, bool consumeFrameData);
     bool isFsrUpscalerActive(RtxContext&);
     void dispatchFsrUpscale(RtxContext&, const Resources::RaytracingOutput&);
     void dispatchRcasSharpening(RtxContext&, const Resources::RaytracingOutput&);
