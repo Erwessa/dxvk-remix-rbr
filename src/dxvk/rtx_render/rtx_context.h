@@ -379,6 +379,9 @@ namespace dxvk {
     void dispatchDebugView(Rc<DxvkImage>& srcImage, const Resources::RaytracingOutput& rtOutput, bool captureScreenImage);
     void dispatchObjectPicking(Resources::RaytracingOutput& rtOutput, const VkExtent3D& srcExtent, const VkExtent3D& targetExtent);
     void dispatchFrameInterpolation(const Rc<DxvkImage>& finalOutput);
+    // Mirrors one completed eye to the game backbuffer and captures one logical-frame thumbnail.
+    // Call once after all VR eyes have rendered, using the chosen mirror eye.
+    void dispatchGameMirror(const Rc<DxvkImage>& srcImage, const Rc<DxvkImage>& targetImage);
     void dispatchScreenOverlay(Resources::RaytracingOutput& rtOutput, bool consumeFrameData = true);
     void updateMetrics(const float gpuIdleTimeMilliseconds) const;
     void rasterizeToSkyMatte(const DrawParameters& params, const DrawCallState& drawCallState);
