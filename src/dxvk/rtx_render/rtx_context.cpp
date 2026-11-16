@@ -430,20 +430,37 @@ namespace dxvk {
       resetScreenResolution(upscaledExtent);
     }
 
+    const uint32_t frameId = m_device->getCurrentFrameId();
     const RtCamera& mainCamera = getSceneManager().getCamera();
-    m_resetHistory = m_resetHistory || mainCamera.isViewHistoryInvalidated(m_device->getCurrentFrameId());
+    const CameraManager& cameraManager = getSceneManager().getCameraManager();
+    const bool hasVrEyeCameras = cameraManager.areVrEyeCamerasValid(frameId);
+    const RtCamera& leftEyeCamera = hasVrEyeCameras
+      ? cameraManager.getVrEyeCamera(RtxEye::Left)
+      : mainCamera;
+    const RtCamera& rightEyeCamera = hasVrEyeCameras
+      ? cameraManager.getVrEyeCamera(RtxEye::Right)
+      : mainCamera;
+
+    // Each eye owns an independent temporal camera history. Reset both output histories if
+    // either eye reports an invalidated view, while preserving the game's camera cut as a
+    // logical-frame reset condition.
+    m_resetHistory = m_resetHistory ||
+      mainCamera.isViewHistoryInvalidated(frameId) ||
+      leftEyeCamera.isViewHistoryInvalidated(frameId) ||
+      rightEyeCamera.isViewHistoryInvalidated(frameId);
 
     // Call onFrameBegin callbacks for RtxPases
     // Note: this needs to be called after resetScreenResolution() call in a frame
-    // since an RtxPass may alias some of its resources with the ones created in createRaytracingOutput()
+    // since an RtxPass may alias some of its resources with the ones created in createRaytracingOutput().
+    // The first eye owns logical-frame callbacks; its camera cut is used for shared state.
     getResourceManager().onFrameBegin(this, getCommonObjects()->getTextureManager(), getSceneManager(), downscaledExtent,
-                                      upscaledExtent, m_resetHistory, mainCamera.isCameraCut(),
+                                      upscaledExtent, m_resetHistory, leftEyeCamera.isCameraCut(),
                                       getResourceManager().getRaytracingOutput(), true);
 
     // Prepare the second eye's output-local aliases and temporal resources as well.
     // Pass callbacks and logical-frame synchronization are shared and must run only once.
     getResourceManager().onFrameBegin(this, getCommonObjects()->getTextureManager(), getSceneManager(), downscaledExtent,
-                                      upscaledExtent, m_resetHistory, mainCamera.isCameraCut(),
+                                      upscaledExtent, m_resetHistory, rightEyeCamera.isCameraCut(),
                                       getResourceManager().getRaytracingOutput(1), false);
 
     // Force history reset on integrate indirect mode change to discard incompatible history 
