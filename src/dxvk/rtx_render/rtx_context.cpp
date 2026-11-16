@@ -832,7 +832,10 @@ namespace dxvk {
         recordGpuStageTiming("CloudScreen");
 
         // Neural Radiance Cache
-        m_common->metaNeuralRadianceCache().dispatchTrainingAndResolve(*this, rtOutput);
+        // Training is shared by the logical frame; resolve is specific to this output.
+        // The stereo path can move training after both eyes have produced their query paths.
+        m_common->metaNeuralRadianceCache().dispatchTraining(*this);
+        m_common->metaNeuralRadianceCache().dispatchResolveForEye(*this, rtOutput);
         recordGpuStageTiming("NRC");
 
         // RTXDI confidence
