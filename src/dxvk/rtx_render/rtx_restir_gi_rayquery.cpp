@@ -33,6 +33,8 @@
 #include "dxvk_scoped_annotation.h"
 #include "dxvk_context.h"
 #include "rtx_context.h"
+
+#include <cassert>
 #include "rtx_imgui.h"
 
 #include <rtx_shaders/restir_gi_temporal_reuse.h>
