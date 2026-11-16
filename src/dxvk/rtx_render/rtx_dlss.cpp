@@ -26,6 +26,7 @@
 #include "rtx.h"
 #include "rtx_pre_exposure.h"
 #include "rtx_context.h"
+#include "rtx_camera_manager.h"
 #include "rtx_options.h"
 #include "rtx/pass/tonemap/tonemapping.h"
 #include "dxvk_device.h"
@@ -258,7 +259,12 @@ namespace dxvk {
     {
       // The DLSS y coordinate is pointing down
       float jitterOffset[2];
-      RtCamera& camera = sceneManager.getCamera();
+      CameraManager& cameraManager = sceneManager.getCameraManager();
+      const bool useVrEyeCamera = VrInstance::s_instance.isSceneSessionActive()
+        && cameraManager.areVrEyeCamerasValid(device()->getCurrentFrameId());
+      RtCamera& camera = useVrEyeCamera
+        ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(eyeIndex))
+        : sceneManager.getCamera();
       camera.getJittering(jitterOffset);
       mMotionVectorScale = MotionVectorScale::Absolute;
 

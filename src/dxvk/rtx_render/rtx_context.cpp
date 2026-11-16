@@ -351,6 +351,10 @@ namespace dxvk {
   }
 
   bool RtxContext::useRayReconstruction() const {
+    // VR uses standard DLSS Super Resolution only; Ray Reconstruction is a separate temporal pipeline.
+    if (VrInstance::s_instance.isSceneSessionActive()) {
+      return false;
+    }
     return m_common->metaRayReconstruction().useRayReconstruction();
   }
 
