@@ -85,6 +85,8 @@ namespace dxvk {
     mutable bool m_resetCacheRequested = false;
     bool m_frameResetCacheRequested = false;
     bool m_frameClearCache = false;
+    // NEE is a shared world-space cache; guard its update against per-eye dispatch callers.
+    uint32_t m_lastDispatchFrame = ~0u;
     uvec2 m_previousResolution { 0, 0 };
   };
 } // namespace dxvk

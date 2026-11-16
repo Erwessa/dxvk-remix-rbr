@@ -162,6 +162,12 @@ namespace dxvk {
       return;
     }
 
+    const uint32_t frameId = ctx->getDevice()->getCurrentFrameId();
+    if (m_lastDispatchFrame == frameId) {
+      return;
+    }
+    m_lastDispatchFrame = frameId;
+
     const VkExtent3D& numRaysExtent = rtOutput.m_compositeOutputExtent;
     VkExtent3D workgroups = util::computeBlockCount(numRaysExtent, VkExtent3D{ 16, 8, 1 });
     Rc<DxvkBuffer> primitiveIDPrefixSumBuffer = ctx->getSceneManager().getCurrentFramePrimitiveIDPrefixSumBuffer();
