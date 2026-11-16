@@ -811,6 +811,8 @@ namespace dxvk {
         }
 
         VkExtent3D downscaledExtent = onInjectRtxFrameBegin(renderExtent);
+        // Publish external-effect reloads once at the logical-frame boundary, before any eye work.
+        fork_hooks::preparePostProcessingStack(this);
         RtxSessionLog::noteExtents(renderExtent, downscaledExtent);
         recordGpuStageTiming("FrameResourcePreparation");
         m_perfCpu.renderW = downscaledExtent.width;
@@ -896,8 +898,6 @@ namespace dxvk {
         // captures (WAR for TREX-553: NVTT implicitly applies sRGB during dds->png conversion
         // for 16bit float formats).
         const bool performSRGBConversion = !captureScreenImage && g_allowSrgbConversionForOutput;
-        // Publish external-effect reloads once for the logical frame, before the eye-local stack.
-        fork_hooks::preparePostProcessingStack(this);
         // DLSS-NR already dispatched auto exposure above, so the tonemapper must not dispatch it again.
         fork_hooks::dispatchPostProcessingStack(
           this, rtOutput, performSRGBConversion, /* updateAutoExposure */ !dlssNrEnabled);
