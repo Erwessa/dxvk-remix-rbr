@@ -83,6 +83,7 @@ namespace dxvk {
     const Resources::Resource& primaryScreenSpaceMotionVector,
     const Resources::Resource& colorTextureOutput,
     const bool isUpscale,
+    const bool resetHistory,
     uint32_t eyeIndex) {
     assert(eyeIndex < m_taaFeedbackTexture.size());
     ScopedGpuProfileZone(ctx, "TAA");
@@ -92,6 +93,7 @@ namespace dxvk {
 
     TemporalAaArgs temporalAaArgs = {};
     temporalAaArgs.isTaaUpscale = isUpscale;
+    temporalAaArgs.resetHistory = resetHistory;
     temporalAaArgs.imageSizeOutput = { (uint) outputSize.width, (uint) outputSize.height };
     temporalAaArgs.invImageSizeOutput = { 1.0f / (float)outputSize.width, 1.0f / (float)outputSize.height };
     temporalAaArgs.invMainCameraResolution = float2(1.0f / (float)mainCameraResolution.x, 1.0f / (float)mainCameraResolution.y);

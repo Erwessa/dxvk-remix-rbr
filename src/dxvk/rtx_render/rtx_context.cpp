@@ -3108,7 +3108,7 @@ namespace dxvk {
       : getSceneManager().getCamera();
     const bool isViewHistoryInvalidated = renderCamera.isViewHistoryInvalidated(frameId);
 
-    if (taa.isActive() && !isViewHistoryInvalidated) {
+    if (taa.isActive()) {
       float jitterOffset[2];
       renderCamera.getJittering(jitterOffset);
 
@@ -3120,6 +3120,7 @@ namespace dxvk {
         rtOutput.m_primaryScreenSpaceMotionVector,
         rtOutput.m_finalOutput.resource(Resources::AccessType::Write),
         true,
+        m_resetHistory || isViewHistoryInvalidated,
         m_activeEyeIndex);
     }
   }

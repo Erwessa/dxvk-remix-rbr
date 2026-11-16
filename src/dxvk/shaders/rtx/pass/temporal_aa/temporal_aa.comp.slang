@@ -238,7 +238,13 @@ void main(
   const float2 sourcePos = pixelPos + 0.5f + longestMotionVector * cb.imageSizeOutput;
 
   float3 resultPQ = 0.0f;
-  if (all(sourcePos >= 0) && all(sourcePos < cb.imageSizeOutput))
+  if (cb.resetHistory)
+  {
+    // Seed this eye's feedback texture with the current frame instead of leaving stale
+    // pre-reset feedback for the next frame to consume.
+    resultPQ = pixelColor;
+  }
+  else if (all(sourcePos >= 0) && all(sourcePos < cb.imageSizeOutput))
   {
     float3 historyColor = cb.isTaaUpscale ?
       BicubicSampleCatmullRom(InFeedbackColorTexture, LinearSampler, sourcePos, (float2)cb.invImageSizeOutput) :

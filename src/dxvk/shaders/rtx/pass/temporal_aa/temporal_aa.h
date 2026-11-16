@@ -42,6 +42,7 @@ struct TemporalAaArgs
   float2 inputOverOutputViewSize;
   float  upscalingFactor;
   bool   isTaaUpscale;
+  bool   resetHistory;
 
   // TAA Properties
   float maximumRadiance;

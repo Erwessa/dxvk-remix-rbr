@@ -51,6 +51,7 @@ namespace dxvk {
       const Resources::Resource& primaryScreenSpaceMotionVector,
       const Resources::Resource& colorTextureOutput,
       const bool isUpscale,
+      const bool resetHistory,
       uint32_t eyeIndex);
 
     void prewarmShaders(DxvkPipelineManager& pipelineManager) const;
