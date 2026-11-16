@@ -419,7 +419,15 @@ namespace dxvk
 
     bool validateRaytracingOutput(const VkExtent3D& downscaledExtent, const VkExtent3D& targetExtent) const;
 
-    Resources::RaytracingOutput& getRaytracingOutput() { return m_raytracingOutput; }
+    Resources::RaytracingOutput& getRaytracingOutput() { return m_raytracingOutput[m_activeEyeIndex]; }
+    Resources::RaytracingOutput& getRaytracingOutput(uint32_t eyeIndex) {
+      assert(eyeIndex < 2);
+      return m_raytracingOutput[eyeIndex];
+    }
+    void setActiveEyeIndex(uint32_t eyeIndex) {
+      assert(eyeIndex < 2);
+      m_activeEyeIndex = eyeIndex;
+    }
 
     Rc<DxvkBuffer> getNeeCacheBuffer() const { return m_neeCache; }
     Rc<DxvkBuffer> getNeeCacheTaskBuffer() const { return m_neeCacheTask; }
@@ -495,7 +503,8 @@ namespace dxvk
     Resources(Resources const&) = delete;
     Resources& operator=(Resources const&) = delete;
 
-    RaytracingOutput m_raytracingOutput;
+    RaytracingOutput m_raytracingOutput[2];
+    uint32_t m_activeEyeIndex = 0;
 
     // Shared across both eye renders for one logical frame.
     Rc<DxvkBuffer> m_neeCache;
