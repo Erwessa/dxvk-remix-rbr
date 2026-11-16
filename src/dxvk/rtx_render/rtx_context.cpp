@@ -2754,7 +2754,7 @@ namespace dxvk {
     m_common->metaNeuralRadianceCache().dispatchTraining(*this);
   }
 
-  void RtxContext::dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput) {
+  void RtxContext::dispatchEyePathTracingPreparation(Resources::RaytracingOutput& rtOutput) {
     // Volumetrics own per-eye histories and must use the currently selected eye.
     dispatchVolumetrics(rtOutput);
     recordGpuStageTiming("Volumetrics");
@@ -2767,6 +2767,10 @@ namespace dxvk {
     preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
     midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
     dispatchPathTracingPreparationAfterGBuffer(rtOutput);
+  }
+
+  void RtxContext::dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput) {
+    dispatchEyePathTracingPreparation(rtOutput);
     dispatchPathTracingIntegration(rtOutput);
     dispatchPostDepthForEye(rtOutput);
   }
