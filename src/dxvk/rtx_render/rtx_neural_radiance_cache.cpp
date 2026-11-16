@@ -863,15 +863,27 @@ namespace dxvk {
     Rc<DxvkContext>& ctx,
     const VkExtent3D& downscaledExtent) {
 
-    Resources::RaytracingOutput& rtOutput = ctx->getCommonObjects()->getResources().getRaytracingOutput();
+    Resources& resources = ctx->getCommonObjects()->getResources();
 
-    m_queryPathData1 = Resources::AliasedResource(rtOutput.m_compositeOutput, ctx, downscaledExtent, VK_FORMAT_R16G16B16A16_UINT, "NRC Query Path Data 1");
-
-    // Explicit constant to make it clear where cross format aliasing occurs
+    // Explicit constant to make it clear where cross format aliasing occurs.
     const bool allowCompatibleFormatAliasing = true;
 
-    // Note: technically we only need m_nrcCtxSettings->trainingDimensions, which is often smaller than the m_finalOutputExtent, but the resource is available to alias with so might as well
-    m_trainingPathData1 = Resources::AliasedResource(rtOutput.m_finalOutput, ctx, rtOutput.m_finalOutputExtent, VK_FORMAT_R16G16B16A16_UINT, "NRC Training Path Data 1", allowCompatibleFormatAliasing);
+    // Each eye owns independent composite/final outputs, so its NRC path data must
+    // alias that same eye's resources rather than always aliasing the default eye.
+    for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
+      Resources::RaytracingOutput& rtOutput = resources.getRaytracingOutput(eyeIndex);
+      const bool isLeftEye = eyeIndex == 0;
+
+      m_queryPathData1[eyeIndex] = Resources::AliasedResource(
+        rtOutput.m_compositeOutput, ctx, downscaledExtent, VK_FORMAT_R16G16B16A16_UINT,
+        isLeftEye ? "NRC Query Path Data 1 Left" : "NRC Query Path Data 1 Right");
+
+      // The final output is available for aliasing and has the required compatible format.
+      m_trainingPathData1[eyeIndex] = Resources::AliasedResource(
+        rtOutput.m_finalOutput, ctx, rtOutput.m_finalOutputExtent, VK_FORMAT_R16G16B16A16_UINT,
+        isLeftEye ? "NRC Training Path Data 1 Left" : "NRC Training Path Data 1 Right",
+        allowCompatibleFormatAliasing);
+    }
   }
 
   void NeuralRadianceCache::releaseDownscaledResource() {
@@ -880,8 +892,10 @@ namespace dxvk {
 
     m_trainingQueryReservoir.reset();
 
-    m_queryPathData1.reset();
-    m_trainingPathData1.reset();
+    for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
+      m_queryPathData1[eyeIndex].reset();
+      m_trainingPathData1[eyeIndex].reset();
+    }
   }
 
   void NeuralRadianceCache::bindGBufferPathTracingResources(RtxContext& ctx) {
@@ -895,10 +909,11 @@ namespace dxvk {
     ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_GBUFFER_SURFACE_RADIANCE_B_OUTPUT, m_trainingGBufferSurfaceRadianceB.view, nullptr);
     ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA0_OUTPUT, m_queryPathData0.view, nullptr);
 
-    // Aliased resource methods must not be called when the resource is invalid
+    // Aliased resource methods must not be called when the resource is invalid.
     if (isActive()) {
-      ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA1_OUTPUT, m_queryPathData1.view(Resources::AccessType::Write), nullptr);
-      ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_PATH_DATA1_OUTPUT, m_trainingPathData1.view(Resources::AccessType::Write), nullptr);
+      const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
+      ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA1_OUTPUT, m_queryPathData1[eyeIndex].view(Resources::AccessType::Write), nullptr);
+      ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_PATH_DATA1_OUTPUT, m_trainingPathData1[eyeIndex].view(Resources::AccessType::Write), nullptr);
     } else {
       ctx.bindResourceView(GBUFFER_BINDING_NRC_QUERY_PATH_DATA1_OUTPUT, nullptr, nullptr);
       ctx.bindResourceView(GBUFFER_BINDING_NRC_TRAINING_PATH_DATA1_OUTPUT, nullptr, nullptr);
@@ -917,9 +932,10 @@ namespace dxvk {
     ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_QUERY_PATH_DATA0_OUTPUT, m_queryPathData0.view, nullptr);
 
     if (isActive()) {
+      const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
       // Only the deferred variant writes this, so the aliasing bookkeeping is told when it is actually accessed.
       ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_TRAINING_PATH_DATA1_OUTPUT,
-                           m_trainingPathData1.view(Resources::AccessType::Write, deferredNrcTrainingSetup), nullptr);
+                           m_trainingPathData1[eyeIndex].view(Resources::AccessType::Write, deferredNrcTrainingSetup), nullptr);
     } else {
       ctx.bindResourceView(INTEGRATE_DIRECT_BINDING_NRC_TRAINING_PATH_DATA1_OUTPUT, nullptr, nullptr);
     }
@@ -939,8 +955,9 @@ namespace dxvk {
 
     // Aliased resource methods must not be called when the resource is invalid
     if (isActive()) {
-      ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_PATH_DATA1_INPUT, m_queryPathData1.view(Resources::AccessType::Read), nullptr);
-      ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_UPDATE_PATH_DATA1_INPUT, m_trainingPathData1.view(Resources::AccessType::Read), nullptr);
+      const uint32_t eyeIndex = ctx.getCommonObjects()->getResources().getActiveEyeIndex();
+      ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_PATH_DATA1_INPUT, m_queryPathData1[eyeIndex].view(Resources::AccessType::Read), nullptr);
+      ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_UPDATE_PATH_DATA1_INPUT, m_trainingPathData1[eyeIndex].view(Resources::AccessType::Read), nullptr);
     } else {
       ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_PATH_DATA1_INPUT, nullptr, nullptr);
       ctx.bindResourceView(INTEGRATE_INDIRECT_BINDING_NRC_UPDATE_PATH_DATA1_INPUT, nullptr, nullptr);
