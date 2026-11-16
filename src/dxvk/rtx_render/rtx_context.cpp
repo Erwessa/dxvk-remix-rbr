@@ -2121,7 +2121,7 @@ namespace dxvk {
     NeuralRadianceCache& nrc = m_common->metaNeuralRadianceCache();
     constants.enableNrc = nrc.isActive();
     constants.allowNrcTraining = NeuralRadianceCache::NrcOptions::trainCache();
-    nrc.setRaytraceArgs(constants);
+    nrc.setRaytraceArgs(constants, m_activeEyeIndex);
     m_common->metaSharc().setRaytraceArgs(*this, constants);
 
     m_common->metaNeeCache().setRaytraceArgs(constants);
