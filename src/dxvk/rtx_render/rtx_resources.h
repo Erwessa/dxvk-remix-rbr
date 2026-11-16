@@ -524,7 +524,6 @@ namespace dxvk
     bool m_rtxdiIlluminanceResourcesAllocated = true;
     bool m_nrdDenoisingGuideResourcesAllocated = false;
     bool m_primaryDenoisingNormalAllocated = false;
-    bool m_dlfgResourceQueueAllocated = false;
     bool m_dlssNeuralRenderingResourcesAllocated = false;
     VkExtent3D m_targetExtent = { 0, 0, 0 };
 
