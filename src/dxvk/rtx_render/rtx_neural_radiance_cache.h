@@ -183,8 +183,19 @@ namespace dxvk {
     // Run the shared NRC SDK training step once per logical frame.
     // IMPORTANT: NRC query/path buffers are currently owned by NeuralRadianceCache and shared,
     // not double-buffered per eye. A stereo renderer must not dispatch both eyes into these
-    // bindings sequentially and assume both query sets survive; per-eye capture/aggregation
-    // must be implemented before moving this call after two eye integrations.
+    // bindings sequentially and assume both query sets survive.
+    //
+    // The SDK shader helpers use deterministic pixel-addressed slots:
+    //   queryPathIndex = sample + pixel.x * samplesPerPixel
+    //                  + pixel.y * samplesPerPixel * frameDimensions.x
+    //   trainingPathIndex = pixel.x + pixel.y * trainingDimensions.x
+    //   trainingVertexIndex = trainingPathIndex * maxPathVertices + vertex
+    // QueryRadianceParams instead uses the shared atomic Queries counter. Thus a correct
+    // single-context stereo layout can pack eye-local pixel coordinates into disjoint regions
+    // of enlarged SDK frame/training dimensions while retaining the shared atomic query counter.
+    // That layout also requires matching eye offsets in every producer and resolve consumer;
+    // simply duplicating Vulkan buffers or running QueryAndTrain between eyes is not sufficient.
+    // Keep this call after both eye integrations only once that complete indexing contract exists.
     void dispatchTraining(RtxContext& ctx);
 
     // Resolve the shared NRC query results into one eye's output after dispatchTraining().
