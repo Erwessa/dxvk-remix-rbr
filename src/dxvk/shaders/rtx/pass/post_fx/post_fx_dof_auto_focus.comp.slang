@@ -102,7 +102,9 @@ void main(uint3 threadId : SV_DispatchThreadID)
   const float targetDistance = depths[validCount / 2];
 
   float nextDistance = targetDistance;
-  if (cb.forceReset == 0 && cb.tauSeconds > 0.0f)
+  // A miss sentinel means the previous focus state has no valid surface. Seed directly
+  // from the first valid target instead of smoothing from the sentinel as if it were a distance.
+  if (cb.forceReset == 0 && cb.tauSeconds > 0.0f && previousDistance != cb.missLinearViewZ)
   {
     // Focus moves linearly in optical power (reciprocal distance), like a lens.
     const float previousPower = rcp(max(previousDistance, 1e-4f));
