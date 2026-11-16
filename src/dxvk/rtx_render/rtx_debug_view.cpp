@@ -39,6 +39,7 @@
 #include "rtx_terrain_baker.h"
 #include "rtx_neural_radiance_cache.h"
 #include "rtx_nrd_context.h"
+#include "rtx_vr.h"
 
 #include <rtx_shaders/debug_view.h>
 #include <rtx_shaders/debug_view_using_optional_extensions.h>
@@ -1203,8 +1204,13 @@ namespace dxvk {
       if (PreExposure::stepped()) {
         m_accumulation.resetNumAccumulatedFrames();
       }
+      // Debug-view accumulation uses one shared output image. In VR that would blend
+      // the left and right eyes together and advance the accumulation count twice
+      // during one logical frame, so keep the diagnostic view instantaneous.
+      const bool enableAccumulation = Accumulation::enable()
+        && !VrInstance::s_instance.isSceneSessionActive();
       m_accumulation.onFrameBegin(
-        rtxCtx, Accumulation::enable(), Accumulation::numberOfFramesToAccumulate(),
+        rtxCtx, enableAccumulation, Accumulation::numberOfFramesToAccumulate(),
         Accumulation::resetOnCameraTransformChange());
     }
 
