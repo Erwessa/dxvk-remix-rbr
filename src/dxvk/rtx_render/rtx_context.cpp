@@ -493,7 +493,7 @@ namespace dxvk {
     if (rayTracedThisFrame) {
       // NRC training is logical-frame scoped. Only advance histories for outputs
       // that were actually rendered; the second eye is prepared but not rendered yet.
-      m_common->metaNeuralRadianceCache().onFrameEnd(getResourceManager().getRaytracingOutput(0));
+      m_common->metaNeuralRadianceCache().onFrameEnd();
       getResourceManager().getRaytracingOutput(0).onFrameEnd();
     }
 
