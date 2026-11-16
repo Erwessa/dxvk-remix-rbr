@@ -1227,7 +1227,7 @@ namespace dxvk {
       return;
     }
 
-    ScopedGpuProfileZone(&ctx, "NRC: Training and Resolve");
+    ScopedGpuProfileZone(&ctx, "NRC: Training");
     ctx.setFramePassStage(RtxFramePassStage::NRC);
 
     // NRC training pass
