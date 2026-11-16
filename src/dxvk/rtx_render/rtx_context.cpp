@@ -355,13 +355,14 @@ namespace dxvk {
   }
 
   RtxContext::InternalUpscaler RtxContext::getCurrentFrameUpscaler() {
+    const bool vrStereoFrame = VrInstance::s_instance.isSceneSessionActive();
     if (shouldUseDLSS() && m_common->metaDLSS().isActive()) {
       return InternalUpscaler::DLSS;
     } else if (shouldUseRayReconstruction() && m_common->metaRayReconstruction().isActive()) {
       return InternalUpscaler::DLSS_RR;
-    } else if (shouldUseXeSS() && m_common->metaXeSS().isActive()) {
+    } else if (!vrStereoFrame && shouldUseXeSS() && m_common->metaXeSS().isActive()) {
       return InternalUpscaler::XeSS;
-    } else if (fork_hooks::isFsrUpscalerActive(*this)) {
+    } else if (!vrStereoFrame && fork_hooks::isFsrUpscalerActive(*this)) {
       return InternalUpscaler::FSR;
     } else if (shouldUseNIS()) {
       return InternalUpscaler::NIS;
@@ -911,9 +912,9 @@ namespace dxvk {
         // subsequent eyes reuse the same exposure texture instead of advancing it twice.
         const bool updateAutoExposure = m_activeEyeIndex == 0;
 
-        // DLSS-NR stays outside the ordered post-processing stack. It must see linear HDR before any
-        // stack member runs, it dispatches auto exposure itself, and "Post FX Enabled" must not gate it.
-        const bool dlssNrEnabled = dispatchDlssNR(rtOutput, updateAutoExposure);
+        // DLSS-NR is not part of the VR rendering path. Keep its existing mono path intact.
+        const bool vrStereoFrame = VrInstance::s_instance.isSceneSessionActive();
+        const bool dlssNrEnabled = !vrStereoFrame && dispatchDlssNR(rtOutput, updateAutoExposure);
         recordGpuStageTiming("DlssNR");
         m_perfCpu.dlssNr = dlssNrEnabled;
 
@@ -922,7 +923,7 @@ namespace dxvk {
         // captures (WAR for TREX-553: NVTT implicitly applies sRGB during dds->png conversion
         // for 16bit float formats).
         const bool performSRGBConversion = !captureScreenImage && g_allowSrgbConversionForOutput;
-        // DLSS-NR already dispatched auto exposure above, so the tonemapper must not dispatch it again.
+        // Auto exposure remains a logical-frame operation; DLSS-NR is skipped in VR.
         fork_hooks::dispatchPostProcessingStack(
           this, rtOutput, performSRGBConversion, /* updateAutoExposure */ !dlssNrEnabled && updateAutoExposure);
         recordGpuStageTiming("PostProcessing");
