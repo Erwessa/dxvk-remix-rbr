@@ -25,6 +25,7 @@
 #include <array>
 
 #include "dxvk_device.h"
+#include "../dxvk_openvr.h"
 #include "dxvk_cs.h"
 #include <algorithm>
 #include "dxvk_scoped_annotation.h"
@@ -3509,7 +3510,9 @@ namespace dxvk {
     // DLSS-G and FSR frame generation currently accept one mono image and Main-camera
     // motion/depth inputs. Do not enqueue those inputs for an active OpenVR stereo frame:
     // doing so would mix the left-eye output with non-eye-specific camera data.
-    const bool vrStereoFrame = m_vrFrame.isValid();
+    // Frame generation is mono-only and must stay disabled for the entire active OpenVR scene session,
+    // including frames where pose acquisition fails and m_vrFrame is temporarily invalid.
+    const bool vrStereoFrame = VrInstance::s_instance.isSceneSessionActive();
     const bool dlfg = !vrStereoFrame && isDLFGEnabled();
     const bool fsrfg = !vrStereoFrame && !dlfg && isFSRFGEnabled();
     if (!dlfg && !fsrfg) {
