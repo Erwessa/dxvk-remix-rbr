@@ -344,7 +344,11 @@ namespace dxvk {
 
     SceneManager& scene = ctx.getSceneManager();
     const CameraManager& cameraManager = scene.getCameraManager();
-    const RtCamera& camera = scene.getCamera();
+    // NUMOS's view-dependent cloud and aerial-perspective passes must use the same eye camera
+    // as this RaytracingOutput. The logical scene camera is only the mono fallback.
+    const RtCamera& camera = cameraManager.areVrEyeCamerasValid(deviceFrame)
+      ? cameraManager.getVrEyeCamera(static_cast<RtxEye::Enum>(ctx.getActiveEyeIndex()))
+      : scene.getCamera();
     Resources& resources = ctx.getResourceManager();
 
     numos::FrameInputs in;
