@@ -160,7 +160,7 @@ namespace dxvk {
     uint32_t m_compatibilityFlags = 0;
     uint32_t m_cacheAge = 0;
     // SHARC is a shared world-space cache; capture its camera anchor once per logical frame.
-    uint32_t m_cameraArgsFrame = UINT32_MAX;
+    uint32_t m_cameraArgsFrame = ~0u;
     int32_t m_cacheLog2P = 0;  // the pre-exposure the cache's radiance is stored at
     uint32_t m_lastFrame = ~0u;
     bool m_clearedThisFrame = true;
