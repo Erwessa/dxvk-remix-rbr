@@ -463,9 +463,9 @@ namespace dxvk
     void createBlueNoiseTexture(Rc<DxvkContext> ctx);
     void createValueNoiseLut(Rc<DxvkContext> ctx);
 
-    float getUpscaleRatio() const { return m_raytracingOutput.isReady() ? ((float)m_downscaledExtent.width / m_targetExtent.width) : 1.0f; }
+    float getUpscaleRatio() const { return m_raytracingOutput[m_activeEyeIndex].isReady() ? ((float)m_downscaledExtent.width / m_targetExtent.width) : 1.0f; }
 
-    bool isResourceReady() const { return m_raytracingOutput.isReady(); }
+    bool isResourceReady() const { return m_raytracingOutput[m_activeEyeIndex].isReady(); }
 
     const VkExtent3D& getTargetDimensions() const { return m_targetExtent; }
     const VkExtent3D& getDownscaleDimensions() const { return m_downscaledExtent; }
