@@ -3328,7 +3328,7 @@ namespace dxvk {
       // For overlayed debug views, we preserve the post tonemapping naming since the post tonemapped image is a base image.
       // The benefit is retention of most of the existing testing pipeline.
       if (debugView.getOverlayOnTopOfRenderOutput()) {
-        takeScreenshot("rtxImagePostTonemapping", srcImage);
+        takeEyeScreenshot("rtxImagePostTonemapping", srcImage);
       } else {
         takeEyeScreenshot("rtxImageDebugView", srcImage);
       }
