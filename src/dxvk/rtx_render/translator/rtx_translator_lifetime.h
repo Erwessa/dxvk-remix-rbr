@@ -47,6 +47,8 @@ namespace dxvk {
     // Per-collection inputs, read once.
     struct LifetimeFrame {
       RtCamera* camera = nullptr;
+      RtCamera* leftEyeCamera = nullptr;
+      RtCamera* rightEyeCamera = nullptr;
       uint32_t currentFrame = 0;
       uint32_t framesToKeepObjects = 0;
       uint32_t framesToKeepLights = 0;
@@ -64,9 +66,18 @@ namespace dxvk {
         return keptCutFrame != ~0u && frameLastSeen < keptCutFrame;
       }
 
-      static LifetimeFrame read(RtCamera& camera, bool antiCullingSupported, bool forceCollect) {
+      static LifetimeFrame read(
+          RtCamera& camera,
+          bool antiCullingSupported,
+          bool forceCollect,
+          RtCamera* leftEyeCamera = nullptr,
+          RtCamera* rightEyeCamera = nullptr) {
         LifetimeFrame frame;
         frame.camera = &camera;
+        if (leftEyeCamera != nullptr && rightEyeCamera != nullptr) {
+          frame.leftEyeCamera = leftEyeCamera;
+          frame.rightEyeCamera = rightEyeCamera;
+        }
         frame.framesToKeepObjects = RtxOptions::numFramesToKeepInstances();
         frame.framesToKeepLights = RtxOptions::AntiCulling::Light::numFramesToExtendLightLifetime();
         frame.objectAntiCulling = RtxOptions::AntiCulling::isObjectAntiCullingEnabled();
@@ -89,6 +100,22 @@ namespace dxvk {
             RtxOptions::AntiCulling::Object::enableInfinityFarFrustum());
         }
         return boundingBoxIntersectsFrustum(camera.getFrustum(), aabb.minPos, aabb.maxPos, objectToView);
+      }
+
+      // Stereo anti-culling uses the union of both eye frustums: an object is visible
+      // when either eye can see it. Trace replay may have no camera, so the mono fallback
+      // is explicitly null-safe.
+      static bool aabbIntersectsViewFrustum(
+          const LifetimeFrame& frame,
+          const AxisAlignedBoundingBox& aabb,
+          const Matrix4& objectToWorld) {
+        if (frame.leftEyeCamera != nullptr && frame.rightEyeCamera != nullptr) {
+          return aabbIntersectsFrustum(*frame.leftEyeCamera, aabb, objectToWorld)
+              || aabbIntersectsFrustum(*frame.rightEyeCamera, aabb, objectToWorld);
+        }
+
+        return frame.camera != nullptr
+            && aabbIntersectsFrustum(*frame.camera, aabb, objectToWorld);
       }
 
       // Returns how many frames an object stays alive without a draw.
@@ -133,14 +160,14 @@ namespace dxvk {
         // Object anti-culling: keep objects outside the camera frustum (the game's own culling may differ from ours);
         // an object clearly in view that the game stopped drawing had a reason (destruction, LOD swap).
         if (frame.objectAntiCulling && hasMeshes &&
-            !aabbIntersectsFrustum(*frame.camera, *object.geometryBounds, *object.objectToWorld)) {
+            !aabbIntersectsViewFrustum(frame, *object.geometryBounds, *object.objectToWorld)) {
           return true;
         }
 
         // Light anti-culling for mesh replacement lights: outside the frustum, within the extended lifetime.
         if (frame.lightAntiCulling && hasLights &&
             object.frameLastSeen + frame.framesToKeepLights > frame.currentFrame) {
-          return !aabbIntersectsFrustum(*frame.camera, *object.lightBounds, *object.objectToWorld);
+          return !aabbIntersectsViewFrustum(frame, *object.lightBounds, *object.objectToWorld);
         }
         return false;
       }
