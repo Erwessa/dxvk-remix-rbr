@@ -23,6 +23,7 @@
 #include "dxvk_device.h"
 #include "rtx_nrd_context.h"
 #include "rtx/pass/nrd_args.h"
+#include <cassert>
 
 namespace dxvk {
   
