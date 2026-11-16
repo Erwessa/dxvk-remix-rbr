@@ -21,6 +21,8 @@
 */
 #pragma once
 
+#include <array>
+
 #include "dxvk_context.h"
 #include "rtx_resources.h"
 #include "rtx_types.h"
@@ -56,6 +58,8 @@ namespace dxvk {
     CompositePass(dxvk::DxvkDevice* device);
     ~CompositePass();
 
+    void onLogicalFrameEnd();
+
     void dispatch(
       Rc<RtxContext> ctx,
       SceneManager& sceneManager,
@@ -82,10 +86,11 @@ namespace dxvk {
 
     RtxAccumulation m_accumulation;
     bool m_enableAccumulation = false;
+    bool m_accumulationDispatchedThisFrame = false;
 
     // Note: we need a separate resource for the accumulated output since last final output resource is aliased.
     // On the up-side this resource is only allocated when needed
-    Resources::Resource m_accumulatedFinalOutput;
+    std::array<Resources::Resource, 2> m_accumulatedFinalOutput;
 
     RTX_OPTION("rtx", bool, enableFog, true, "");
     RTX_OPTION("rtx", bool, fogApplyToSky, true,

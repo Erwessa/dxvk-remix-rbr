@@ -298,6 +298,7 @@ namespace dxvk {
   Rc<DxvkContext>& ctx,
   const FrameBeginContext& frameBeginCtx) {
 
+    m_accumulationDispatchedThisFrame = false;
     RtxPass::onFrameBegin(ctx, frameBeginCtx);
 
     // Accumulation per-frame setup
@@ -314,10 +315,14 @@ namespace dxvk {
 
       // Create/release accumulation buffer when needed
       if (enableAccumulationChanged) {
-        if (m_enableAccumulation) {
-          m_accumulatedFinalOutput = Resources::createImageResource(ctx, "accumulated final output", frameBeginCtx.downscaledExtent, VK_FORMAT_R32G32B32A32_SFLOAT);
-        } else {
-          m_accumulatedFinalOutput.reset();
+        for (uint32_t eyeIndex = 0; eyeIndex < m_accumulatedFinalOutput.size(); ++eyeIndex) {
+          if (m_enableAccumulation) {
+            m_accumulatedFinalOutput[eyeIndex] = Resources::createImageResource(
+              ctx, str::format("accumulated final output eye ", eyeIndex), frameBeginCtx.downscaledExtent,
+              VK_FORMAT_R32G32B32A32_SFLOAT);
+          } else {
+            m_accumulatedFinalOutput[eyeIndex].reset();
+          }
         }
       }
     }
@@ -325,6 +330,21 @@ namespace dxvk {
 
   void CompositePass::createDownscaledResource(Rc<DxvkContext>& ctx, const VkExtent3D& downscaledExtent) {
     m_accumulation.resetNumAccumulatedFrames();
+
+    if (m_enableAccumulation) {
+      for (uint32_t eyeIndex = 0; eyeIndex < m_accumulatedFinalOutput.size(); ++eyeIndex) {
+        m_accumulatedFinalOutput[eyeIndex] = Resources::createImageResource(
+          ctx, str::format("accumulated final output eye ", eyeIndex), downscaledExtent,
+          VK_FORMAT_R32G32B32A32_SFLOAT);
+      }
+    }
+  }
+
+  void CompositePass::onLogicalFrameEnd() {
+    if (m_accumulationDispatchedThisFrame) {
+      m_accumulation.onFrameEnd();
+      m_accumulationDispatchedThisFrame = false;
+    }
   }
 
   void CompositePass::dispatch(
@@ -399,7 +419,8 @@ namespace dxvk {
     // Inputs/Outputs
 
     ctx->bindResourceView(COMPOSITE_PRIMARY_ALBEDO_INPUT_OUTPUT, rtOutput.m_primaryAlbedo.view, nullptr);
-    ctx->bindResourceView(COMPOSITE_ACCUMULATED_FINAL_OUTPUT_INPUT_OUTPUT, m_accumulatedFinalOutput.view, nullptr);
+    ctx->bindResourceView(COMPOSITE_ACCUMULATED_FINAL_OUTPUT_INPUT_OUTPUT,
+      m_accumulatedFinalOutput[ctx->getActiveEyeIndex()].view, nullptr);
 
     // Outputs
 
@@ -581,7 +602,7 @@ namespace dxvk {
       ctx->dispatch(workgroups.width, workgroups.height, workgroups.depth);
     }
 
-    // End frame from Composite Pass's perspective
-    m_accumulation.onFrameEnd();
+    // Accumulation advances once after all eyes have completed composition.
+    m_accumulationDispatchedThisFrame = true;
   }
 } // namespace dxvk

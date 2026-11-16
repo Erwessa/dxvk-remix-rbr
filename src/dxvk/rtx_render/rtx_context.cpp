@@ -538,6 +538,9 @@ namespace dxvk {
   }
 
   void RtxContext::onInjectRtxFrameEnd(bool rayTracedThisFrame) {
+    // Composite accumulation is shared logical-frame state, not per-eye dispatch state.
+    m_common->metaComposite().onLogicalFrameEnd();
+
     if (rayTracedThisFrame) {
       // NRC training and scene callbacks are shared by the logical frame.
       m_common->metaNeuralRadianceCache().onFrameEnd();
