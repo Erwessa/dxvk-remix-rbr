@@ -862,36 +862,7 @@ namespace dxvk {
           takeScreenshot("sharedSubsurfaceDiffusionProfileData", rtOutput.m_sharedSubsurfaceDiffusionProfileData.image);
         }
 
-        // Demodulation
-        dispatchDemodulate(rtOutput);
-        recordGpuStageTiming("Demodulation");
-
-        // Note: Primary direct diffuse/specular radiance textures noisy and in a demodulated state after demodulation step.
-        if (captureScreenImage && captureDebugImage) {
-          takeScreenshot("noisyDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
-          takeScreenshot("noisySpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
-        }
-
-        // Denoising
-        dispatchDenoise(rtOutput);
-        recordGpuStageTiming("Denoising");
-
-        // Note: Primary direct diffuse/specular radiance textures denoised but in a still demodulated state after denoising step.
-        if (captureScreenImage && captureDebugImage) {
-          takeScreenshot("denoisedDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
-          takeScreenshot("denoisedSpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
-        }
-
-        // Composition
-        dispatchComposite(rtOutput);
-        recordGpuStageTiming("Composition");
-
-        // Post composite Debug View that may overwrite Composite output
-        dispatchReplaceCompositeWithDebugView(rtOutput);
-        
-        if (captureScreenImage && captureDebugImage) {
-          takeScreenshot("rtxImagePostComposite", rtOutput.m_compositeOutput.resource(Resources::AccessType::Read).image);
-        }
+        dispatchEyeDenoisingAndComposition(rtOutput, captureScreenImage, captureDebugImage);
 
         getCommonObjects()->getTextureManager().copySamplerFeedbackToHost(this);
         dispatchObjectPicking(rtOutput, downscaledExtent, renderExtent);
@@ -2804,6 +2775,44 @@ namespace dxvk {
 
 
   
+  // Eye-local radiance processing from demodulation through the composed HDR output.
+  // Screenshot taps stay beside the stages they inspect so capture ordering is unchanged.
+  void RtxContext::dispatchEyeDenoisingAndComposition(
+      const Resources::RaytracingOutput& rtOutput,
+      bool captureScreenImage,
+      bool captureDebugImage) {
+    // Demodulation
+    dispatchDemodulate(rtOutput);
+    recordGpuStageTiming("Demodulation");
+
+    // Primary direct diffuse/specular radiance is noisy and demodulated at this point.
+    if (captureScreenImage && captureDebugImage) {
+      takeScreenshot("noisyDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
+      takeScreenshot("noisySpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
+    }
+
+    // Denoising
+    dispatchDenoise(rtOutput);
+    recordGpuStageTiming("Denoising");
+
+    // Primary direct diffuse/specular radiance is denoised but remains demodulated.
+    if (captureScreenImage && captureDebugImage) {
+      takeScreenshot("denoisedDiffuse", rtOutput.m_primaryDirectDiffuseRadiance.image(Resources::AccessType::Read));
+      takeScreenshot("denoisedSpecular", rtOutput.m_primaryDirectSpecularRadiance.image(Resources::AccessType::Read));
+    }
+
+    // Composition
+    dispatchComposite(rtOutput);
+    recordGpuStageTiming("Composition");
+
+    // The post-composite debug view may overwrite the composite output.
+    dispatchReplaceCompositeWithDebugView(rtOutput);
+
+    if (captureScreenImage && captureDebugImage) {
+      takeScreenshot("rtxImagePostComposite", rtOutput.m_compositeOutput.resource(Resources::AccessType::Read).image);
+    }
+  }
+
   void RtxContext::dispatchDemodulate(const Resources::RaytracingOutput& rtOutput) {
     ScopedCpuProfileZone();
     DemodulatePass& demodulate = m_common->metaDemodulate();
