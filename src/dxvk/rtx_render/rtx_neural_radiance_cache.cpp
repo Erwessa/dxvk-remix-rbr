@@ -435,7 +435,7 @@ namespace dxvk {
 
     NrcArgs& nrcArgs = constants.nrcArgs;
     m_nrcCtx->populateShaderConstants(nrcArgs.nrcConstants);
-    nrcArgs.eyeIndex = eyeIndex;
+    nrcArgs.eyeIndex = m_useStereoAtlas ? eyeIndex : 0;
 
     nrcArgs.updatePathMaxBounces = calculateTrainingMaxPathBounces();
 
@@ -599,6 +599,9 @@ namespace dxvk {
       return;
     }
 
+    m_useStereoAtlas = ctx->getCommonObjects()->getSceneManager().getCameraManager().areVrEyeCamerasValid(
+      ctx->getDevice()->getCurrentFrameId());
+
     const bool reinitializeNrcContext =
       m_nrcCtx->isDebugBufferRequired() != NrcOptions::s_nrcDebugBufferIsRequired
       || m_delayedEnableCustomNetworkConfig != NrcCtxOptions::enableCustomNetworkConfig()
@@ -626,7 +629,7 @@ namespace dxvk {
     bool hasNrcSetupSucceeded = true;
    
     // Check supported limits
-    if (frameBeginCtx.downscaledExtent.width > NRC_MAX_RAYTRACING_RESOLUTION_X ||
+    if (frameBeginCtx.downscaledExtent.width * (m_useStereoAtlas ? 2u : 1u) > NRC_MAX_RAYTRACING_RESOLUTION_X ||
         frameBeginCtx.downscaledExtent.height > NRC_MAX_RAYTRACING_RESOLUTION_Y) {
       // NRC can't handle this
       // Note: the resolution limits are very large to accomodate practical gaming resolutions 
@@ -635,7 +638,7 @@ namespace dxvk {
       ONCE(Logger::err(str::format(
         "[RTX Neural Radiance Cache] Unsupported ray tracing resolution. The resolution is too large. Disabling NRC!\n"
         "  Max supported resolution: ", NRC_MAX_RAYTRACING_RESOLUTION_X, " x ", NRC_MAX_RAYTRACING_RESOLUTION_Y, "\n"
-        "  Requested resolution: ", frameBeginCtx.downscaledExtent.width, " x ", frameBeginCtx.downscaledExtent.height)));
+        "  Requested resolution: ", frameBeginCtx.downscaledExtent.width * (m_useStereoAtlas ? 2u : 1u), " x ", frameBeginCtx.downscaledExtent.height)));
 
       // Fallback to Basic mode if NRC setup failed.
       // Note: it would be preferable to fallback to ReSTIRGI, but that would require delaying that change to the beginning of the next frame
@@ -662,7 +665,7 @@ namespace dxvk {
           frameBeginCtx.downscaledExtent.height
         };
         m_nrcCtxSettings->frameDimensions = nrc_uint2 {
-          m_eyeFrameDimensions.x * 2,
+          m_eyeFrameDimensions.x * (m_useStereoAtlas ? 2u : 1u),
           m_eyeFrameDimensions.y
         };
 
@@ -687,7 +690,7 @@ namespace dxvk {
         // In practice, this should always be the case unless in case of contrived tiny frame dimensions.
         // Therefore we clamp it to ensure the constraint
         m_eyeTrainingDimensions.x = std::min(m_eyeTrainingDimensions.x, m_eyeFrameDimensions.x);
-        m_nrcCtxSettings->trainingDimensions = nrc_uint2 { m_eyeTrainingDimensions.x * 2, m_eyeTrainingDimensions.y };
+        m_nrcCtxSettings->trainingDimensions = nrc_uint2 { m_eyeTrainingDimensions.x * (m_useStereoAtlas ? 2u : 1u), m_eyeTrainingDimensions.y };
 
         const bool haveMaxTrainingDimensionsChanged = memcmp(&m_eyeTrainingDimensions, &prevTrainingDimensions, sizeof(prevTrainingDimensions)) != 0;
       
@@ -744,7 +747,7 @@ namespace dxvk {
       nrcFrameSettings.resolveMode = NrcOptions::enableDebugResolveMode() ? NrcOptions::debugResolveMode() : NrcResolveMode::AddQueryResultToOutput;
       nrcFrameSettings.trainTheCache = NrcOptions::trainCache();
 
-      nrcFrameSettings.usedTrainingDimensions = nrc_uint2 { m_activeTrainingDimensions.x * 2, m_activeTrainingDimensions.y };
+      nrcFrameSettings.usedTrainingDimensions = nrc_uint2 { m_activeTrainingDimensions.x * (m_useStereoAtlas ? 2u : 1u), m_activeTrainingDimensions.y };
 
       nrcFrameSettings.proportionPrimarySegmentsToTrainOn = NrcOptions::proportionPrimarySegmentsToTrainOn();
       nrcFrameSettings.proportionTertiaryPlusSegmentsToTrainOn = NrcOptions::proportionTertiaryPlusSegmentsToTrainOn();
