@@ -489,12 +489,15 @@ namespace dxvk {
     return downscaledExtent;
   }
 
+  void RtxContext::onInjectRtxEyeFrameEnd(uint32_t eyeIndex) {
+    // Advance only the temporal history belonging to an eye that completed rendering.
+    getResourceManager().getRaytracingOutput(eyeIndex).onFrameEnd();
+  }
+
   void RtxContext::onInjectRtxFrameEnd(bool rayTracedThisFrame) {
     if (rayTracedThisFrame) {
-      // NRC training is logical-frame scoped. Only advance histories for outputs
-      // that were actually rendered; the second eye is prepared but not rendered yet.
+      // NRC training and scene callbacks are shared by the logical frame.
       m_common->metaNeuralRadianceCache().onFrameEnd();
-      getResourceManager().getRaytracingOutput(0).onFrameEnd();
     }
 
     getSceneManager().onFrameEnd(this, rayTracedThisFrame);
@@ -1049,6 +1052,10 @@ namespace dxvk {
       } else {
         m_framesWithoutValidScene = 0;
       }
+    }
+
+    if (raytracedThisFrame) {
+      onInjectRtxEyeFrameEnd(0);
     }
 
     onInjectRtxFrameEnd(raytracedThisFrame);
