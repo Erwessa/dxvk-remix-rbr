@@ -435,6 +435,12 @@ namespace dxvk {
                                       upscaledExtent, m_resetHistory, mainCamera.isCameraCut(),
                                       getResourceManager().getRaytracingOutput(), true);
 
+    // Prepare the second eye's output-local aliases and temporal resources as well.
+    // Pass callbacks and logical-frame synchronization are shared and must run only once.
+    getResourceManager().onFrameBegin(this, getCommonObjects()->getTextureManager(), getSceneManager(), downscaledExtent,
+                                      upscaledExtent, m_resetHistory, mainCamera.isCameraCut(),
+                                      getResourceManager().getRaytracingOutput(1), false);
+
     // Force history reset on integrate indirect mode change to discard incompatible history 
     if (RtxOptions::integrateIndirectMode() != m_prevIntegrateIndirectMode) {
       m_resetHistory = true;
