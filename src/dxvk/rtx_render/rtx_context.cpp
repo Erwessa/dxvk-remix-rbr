@@ -728,6 +728,7 @@ namespace dxvk {
     RtxSessionLog::onFrame(*this);
 
     bool raytracedThisFrame = false;
+    uint32_t completedEyeCount = 0;
 
     // Note: Only engage ray tracing when it is enabled, the camera is valid and when no shaders are currently being compiled asynchronously (as
     // trying to render before shaders are done compiling will cause Remix to block).
@@ -855,68 +856,103 @@ namespace dxvk {
         m_perfCpu.outputW = renderExtent.width;
         m_perfCpu.outputH = renderExtent.height;
 
-        Resources::RaytracingOutput& rtOutput = getResourceManager().getRaytracingOutput();
+        // A stereo frame is valid only when OpenVR supplied a pose snapshot and both
+        // eye cameras were updated for this host frame. Otherwise retain the mono path.
+        const uint32_t frameId = m_device->getCurrentFrameId();
+        const bool vrStereoFrame = VrInstance::s_instance.isSceneSessionActive()
+          && m_vrFrame.isValid()
+          && getSceneManager().getCameraManager().areVrEyeCamerasValid(frameId);
+        const uint32_t eyeCount = vrStereoFrame ? 2u : 1u;
+        std::array<Resources::RaytracingOutput*, 2> eyeOutputs = {
+          &getResourceManager().getRaytracingOutput(0),
+          &getResourceManager().getRaytracingOutput(1),
+        };
+        std::array<Rc<DxvkImage>, 2> eyeFinalImages = {};
 
         getCommonObjects()->getTextureManager().prepareSamplerFeedback(this);
 
-        prepareEyeRaytraceArgs(rtOutput, m_activeEyeIndex, downscaledExtent, renderExtent);
+        // NEE cache setup is shared and consumes the left-eye frame constants once.
+        prepareEyeRaytraceArgs(*eyeOutputs[0], 0, downscaledExtent, renderExtent);
         preGateFlush(2);
-
-        // Update the world-space NEE cache once per logical frame, before any eye integrates.
-        // The update consumes scene prefix-sum/light data and frame constants, not eye G-buffer data.
-        dispatchNeeCache(rtOutput);
+        dispatchNeeCache(*eyeOutputs[0]);
         recordGpuStageTiming("NEECache");
 
-        // Eye-local path tracing starts after the logical-frame NEE cache update.
-        // Keep all passes that consume or write the active eye's resources together.
-        dispatchEyePathTracing(rtOutput);
-        dispatchLogicalFramePostPathTracing();
+        // Phase one: complete G-buffer and Integration for every eye before entering
+        // the shared NRC training/readback barrier.
+        for (uint32_t eyeIndex = 0; eyeIndex < eyeCount; ++eyeIndex) {
+          Resources::RaytracingOutput& eyeOutput = *eyeOutputs[eyeIndex];
+          if (eyeIndex != 0) {
+            prepareEyeRaytraceArgs(eyeOutput, eyeIndex, downscaledExtent, renderExtent);
+          }
 
-        // Resolve and the following reuse passes consume eye-local output resources.
-        dispatchPostNrcForEye(rtOutput);
-        
-        if (captureScreenImage && captureDebugImage) {
-          takeEyeScreenshot("baseReflectivity", rtOutput.m_primaryBaseReflectivity.image(Resources::AccessType::Read));
-          takeEyeScreenshot("sharedSubsurfaceData", rtOutput.m_sharedSubsurfaceData.image);
-          takeEyeScreenshot("sharedSubsurfaceDiffusionProfileData", rtOutput.m_sharedSubsurfaceDiffusionProfileData.image);
+          dispatchEyePathTracingPreparation(eyeOutput);
+          dispatchPathTracingIntegration(eyeOutput);
+          dispatchPostDepthForEye(eyeOutput);
         }
 
-        dispatchEyeDenoisingAndComposition(rtOutput, captureScreenImage, captureDebugImage);
+        dispatchLogicalFramePostPathTracing();
 
-        // Sampler feedback and object-picking requests are logical-frame work, not one operation per eye.
-        // Object picking consumes one mouse-space request and reads an eye-local ID buffer; once a stereo
-        // loop is added, run it only for the eye selected for the game mirror.
+        // Phase two: resolve NRC and produce each eye's denoised/composited HDR image.
+        for (uint32_t eyeIndex = 0; eyeIndex < eyeCount; ++eyeIndex) {
+          setActiveEyeIndex(eyeIndex);
+          Resources::RaytracingOutput& eyeOutput = *eyeOutputs[eyeIndex];
+
+          dispatchPostNrcForEye(eyeOutput);
+
+          if (captureScreenImage && captureDebugImage) {
+            takeEyeScreenshot("baseReflectivity", eyeOutput.m_primaryBaseReflectivity.image(Resources::AccessType::Read));
+            takeEyeScreenshot("sharedSubsurfaceData", eyeOutput.m_sharedSubsurfaceData.image);
+            takeEyeScreenshot("sharedSubsurfaceDiffusionProfileData", eyeOutput.m_sharedSubsurfaceDiffusionProfileData.image);
+          }
+
+          dispatchEyeDenoisingAndComposition(eyeOutput, captureScreenImage, captureDebugImage);
+        }
+
+        // Sampler feedback is consumed once. Object picking uses the left eye, which is
+        // also the eye mirrored into the game's backbuffer.
+        setActiveEyeIndex(0);
         getCommonObjects()->getTextureManager().copySamplerFeedbackToHost(this);
-        dispatchObjectPicking(rtOutput, downscaledExtent, renderExtent);
+        dispatchObjectPicking(*eyeOutputs[0], downscaledExtent, renderExtent);
         recordGpuStageTiming("FeedbackAndPicking");
         midFrameFlush(16); // rtx.present.midFrameFlushes bit 16, before upscaling
 
-        // Auto-exposure resources are shared by the logical frame; initialize them once before
-        // dispatching the eye-local upscaler.
+        // Auto-exposure resources are shared by the logical frame; initialize them once.
         if (m_currentUpscaler == InternalUpscaler::DLSS ||
             m_currentUpscaler == InternalUpscaler::DLSS_RR ||
             m_currentUpscaler == InternalUpscaler::XeSS ||
             m_currentUpscaler == InternalUpscaler::FSR) {
-          // The DLSS indicator reads the exposure texture even with DLSS auto exposure enabled.
           m_common->metaAutoExposure().createResources(this);
         }
-        const bool updateAutoExposure = m_activeEyeIndex == 0;
-        Rc<DxvkImage> srcImage;
-        const bool dlssNrEnabled = dispatchEyePostProcessing(
-          rtOutput, captureScreenImage, captureDebugImage, updateAutoExposure, true, srcImage);
+
+        bool dlssNrEnabled = false;
+        // Phase three: eye-local upscaling and post-processing. Upload/consume CPU overlay
+        // frame data only on the last eye, while blending the resulting overlay into both.
+        for (uint32_t eyeIndex = 0; eyeIndex < eyeCount; ++eyeIndex) {
+          setActiveEyeIndex(eyeIndex);
+          Rc<DxvkImage> srcImage;
+          const bool eyeDlssNrEnabled = dispatchEyePostProcessing(
+            *eyeOutputs[eyeIndex], captureScreenImage, captureDebugImage,
+            eyeIndex == 0, eyeIndex + 1 == eyeCount, srcImage);
+          dlssNrEnabled = dlssNrEnabled || eyeDlssNrEnabled;
+          eyeFinalImages[eyeIndex] = srcImage;
+        }
         recordGpuStageTiming("DlssNR");
         m_perfCpu.dlssNr = dlssNrEnabled;
 
-        dispatchFrameInterpolation(srcImage);
+        // Frame interpolation is not used by the VR path; retain the existing mono call.
+        dispatchFrameInterpolation(eyeFinalImages[0]);
 
-        // Mirror one completed eye to the game target and capture one logical-frame thumbnail.
-        dispatchGameMirror(srcImage, targetImage);
+        // Mirror one eye to the game's backbuffer, then hand both completed images to OpenVR.
+        dispatchGameMirror(eyeFinalImages[0], targetImage);
+        if (vrStereoFrame) {
+          submitVrFrame(eyeFinalImages);
+        }
 
-        // Log stats when an image is taken
         if (captureScreenImage) {
           getSceneManager().logStatistics();
         }
 
+        completedEyeCount = eyeCount;
         raytracedThisFrame = true;
       }
 
@@ -978,10 +1014,13 @@ namespace dxvk {
     }
 
     if (raytracedThisFrame) {
-      // Advance the history slot that was actually rendered. Mono currently leaves this at
-      // zero; the stereo eye loop must call this once for each completed eye.
-      onInjectRtxEyeFrameEnd(m_activeEyeIndex);
+      // Advance each output's ping-pong history exactly once, after all consumers and
+      // the OpenVR compositor have finished using the completed eye images.
+      for (uint32_t eyeIndex = 0; eyeIndex < completedEyeCount; ++eyeIndex) {
+        onInjectRtxEyeFrameEnd(eyeIndex);
+      }
     }
+    setActiveEyeIndex(0);
 
     onInjectRtxFrameEnd(raytracedThisFrame);
 
