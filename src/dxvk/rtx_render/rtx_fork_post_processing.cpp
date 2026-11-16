@@ -773,6 +773,10 @@ namespace dxvk {
 
   namespace fork_hooks {
 
+    void preparePostProcessingStack(Rc<RtxContext> ctx) {
+      RtxPostProcessingStack::prepareFrame(ctx);
+    }
+
     void dispatchPostProcessingStack(
       Rc<RtxContext> ctx,
       Resources::RaytracingOutput& rtOutput,
