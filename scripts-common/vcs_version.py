@@ -1,5 +1,6 @@
 """Prints the build's version string: the project version, plus "+<short hash>" of the commit being built.
 
+When git cannot report a commit, the suffix is "+unknown" and the build goes on.
 The hash is left out only when the commit carries a tag (CI_COMMIT_TAG, or an exact git describe match) equal to
 the project version. meson's vcs_tag runs this at every build, so the string follows the checked-out commit without
 a reconfigure.
@@ -23,8 +24,10 @@ def main():
     version, root = sys.argv[1], sys.argv[2]
     commit = git(root, "rev-parse", "--verify", "--short=8", "HEAD")
     if not commit:
-        print("ERROR: could not read the current git hash", file=sys.stderr)
-        return 1
+        # A source archive, a missing git or a "dubious ownership" refusal must not stop the build.
+        print("WARNING: could not read the current git hash, using +unknown", file=sys.stderr)
+        print(version + "+unknown")
+        return 0
     tag = os.environ.get("CI_COMMIT_TAG", "") or git(root, "describe", "--always", "--exact-match", commit)
     print(version if tag == version else version + "+" + commit)
     return 0
