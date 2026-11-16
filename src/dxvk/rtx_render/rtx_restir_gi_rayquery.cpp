@@ -373,10 +373,10 @@ namespace dxvk {
     ScopedGpuProfileZone(ctx, "ReSTIR GI");
 
     const uint32_t eyeIndex = ctx->getActiveEyeIndex();
-    auto& restirGIRadiance = restirGIRadiance[eyeIndex];
-    auto& restirGIHitGeometry = restirGIHitGeometry[eyeIndex];
-    auto& restirGIReservoirBuffer = restirGIReservoirBuffer[eyeIndex];
-    auto& bsdfFactor2 = bsdfFactor2[eyeIndex];
+    auto& restirGIRadiance = m_restirGIRadiance[eyeIndex];
+    auto& restirGIHitGeometry = m_restirGIHitGeometry[eyeIndex];
+    auto& restirGIReservoirBuffer = m_restirGIReservoirBuffer[eyeIndex];
+    auto& bsdfFactor2 = m_bsdfFactor2[eyeIndex];
 
     const uint32_t frameIdx = ctx->getDevice()->getCurrentFrameId();
     const auto& numRaysExtent = rtOutput.m_compositeOutputExtent;
