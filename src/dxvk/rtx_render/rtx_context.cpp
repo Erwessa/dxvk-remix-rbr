@@ -2398,10 +2398,10 @@ namespace dxvk {
     Rc<DxvkBuffer> previousLightBuffer = getSceneManager().getLightManager().getPreviousLightBuffer();
     Rc<DxvkBuffer> lightMappingBuffer = getSceneManager().getLightManager().getLightMappingBuffer();
     Rc<DxvkBuffer> lightIdentityBuffer = getSceneManager().getLightManager().getLightIdentityBuffer();
-    Rc<DxvkBuffer> gpuPrintBuffer = getResourceManager().getRaytracingOutput().m_gpuPrintBuffer;
+    Rc<DxvkBuffer> gpuPrintBuffer = getResourceManager().getGpuPrintBuffer();
     Rc<DxvkImageView> valueNoiseLut = getResourceManager().getValueNoiseLut(this);
     Rc<DxvkSampler> linearSampler = getResourceManager().getSampler(VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT);
-    Rc<DxvkBuffer> samplerFeedbackBuffer = getResourceManager().getRaytracingOutput().m_samplerFeedbackDevice;
+    Rc<DxvkBuffer> samplerFeedbackBuffer = getResourceManager().getSamplerFeedbackDeviceBuffer();
 
     DebugView& debugView = getCommonObjects()->metaDebugView();
 
@@ -3094,7 +3094,7 @@ namespace dxvk {
     if (debugView.gpuPrint.enable()) {
       // Read from the oldest element as it is guaranteed to be written on the GPU by now
       VkDeviceSize offset = ((frameIdx + 1) % kMaxFramesInFlight) * sizeof(GpuPrintBufferElement);
-      GpuPrintBufferElement* gpuPrintElement = reinterpret_cast<GpuPrintBufferElement*>(rtOutput.m_gpuPrintBuffer->mapPtr(offset));
+      GpuPrintBufferElement* gpuPrintElement = reinterpret_cast<GpuPrintBufferElement*>(getResourceManager().getGpuPrintBuffer()->mapPtr(offset));
 
       if (gpuPrintElement && gpuPrintElement->isValid()) {
         static std::string previousString = "";
