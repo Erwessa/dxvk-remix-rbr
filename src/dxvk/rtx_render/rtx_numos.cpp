@@ -119,6 +119,8 @@ namespace dxvk {
     uint32_t lightningFrameId = 0;
     bool lightningFrameValid = false;
     bool lightningStrikeThisFrame = false;
+    numos::Vector3 previousLightningPosition {};
+    bool previousLightningPositionValid = false;
 
     explicit Impl(DxvkDevice* device) {
       for (auto& eye : eyes)
@@ -497,8 +499,19 @@ namespace dxvk {
 
     const numos::FrameOutputs& out = m_impl->eyes[m_activeEyeIndex]->renderer.outputs();
     if (m_activeEyeIndex == 0u) {
+      // The envelope alone is not an event marker: a fresh strike can replace a stronger
+      // existing flash with a lower random peak. The strike position is stable between
+      // strikes, so a changed position also identifies that restart.
+      const numos::Vector3 strikePosition = out.args.lightningStrikePosKm;
+      const bool strikePositionChanged = m_impl->previousLightningPositionValid &&
+        (strikePosition.x != m_impl->previousLightningPosition.x ||
+         strikePosition.y != m_impl->previousLightningPosition.y ||
+         strikePosition.z != m_impl->previousLightningPosition.z);
       m_impl->lightningStrikeThisFrame =
-        out.args.lightningEnvelope > out.args.lightningEnvelopePrevious;
+        out.args.lightningEnvelope > out.args.lightningEnvelopePrevious ||
+        (strikePositionChanged && out.args.lightningEnvelope > 0.0f);
+      m_impl->previousLightningPosition = strikePosition;
+      m_impl->previousLightningPositionValid = true;
     }
     // A partial write (the buffer has a tail pad): DXVK updates it in place in the command stream,
     // ordered before this frame's readers, instead of renaming it under bindings already taken.
