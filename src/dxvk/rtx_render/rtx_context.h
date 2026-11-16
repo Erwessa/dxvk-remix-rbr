@@ -287,6 +287,7 @@ namespace dxvk {
     VkExtent3D setDownscaleExtent(const VkExtent3D& upscaleExtent);
 
     VkExtent3D onInjectRtxFrameBegin(const VkExtent3D& upscaleExtent);
+    void onInjectRtxEyeFrameEnd(uint32_t eyeIndex);
     void onInjectRtxFrameEnd(bool raytracedThisFrame);
 
     void dispatchVolumetrics(const Resources::RaytracingOutput& rtOutput);
