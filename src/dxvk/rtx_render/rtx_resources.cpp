@@ -1224,7 +1224,7 @@ namespace dxvk {
            categoryIndex1 == categoryIndex2;
   }
 
-  void Resources::createDownscaledResources(Rc<DxvkContext>& ctx, RaytracingOutput& output) {
+  void Resources::createDownscaledResources(Rc<DxvkContext>& ctx, RaytracingOutput& output, bool notifyResizeEvents) {
     Logger::debug("Render resolution changed, recreating rendering resources");
 
     // Explicit constant to make it clear where cross format aliasing occurs. 
@@ -1232,7 +1232,8 @@ namespace dxvk {
     const bool allowCompatibleFormatAliasing = true;
 
 #ifdef REMIX_DEVELOPMENT
-    Resources::s_resourcesViewMap.clear();
+    if (notifyResizeEvents)
+      Resources::s_resourcesViewMap.clear();
 #endif
 
     // GBuffer (Primary/Secondary Surfaces)
@@ -1403,11 +1404,13 @@ namespace dxvk {
 
 
     // Let other systems know of the resize
-    executeResizeEventList(m_onDownscaleResize, ctx, m_downscaledExtent);
+    if (notifyResizeEvents)
+      executeResizeEventList(m_onDownscaleResize, ctx, m_downscaledExtent);
 
 #ifdef REMIX_DEVELOPMENT
     // Cache Dynamic Aliasing Resources, which are resources that alias to different resources frame to frame. Such aliasing needs to be manually figured out by users, so we separately collect them and send notifications to users in GUI
-    s_dynamicAliasingResourcesSet.clear();
+    if (notifyResizeEvents)
+      s_dynamicAliasingResourcesSet.clear();
     // Note: We did a little bit hack here to just get the image view and WAR the check.
     s_dynamicAliasingResourcesSet.insert(output.m_primaryWorldPositionWorldTriangleNormal[0].view(Resources::AccessType::Read, false).ptr());
     s_dynamicAliasingResourcesSet.insert(output.m_primaryWorldPositionWorldTriangleNormal[1].view(Resources::AccessType::Read, false).ptr());
@@ -1422,7 +1425,7 @@ namespace dxvk {
 #endif
   }
 
-  void Resources::createTargetResources(Rc<DxvkContext>& ctx, RaytracingOutput& output) {
+  void Resources::createTargetResources(Rc<DxvkContext>& ctx, RaytracingOutput& output, bool notifyResizeEvents) {
     Logger::debug("Target resolution changed, recreating target resources");
 
     // Explicit constant to make it clear where cross format aliasing occurs
@@ -1437,7 +1440,8 @@ namespace dxvk {
       output.m_postFxIntermediateTexture, ctx, m_targetExtent, VK_FORMAT_R16G16B16A16_SFLOAT, "DLSS-NR input");
 
     // Let other systems know of the resize
-    executeResizeEventList(m_onTargetResize, ctx, m_targetExtent);
+    if (notifyResizeEvents)
+      executeResizeEventList(m_onTargetResize, ctx, m_targetExtent);
   }
 
   void Resources::createNeuralRenderingOutput(Rc<DxvkContext>& ctx, RaytracingOutput& output) {
