@@ -21,6 +21,8 @@
 */
 #pragma once
 
+#include <array>
+
 #include "../dxvk_include.h"
 #include "rtx_resources.h"
 #include "dxvk_image.h"
@@ -88,7 +90,8 @@ namespace dxvk {
       Rc<RtxContext> ctx,
       DxvkBarrierSet& barriers,
       const Resources::RaytracingOutput& rtOutput,
-      bool resetHistory = false);
+      bool resetHistory,
+      uint32_t eyeIndex);
 
     void showImguiSettings();
 
@@ -110,7 +113,7 @@ namespace dxvk {
     static void logRenderSize(const char* upscaler, DLSSProfile profile, const uint32_t displaySize[2],
                               const uint32_t optimalSize[2], const uint32_t minSize[2], const uint32_t maxSize[2]);
 
-    void initializeDLSS(Rc<DxvkContext> pRenderContext);
+    void initializeDLSS(Rc<DxvkContext> pRenderContext, uint32_t eyeIndex);
 
     bool useDlssAutoExposure() const;
 
@@ -129,12 +132,13 @@ namespace dxvk {
     bool                        mAutoExposure = false;
     bool                        mInverseDepth = false;
 
-    bool                        mRecreate = true;
+    std::array<bool, 2>         mRecreate = { true, true };
     DLSSPreset                  m_prevPreset = DLSSPreset::Default;
     uint32_t                    mInputSize[2] = {};            ///< Input size in pixels.
     uint32_t                    mDLSSOutputSize[2] = {};       ///< DLSS output size in pixels.
 
     bool                        mBiasCurrentColorEnabled = false;
-    std::unique_ptr < NGXDLSSContext > m_dlssContext;
+    // NGX owns temporal accumulation per feature; never share one feature across VR eyes.
+    std::array<std::unique_ptr<NGXDLSSContext>, 2> m_dlssContext;
   };
 }  // namespace dxvk

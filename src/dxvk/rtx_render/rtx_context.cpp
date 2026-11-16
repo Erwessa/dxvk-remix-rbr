@@ -2986,7 +2986,7 @@ namespace dxvk {
 
   void RtxContext::dispatchDLSS(const Resources::RaytracingOutput& rtOutput) {
     DxvkDLSS& dlss = m_common->metaDLSS();
-    dlss.dispatch(this, m_execBarriers, rtOutput, m_resetHistory);
+    dlss.dispatch(this, m_execBarriers, rtOutput, m_resetHistory, m_activeEyeIndex);
   }
 
   void RtxContext::dispatchRayReconstruction(const Resources::RaytracingOutput& rtOutput) {
