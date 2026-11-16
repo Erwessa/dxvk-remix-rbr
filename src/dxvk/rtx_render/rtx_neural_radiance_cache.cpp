@@ -767,8 +767,6 @@ namespace dxvk {
 
       // Query-path and training intermediates are consumed by the matching eye's Integration pass.
       for (uint32_t eyeIndex = 0; eyeIndex < 2; eyeIndex++) {
-        const char* eyeName = eyeIndex == 0 ? "Left" : "Right";
-
         if (!NrcOptions::includeDirectLighting() && m_queryPathData0[eyeIndex].image == nullptr) {
           m_queryPathData0[eyeIndex] = Resources::createImageResource(
             ctx, eyeIndex == 0 ? "NRC Query Path Data 0 Left" : "NRC Query Path Data 0 Right",
