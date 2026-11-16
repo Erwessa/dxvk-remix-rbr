@@ -128,7 +128,7 @@ namespace dxvk {
     m_previousResolution = resolution;
   }
 
-  void NeeCachePass::setRaytraceArgs(RaytraceArgs& constants, bool resetHistory) const {
+  void NeeCachePass::setRaytraceArgs(RaytraceArgs& constants) const {
     const bool neeCacheActive = isActive();
 
     constants.neeCacheArgs.enable = neeCacheActive;
