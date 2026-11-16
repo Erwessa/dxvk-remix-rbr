@@ -25,7 +25,6 @@
 #include <array>
 
 #include "dxvk_device.h"
-#include "../dxvk_openvr.h"
 #include "dxvk_cs.h"
 #include <algorithm>
 #include "dxvk_scoped_annotation.h"
@@ -768,12 +767,11 @@ namespace dxvk {
         // OpenVR's recommended size is the per-eye render extent. Keep the game's
         // backbuffer as the presentation target; the completed eye image is scaled to it below.
         VkExtent3D renderExtent = targetImage->info().extent;
-        if (m_vrFrame.isValid()) {
-          const OpenVrFrameState& vrFrame = m_vrFrame.get();
-          if (vrFrame.recommendedWidth > 0 && vrFrame.recommendedHeight > 0) {
-            renderExtent.width = vrFrame.recommendedWidth;
-            renderExtent.height = vrFrame.recommendedHeight;
-          }
+        uint32_t recommendedWidth = 0;
+        uint32_t recommendedHeight = 0;
+        if (m_vrFrame.getRecommendedRenderTargetSize(recommendedWidth, recommendedHeight)) {
+          renderExtent.width = recommendedWidth;
+          renderExtent.height = recommendedHeight;
         }
 
         VkExtent3D downscaledExtent = onInjectRtxFrameBegin(renderExtent);
