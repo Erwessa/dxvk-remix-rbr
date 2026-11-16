@@ -730,7 +730,7 @@ struct NEECache
 {
   static vec3 getCenter()
   {
-    return cameraGetWorldPosition(cb.camera);
+    return cb.neeCacheArgs.cacheCenter.xyz;
   }
 
   // This is an advanced form from Johannes Jendersie (aligned log grid):
