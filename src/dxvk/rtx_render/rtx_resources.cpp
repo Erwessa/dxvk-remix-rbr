@@ -1347,12 +1347,12 @@ namespace dxvk {
     DxvkBufferCreateInfo neeCacheInfo = rtxdiBufferInfo;
     int cellCount = NEE_CACHE_PROBE_RESOLUTION * NEE_CACHE_PROBE_RESOLUTION * NEE_CACHE_PROBE_RESOLUTION;
     neeCacheInfo.size = cellCount * NEE_CACHE_CELL_CANDIDATE_TOTAL_SIZE;
-    m_raytracingOutput.m_neeCache = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Buffer");
+    m_neeCache = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Buffer");
     neeCacheInfo.size = cellCount * NEE_CACHE_CELL_TASK_TOTAL_SIZE;
-    m_raytracingOutput.m_neeCacheTask = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NRR Cache Task Buffer");
+    m_neeCacheTask = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NRR Cache Task Buffer");
     neeCacheInfo.size = cellCount * NEE_CACHE_SAMPLES * sizeof(NeeCache_PackedSample);
-    m_raytracingOutput.m_neeCacheSample = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Sample Buffer");
-    m_raytracingOutput.m_neeCacheThreadTask = createImageResource(ctx, "radiance cache thread task", m_downscaledExtent, VK_FORMAT_R32G32_UINT);
+    m_neeCacheSample = m_device->createBuffer(neeCacheInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "NEE Cache Sample Buffer");
+    m_neeCacheThreadTask = createImageResource(ctx, "radiance cache thread task", m_downscaledExtent, VK_FORMAT_R32G32_UINT);
 
     // Displacement
     // zw hold the SCCR depth scale and triangle normal (sccrSharedTextureCoord).
@@ -1372,8 +1372,8 @@ namespace dxvk {
       gpuPrintBufferInfo.access = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
       gpuPrintBufferInfo.size = bufferLength * sizeof(GpuPrintBufferElement);
       
-      m_raytracingOutput.m_gpuPrintBuffer = m_device->createBuffer(gpuPrintBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DxvkMemoryStats::Category::RTXBuffer, "GPU Print Buffer");
-      GpuPrintBufferElement* gpuPrintElements = reinterpret_cast<GpuPrintBufferElement*>(m_raytracingOutput.m_gpuPrintBuffer->mapPtr(0));
+      m_gpuPrintBuffer = m_device->createBuffer(gpuPrintBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DxvkMemoryStats::Category::RTXBuffer, "GPU Print Buffer");
+      GpuPrintBufferElement* gpuPrintElements = reinterpret_cast<GpuPrintBufferElement*>(m_gpuPrintBuffer->mapPtr(0));
      
       if (gpuPrintElements) {
         for (uint32_t i = 0; i < bufferLength; i++) {
@@ -1395,12 +1395,12 @@ namespace dxvk {
           feedInfo.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
           feedInfo.size = sizeInBytes;
         }
-        m_raytracingOutput.m_samplerFeedbackDevice = m_device->createBuffer(
+        m_samplerFeedbackDevice = m_device->createBuffer(
           feedInfo,
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
           DxvkMemoryStats::Category::RTXBuffer, "Sampler Feedback Buffer");
       }
-      for (Rc<DxvkBuffer>& readbackBuf : m_raytracingOutput.m_samplerFeedbackReadback) {
+      for (Rc<DxvkBuffer>& readbackBuf : m_samplerFeedbackReadback) {
         DxvkBufferCreateInfo feedInfo = {};
         {
           feedInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
