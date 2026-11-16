@@ -114,6 +114,12 @@ namespace dxvk {
     uint32_t lightsFrameId = 0;
     bool lightsFrameValid = false;
 
+    // NUMOS's manual lightning request is process-wide and consumed by the first Renderer.
+    // Mirror a newly started flash from the left renderer into the right renderer's FrameInputs.
+    uint32_t lightningFrameId = 0;
+    bool lightningFrameValid = false;
+    bool lightningStrikeThisFrame = false;
+
     explicit Impl(DxvkDevice* device) {
       for (auto& eye : eyes)
         eye = std::make_unique<EyeState>(device);
@@ -354,6 +360,13 @@ namespace dxvk {
       m_impl->eyes[m_activeEyeIndex]->argsCleared = true;
     }
 
+    const uint32_t deviceFrame = ctx.getDevice()->getCurrentFrameId();
+    if (m_activeEyeIndex == 0u) {
+      m_impl->lightningFrameId = deviceFrame;
+      m_impl->lightningFrameValid = true;
+      m_impl->lightningStrikeThisFrame = false;
+    }
+
     const bool shadersLoaded = active();
     if (!shadersLoaded || !corePipelinesReady(ctx)) {
       if (RtxOptions::skyMode() == SkyMode::Numos) {
@@ -380,8 +393,6 @@ namespace dxvk {
     // The user's settings with the weather presets blended over them (rtx_numos_weather.h). The weather
     // reaches NUMOS inside the settings, so FrameInputs::weather stays null.
     Rc<DxvkContext> dxvkCtx = &ctx;
-    const uint32_t deviceFrame = ctx.getDevice()->getCurrentFrameId();
-
     // Weather::update advances transition time. Cache its result by logical device frame so
     // separate eye renderers receive the exact same weather without advancing the blend twice.
     if (!m_impl->frameSettingsValid || m_impl->frameSettingsFrameId != deviceFrame) {
@@ -473,11 +484,22 @@ namespace dxvk {
     in.hostLocalLightInjection = false;
     in.debugViewActive = ctx.getCommonObjects()->metaDebugView().getDebugViewIndex() != DEBUG_VIEW_DISABLED;
     in.weather = nullptr;
+    // Renderer::requestLightningStrike() is a process-wide one-shot consumed by whichever eye
+    // begins first. Re-broadcast a flash observed in the left eye so both independent renderers
+    // advance their lightning envelope and scene-light state on the same logical frame.
+    if (m_activeEyeIndex == 1u && m_impl->lightningFrameValid &&
+        m_impl->lightningFrameId == deviceFrame) {
+      in.lightningStrike = m_impl->lightningStrikeThisFrame;
+    }
 
     m_impl->eyes[m_activeEyeIndex]->renderer.beginFrame(*m_impl->eyes[m_activeEyeIndex]->gpu, in);
     ++m_impl->eyes[m_activeEyeIndex]->frameIndex;
 
     const numos::FrameOutputs& out = m_impl->eyes[m_activeEyeIndex]->renderer.outputs();
+    if (m_activeEyeIndex == 0u) {
+      m_impl->lightningStrikeThisFrame =
+        out.args.lightningEnvelope > out.args.lightningEnvelopePrevious;
+    }
     // A partial write (the buffer has a tail pad): DXVK updates it in place in the command stream,
     // ordered before this frame's readers, instead of renaming it under bindings already taken.
     ctx.writeToBuffer(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, sizeof(numos::AtmosphereArgs), &out.args);
