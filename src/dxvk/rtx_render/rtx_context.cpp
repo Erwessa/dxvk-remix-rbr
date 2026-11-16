@@ -457,9 +457,18 @@ namespace dxvk {
     }
 
     const uint32_t frameId = m_device->getCurrentFrameId();
+    const bool vrSceneSessionActive = VrInstance::s_instance.isSceneSessionActive();
+    // A new or ended OpenVR session invalidates temporal data even when the eye poses
+    // happen to be close to the previous session's final poses. Propagate this through
+    // the normal logical-frame reset path before either eye's resources are prepared.
+    if (vrSceneSessionActive != m_previousVrSceneSessionActive) {
+      m_resetHistory = true;
+      m_previousVrSceneSessionActive = vrSceneSessionActive;
+    }
+
     const RtCamera& mainCamera = getSceneManager().getCamera();
     const CameraManager& cameraManager = getSceneManager().getCameraManager();
-    const bool hasVrEyeCameras = VrInstance::s_instance.isSceneSessionActive()
+    const bool hasVrEyeCameras = vrSceneSessionActive
       && cameraManager.areVrEyeCamerasValid(frameId);
     const RtCamera& leftEyeCamera = hasVrEyeCameras
       ? cameraManager.getVrEyeCamera(RtxEye::Left)
