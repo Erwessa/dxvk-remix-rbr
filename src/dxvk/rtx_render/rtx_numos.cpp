@@ -77,28 +77,47 @@ namespace dxvk {
   }
 
   struct RtxNumos::Impl {
-    NumosGpu gpu;
-    numos::Renderer renderer;
-    std::vector<numos::LocalLight> localLights;
+    struct EyeState {
+      std::unique_ptr<NumosGpu> gpu;
+      numos::Renderer renderer;
+      std::vector<numos::LocalLight> localLights;
+      Rc<DxvkBuffer> argsBuffer;
+      bool rendering = false;
+      bool postDepthDone = false;
+      bool argsCleared = false;
+      bool hostSkyOverride = false;
+      uint32_t frameIndex = 0;
+      uint32_t lastCameraCutFrame = 0;
+
+      // Shader readiness and optional-pass state belong to the renderer/adapter for this eye.
+      std::vector<bool> passPipelineReady = std::vector<bool>(numos::passCount(), false);
+      bool corePipelinesReady = false;
+      bool coreWaitLogged = false;
+      bool cloudRenderHeldBack = false;
+      bool secondaryLutHeldBack = false;
+
+      explicit EyeState(DxvkDevice* device)
+        : gpu(std::make_unique<NumosGpu>(device, env::getDllDirectory() + "/numos/spirv")) { }
+    };
+
+    std::array<std::unique_ptr<EyeState>, 2> eyes;
+    // NUMOS-emitted scene lights are logical-frame objects, not eye-local GPU state.
     RtLight* lights[numos::kMaxMoons + 2] = {};
 
-    // Per pass, whether RtxNumos::pipelineReady found its pipeline compiled. A compiled pipeline stays compiled.
-    std::vector<bool> passPipelineReady = std::vector<bool>(numos::passCount(), false);
-    bool corePipelinesReady = false;
-    bool coreWaitLogged = false;
-    bool cloudRenderHeldBack = false;
-    bool secondaryLutHeldBack = false;
-
     // Weather transitions and the host's world-change signal advance once per logical device frame.
-    // The cache also makes repeated beginFrame calls safe when the stereo eye loop is introduced.
     numos::Settings frameSettings;
     uint32_t frameSettingsFrameId = 0;
     bool frameSettingsValid = false;
     uint32_t worldChangeFrameId = 0;
     bool worldChangeFrameValid = false;
     bool worldChangedThisFrame = false;
+    uint32_t lightsFrameId = 0;
+    bool lightsFrameValid = false;
 
-    explicit Impl(DxvkDevice* device) : gpu(device, env::getDllDirectory() + "/numos/spirv") { }
+    explicit Impl(DxvkDevice* device) {
+      for (auto& eye : eyes)
+        eye = std::make_unique<EyeState>(device);
+    }
   };
 
   RtxNumos::RtxNumos(DxvkDevice* device)
@@ -112,16 +131,21 @@ namespace dxvk {
     info.stages = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
                   VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     info.access = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_UNIFORM_READ_BIT;
-    m_argsBuffer = device->createBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer,
-                                        "NUMOS AtmosphereArgs");
+    for (uint32_t eyeIndex = 0; eyeIndex < m_impl->eyes.size(); ++eyeIndex) {
+      m_impl->eyes[eyeIndex]->argsBuffer = device->createBuffer(
+        info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer,
+        str::format("NUMOS AtmosphereArgs eye ", eyeIndex).c_str());
+    }
   }
 
   RtxNumos::~RtxNumos() {
-    m_impl->renderer.releaseGpuResources(m_impl->gpu);
+    for (auto& eye : m_impl->eyes)
+      eye->renderer.releaseGpuResources(*eye->gpu);
   }
 
   const numos::FrameOutputs* RtxNumos::outputs() const {
-    return m_rendering ? &m_impl->renderer.outputs() : nullptr;
+    const Impl::EyeState& eye = *m_impl->eyes[m_activeEyeIndex];
+    return eye.rendering ? &eye.renderer.outputs() : nullptr;
   }
 
   bool RtxNumos::writesUpscalerBiasMask() const {
@@ -134,27 +158,28 @@ namespace dxvk {
   }
 
   NumosGpu& RtxNumos::gpu() {
-    return m_impl->gpu;
+    return *m_impl->eyes[m_activeEyeIndex]->gpu;
   }
 
   numos::Renderer& RtxNumos::renderer() {
-    return m_impl->renderer;
+    return m_impl->eyes[m_activeEyeIndex]->renderer;
   }
 
   bool RtxNumos::active() const {
-    return RtxOptions::skyMode() == SkyMode::Numos && m_impl->gpu.shadersValid();
+    return RtxOptions::skyMode() == SkyMode::Numos && m_impl->eyes[m_activeEyeIndex]->gpu->shadersValid();
   }
 
   void RtxNumos::prewarmShaders() {
     if (RtxOptions::skyMode() == SkyMode::Numos) {
-      m_impl->gpu.prewarmShaders(cloudRenderPass(NumosSettings::resolved()));
+      for (auto& eye : m_impl->eyes)
+        eye->gpu->prewarmShaders(cloudRenderPass(NumosSettings::resolved()));
     }
   }
 
   bool RtxNumos::pipelineReady(RtxContext& ctx, numos::PassId pass) {
     const uint32_t index = uint32_t(pass);
-    if (!m_impl->passPipelineReady[index]) {
-      const Rc<DxvkShader> shader = m_impl->gpu.shaderFor(index);
+    if (!m_impl->eyes[m_activeEyeIndex]->passPipelineReady[index]) {
+      const Rc<DxvkShader> shader = m_impl->eyes[m_activeEyeIndex]->gpu->shaderFor(index);
       // Without the state cache workers nothing compiles ahead of use, so the dispatch compiles the pipeline itself.
       m_impl->passPipelineReady[index] = shader != nullptr &&
         (!ctx.getCommonObjects()->pipelineManager().hasStateCache() || ctx.isComputeShaderPipelineReady(shader));
@@ -163,7 +188,7 @@ namespace dxvk {
   }
 
   bool RtxNumos::corePipelinesReady(RtxContext& ctx) {
-    if (m_impl->corePipelinesReady) {
+    if (m_impl->eyes[m_activeEyeIndex]->corePipelinesReady) {
       return true;
     }
     // Every core pass is asked, so that each one's shader is created and queued for compilation.
@@ -174,7 +199,7 @@ namespace dxvk {
       }
     }
     if (!ready) {
-      if (!m_impl->coreWaitLogged) {
+      if (!m_impl->eyes[m_activeEyeIndex]->coreWaitLogged) {
         m_impl->coreWaitLogged = true;
         Logger::info("[NUMOS] Its shaders are compiling in the background. Until they are ready, there is no NUMOS sky, sun or moon.");
       }
@@ -201,7 +226,7 @@ namespace dxvk {
         settings.cloudRenderRTEnable = false;
         settings.debugDispatchCloudRender = false;
       }
-      if (heldBack != m_impl->cloudRenderHeldBack) {
+      if (heldBack != m_impl->eyes[m_activeEyeIndex]->cloudRenderHeldBack) {
         m_impl->cloudRenderHeldBack = heldBack;
         Logger::info(heldBack
           ? str::format("[NUMOS] The on-screen cloud pass (", numos::passInfo(cloudPass).name,
@@ -214,7 +239,7 @@ namespace dxvk {
       if (heldBack) {
         settings.cloudSecondaryLutEnable = false;
       }
-      if (heldBack != m_impl->secondaryLutHeldBack) {
+      if (heldBack != m_impl->eyes[m_activeEyeIndex]->secondaryLutHeldBack) {
         m_impl->secondaryLutHeldBack = heldBack;
         Logger::info(heldBack
           ? "[NUMOS] The cloud dome pass (cloud_secondary_lut) is compiling in the background. Until it is ready, reflections show no clouds."
@@ -243,11 +268,12 @@ namespace dxvk {
     assets.milkyWay = milkyWay.data();         assets.milkyWaySize = milkyWay.size();
     assets.starlightLow = starlightLow.data(); assets.starlightLowSize = starlightLow.size();
     assets.moon = moon.data();                 assets.moonSize = moon.size();
-    m_impl->renderer.setNightSkyAssets(assets);
+    for (auto& eye : m_impl->eyes)
+      eye->renderer.setNightSkyAssets(assets);
   }
 
   void RtxNumos::gatherLocalLights(RtxContext& ctx) {
-    m_impl->localLights.clear();
+    m_impl->eyes[m_activeEyeIndex]->localLights.clear();
     for (const RtLight* light : ctx.getSceneManager().getLightManager().getLinearizedLights()) {
       if (light == nullptr || std::find(std::begin(m_impl->lights), std::end(m_impl->lights), light) != std::end(m_impl->lights)) {
         continue;  // NUMOS's own lights (the lightning sphere) are not local lights of the scene
@@ -315,8 +341,8 @@ namespace dxvk {
     m_activeEyeIndex = ctx.getActiveEyeIndex();
     constants.skyRadianceUnscale = 1.0f;
     constants.skyArgsProbe = 0u;
-    if (!m_argsCleared) {
-      ctx.clearBuffer(m_argsBuffer, 0, m_argsBuffer->info().size, 0);
+    if (!m_impl->eyes[m_activeEyeIndex]->argsCleared) {
+      ctx.clearBuffer(m_impl->eyes[m_activeEyeIndex]->argsBuffer, 0, m_argsBuffer->info().size, 0);
       m_argsCleared = true;
     }
 
@@ -330,16 +356,16 @@ namespace dxvk {
           ONCE(Logger::err("[NUMOS] rtx.skyMode is NUMOS but its shaders did not load; the sky falls back to the skybox."));
         }
       }
-      if (m_rendering) {
+      if (m_impl->eyes[m_activeEyeIndex]->rendering) {
         dropLights();
         m_rendering = false;
         LightBvh::setSkyProviderRendering(false);
       }
-      m_impl->gpu.endFrame();
+      *m_impl->eyes[m_activeEyeIndex]->gpu.endFrame();
       return;
     }
 
-    m_postDepthDone = false;
+    m_impl->eyes[m_activeEyeIndex]->postDepthDone = false;
     loadNightSky();
     // The user's settings with the weather presets blended over them (rtx_numos_weather.h). The weather
     // reaches NUMOS inside the settings, so FrameInputs::weather stays null.
@@ -356,7 +382,7 @@ namespace dxvk {
     }
     numos::Settings settings = m_impl->frameSettings;
     holdBackUncompiledPasses(ctx, settings);
-    m_impl->renderer.setSettings(settings);
+    m_impl->eyes[m_activeEyeIndex]->renderer.setSettings(settings);
 
     m_impl->gpu.beginFrame(dxvkCtx, deviceFrame);
 
@@ -370,11 +396,11 @@ namespace dxvk {
     Resources& resources = ctx.getResourceManager();
 
     numos::FrameInputs in;
-    in.frameIndex = m_frameIndex;
+    in.frameIndex = m_impl->eyes[m_activeEyeIndex]->frameIndex;
     in.deltaSeconds = GlobalTime::get().deltaTime();
     in.cameraCut = cameraManager.getLastCameraCutFrameId() + 1u >= deviceFrame;
     if (in.cameraCut) {
-      m_lastCameraCutFrame[m_activeEyeIndex] = m_frameIndex;
+      m_impl->eyes[m_activeEyeIndex]->lastCameraCutFrame = m_frameIndex;
     }
     in.lastCameraCutFrame = m_lastCameraCutFrame[m_activeEyeIndex];
     if (!m_impl->worldChangeFrameValid || m_impl->worldChangeFrameId != deviceFrame) {
@@ -431,7 +457,7 @@ namespace dxvk {
     in.localLights = m_impl->localLights.data();
     in.localLightCount = uint32_t(m_impl->localLights.size());
     in.hostSkyOverride = scene.getLightManager().getDomeLightArgs().active;
-    m_hostSkyOverride = in.hostSkyOverride;
+    m_impl->eyes[m_activeEyeIndex]->hostSkyOverride = in.hostSkyOverride;
     in.volumetricsHandoffWorldUnits = RtxGlobalVolumetrics::enable()
       ? RtxGlobalVolumetrics::froxelMaxDistanceMeters() * RtxOptions::getMeterToWorldUnitScale() : 0.0f;
     in.hostLocalLightInjection = false;
