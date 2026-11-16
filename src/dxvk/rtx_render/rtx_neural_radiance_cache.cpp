@@ -1166,7 +1166,7 @@ namespace dxvk {
       ctx.bindResourceView(NRC_RESOLVE_BINDING_INDIRECT_RADIANCE_HIT_DISTANCE_INPUT_OUTPUT, rtOutput.m_indirectRadianceHitDistance.view(Resources::AccessType::ReadWrite), nullptr);
 
       ctx.bindResourceView(NRC_RESOLVE_BINDING_DEBUG_VIEW_TEXTURE_OUTPUT, debugView.getDebugOutput(), nullptr);
-      ctx.bindResourceBuffer(NRC_RESOLVE_BINDING_GPU_PRINT_BUFFER_OUTPUT, DxvkBufferSlice(rtOutput.m_gpuPrintBuffer, 0, rtOutput.m_gpuPrintBuffer.ptr() ? rtOutput.m_gpuPrintBuffer->info().size : 0));
+      ctx.bindResourceBuffer(NRC_RESOLVE_BINDING_GPU_PRINT_BUFFER_OUTPUT, DxvkBufferSlice(ctx.getResourceManager().getGpuPrintBuffer(), 0, ctx.getResourceManager().getGpuPrintBuffer().ptr() ? ctx.getResourceManager().getGpuPrintBuffer()->info().size : 0));
     }
 
     const uint32_t kMaxFramesToAccumulate = 300;
