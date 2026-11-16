@@ -16,6 +16,9 @@ namespace dxvk {
 
   class RtxPostProcessingStack {
   public:
+    // Load and atomically apply external-effect hot reloads once before rendering either eye.
+    static void prepareFrame(Rc<RtxContext> ctx);
+
     // updateAutoExposure is forwarded to RtxContext::dispatchToneMapping. It has no default, because
     // DLSS-NR dispatches auto exposure itself and a default of true would dispatch it twice.
     static void dispatch(
