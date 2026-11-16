@@ -365,6 +365,8 @@ namespace dxvk {
     void dispatchPostNrcForEye(const Resources::RaytracingOutput& rtOutput);
     void dispatchEyeDenoisingAndComposition(const Resources::RaytracingOutput& rtOutput, bool captureScreenImage, bool captureDebugImage);
     void dispatchEyeUpscaling(const Resources::RaytracingOutput& rtOutput);
+    bool dispatchEyePostProcessing(Resources::RaytracingOutput& rtOutput, bool captureScreenImage, bool captureDebugImage,
+                                   bool updateAutoExposure, bool consumeOverlayFrameData, Rc<DxvkImage>& srcImage);
     void dispatchDemodulate(const Resources::RaytracingOutput& rtOutput);
     void dispatchNeeCache(const Resources::RaytracingOutput& rtOutput);
     void dispatchDLSS(const Resources::RaytracingOutput& rtOutput);

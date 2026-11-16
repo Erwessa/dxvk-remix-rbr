@@ -891,56 +891,12 @@ namespace dxvk {
           // The DLSS indicator reads the exposure texture even with DLSS auto exposure enabled.
           m_common->metaAutoExposure().createResources(this);
         }
-        dispatchEyeUpscaling(rtOutput);
-        m_previousUpscaler = m_currentUpscaler;
-
-        RtxDustParticles& dust = m_common->metaDustParticles();
-        dust.simulateAndDraw(this, m_state, rtOutput, m_activeEyeIndex == 0);
-        recordGpuStageTiming("DustParticles");
-
-        // Auto exposure is shared by the logical frame. The left eye owns its update;
-        // subsequent eyes reuse the same exposure texture instead of advancing it twice.
         const bool updateAutoExposure = m_activeEyeIndex == 0;
-
-        // DLSS-NR is not part of the VR rendering path. Keep its existing mono path intact.
-        const bool vrStereoFrame = VrInstance::s_instance.isSceneSessionActive();
-        const bool dlssNrEnabled = !vrStereoFrame && dispatchDlssNR(rtOutput, updateAutoExposure);
+        Rc<DxvkImage> srcImage;
+        const bool dlssNrEnabled = dispatchEyePostProcessing(
+          rtOutput, captureScreenImage, captureDebugImage, updateAutoExposure, true, srcImage);
         recordGpuStageTiming("DlssNR");
         m_perfCpu.dlssNr = dlssNrEnabled;
-
-        // Final output pass converts the linear post-tonemap LDR image to sRGB and applies
-        // dithering as the very last step. SRGB conversion is suppressed for screenshot
-        // captures (WAR for TREX-553: NVTT implicitly applies sRGB during dds->png conversion
-        // for 16bit float formats).
-        const bool performSRGBConversion = !captureScreenImage && g_allowSrgbConversionForOutput;
-        // Auto exposure remains a logical-frame operation; DLSS-NR is skipped in VR.
-        fork_hooks::dispatchPostProcessingStack(
-          this, rtOutput, performSRGBConversion, /* updateAutoExposure */ !dlssNrEnabled && updateAutoExposure);
-        recordGpuStageTiming("PostProcessing");
-
-        // Composite the Remix C API screen overlay after tone mapping and display encoding,
-        // before screenshot capture, so plugin UI is never fed through a post-tonemap pass.
-        dispatchScreenOverlay(rtOutput);
-        recordGpuStageTiming("ScreenOverlay");
-
-        if (captureScreenImage) {
-          if (m_common->metaDebugView().debugViewIdx() == DEBUG_VIEW_DISABLED) {
-            takeScreenshot("rtxImagePostTonemapping", rtOutput.m_finalOutput.resource(Resources::AccessType::Read).image);
-          }
-          
-          if (captureDebugImage) {
-            takeScreenshot("albedo", rtOutput.m_primaryAlbedo.image);
-            takeScreenshot("worldNormals", rtOutput.m_primaryWorldShadingNormal.image);
-            takeScreenshot("worldMotion", rtOutput.m_primaryVirtualMotionVector.image(Resources::AccessType::Read));
-            takeScreenshot("linearZ", rtOutput.m_primaryLinearViewZ.image);
-          }
-        }
-
-        // Set up output src
-        Rc<DxvkImage> srcImage = rtOutput.m_finalOutput.resource(Resources::AccessType::Read).image;
-
-        // Debug view
-        dispatchDebugView(srcImage, rtOutput, captureScreenImage);
 
         dispatchFrameInterpolation(srcImage);
 
@@ -2739,6 +2695,47 @@ namespace dxvk {
     m_common->metaNeuralRadianceCache().dispatchTraining(*this);
   }
 
+
+  bool RtxContext::dispatchEyePostProcessing(Resources::RaytracingOutput& rtOutput,
+                                             bool captureScreenImage, bool captureDebugImage,
+                                             bool updateAutoExposure, bool consumeOverlayFrameData,
+                                             Rc<DxvkImage>& srcImage) {
+    dispatchEyeUpscaling(rtOutput);
+    m_previousUpscaler = m_currentUpscaler;
+
+    RtxDustParticles& dust = m_common->metaDustParticles();
+    dust.simulateAndDraw(this, m_state, rtOutput, m_activeEyeIndex == 0);
+    recordGpuStageTiming("DustParticles");
+
+    // DLSS-NR is not part of the VR rendering path. Keep its existing mono path intact.
+    const bool vrStereoFrame = VrInstance::s_instance.isSceneSessionActive();
+    const bool dlssNrEnabled = !vrStereoFrame && dispatchDlssNR(rtOutput, updateAutoExposure);
+
+    const bool performSRGBConversion = !captureScreenImage && g_allowSrgbConversionForOutput;
+    fork_hooks::dispatchPostProcessingStack(
+      this, rtOutput, performSRGBConversion, /* updateAutoExposure */ !dlssNrEnabled && updateAutoExposure);
+    recordGpuStageTiming("PostProcessing");
+
+    dispatchScreenOverlay(rtOutput, consumeOverlayFrameData);
+    recordGpuStageTiming("ScreenOverlay");
+
+    if (captureScreenImage) {
+      if (m_common->metaDebugView().debugViewIdx() == DEBUG_VIEW_DISABLED) {
+        takeScreenshot("rtxImagePostTonemapping", rtOutput.m_finalOutput.resource(Resources::AccessType::Read).image);
+      }
+
+      if (captureDebugImage) {
+        takeScreenshot("albedo", rtOutput.m_primaryAlbedo.image);
+        takeScreenshot("worldNormals", rtOutput.m_primaryWorldShadingNormal.image);
+        takeScreenshot("worldMotion", rtOutput.m_primaryVirtualMotionVector.image(Resources::AccessType::Read));
+        takeScreenshot("linearZ", rtOutput.m_primaryLinearViewZ.image);
+      }
+    }
+
+    srcImage = rtOutput.m_finalOutput.resource(Resources::AccessType::Read).image;
+    dispatchDebugView(srcImage, rtOutput, captureScreenImage);
+    return dlssNrEnabled;
+  }
   void RtxContext::prepareEyeRaytraceArgs(
       Resources::RaytracingOutput& rtOutput,
       uint32_t eyeIndex,
