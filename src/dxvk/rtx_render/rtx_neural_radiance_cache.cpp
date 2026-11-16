@@ -599,8 +599,10 @@ namespace dxvk {
       return;
     }
 
-    m_useStereoAtlas = ctx->getCommonObjects()->getSceneManager().getCameraManager().areVrEyeCamerasValid(
-      ctx->getDevice()->getCurrentFrameId());
+    // Do not enable the two-eye atlas merely because VR cameras exist: the current RTX
+    // injection path still dispatches one eye. The stereo frame loop must opt in once both
+    // eyes are actually rendered before NRC may expose the second atlas region to the SDK.
+    m_useStereoAtlas = false;
 
     const bool reinitializeNrcContext =
       m_nrcCtx->isDebugBufferRequired() != NrcOptions::s_nrcDebugBufferIsRequired
