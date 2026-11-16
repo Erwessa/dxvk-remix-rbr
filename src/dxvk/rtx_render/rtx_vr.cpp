@@ -25,13 +25,24 @@ namespace dxvk {
       return isLHS ? flipHandedness(result) : result;
     }
 
-    // Returns whether the projection maps the left and right planes to -1 and 1 for a left-handed camera.
-    bool projectionMatchesBounds(const OpenVrProjectionBounds& bounds) {
+    // Checks all four frustum planes for either camera handedness.
+    bool projectionMatchesBounds(const OpenVrProjectionBounds& bounds, bool isLHS) {
       const float distance = 10.0f;
-      const Matrix4 projection = projectionFromRawBounds(bounds.left, bounds.right, bounds.top, bounds.bottom, 0.1f, 1000.0f, true);
-      const Vector4 left = projection * Vector4(bounds.left * distance, 0.0f, distance, 1.0f);
-      const Vector4 right = projection * Vector4(bounds.right * distance, 0.0f, distance, 1.0f);
-      return std::abs(left.x / left.w + 1.0f) < 1e-3f && std::abs(right.x / right.w - 1.0f) < 1e-3f;
+      const float forwardSign = isLHS ? 1.0f : -1.0f;
+      const float upperTangent = -bounds.top;
+      const float lowerTangent = -bounds.bottom;
+      const Matrix4 projection = projectionFromRawBounds(
+        bounds.left, bounds.right, bounds.top, bounds.bottom, 0.1f, 1000.0f, isLHS);
+
+      const Vector4 left = projection * Vector4(bounds.left * distance, 0.0f, forwardSign * distance, 1.0f);
+      const Vector4 right = projection * Vector4(bounds.right * distance, 0.0f, forwardSign * distance, 1.0f);
+      const Vector4 top = projection * Vector4(0.0f, upperTangent * distance, forwardSign * distance, 1.0f);
+      const Vector4 bottom = projection * Vector4(0.0f, lowerTangent * distance, forwardSign * distance, 1.0f);
+
+      return std::abs(left.x / left.w + 1.0f) < 1e-3f
+          && std::abs(right.x / right.w - 1.0f) < 1e-3f
+          && std::abs(top.y / top.w - 1.0f) < 1e-3f
+          && std::abs(bottom.y / bottom.w + 1.0f) < 1e-3f;
     }
 
   }
@@ -77,8 +88,12 @@ namespace dxvk {
         frame.projection[0].top, " ", frame.projection[0].bottom, ", right eye: ", frame.projection[1].left, " ",
         frame.projection[1].right, " ", frame.projection[1].top, " ", frame.projection[1].bottom));
 
-      if (!projectionMatchesBounds(frame.projection[0]) || !projectionMatchesBounds(frame.projection[1])) {
-        Logger::warn("OpenVR: the projection built from the raw bounds does not map the side planes to the clip range.");
+      for (uint32_t eye = 0; eye < RtxEye::Count; eye++) {
+        if (!projectionMatchesBounds(frame.projection[eye], true)
+            || !projectionMatchesBounds(frame.projection[eye], false)) {
+          Logger::warn("OpenVR: the projection built from the raw bounds does not map all frustum planes to the clip range.");
+          break;
+        }
       }
     }
   }
