@@ -925,14 +925,14 @@ namespace dxvk {
 
     for (uint32_t eyeIndex = 0; eyeIndex < RtxEye::Count; eyeIndex++) {
       const char* eyeLabel = eyeIndex == RtxEye::Left ? "left" : "right";
-      m_volumeAccumulatedRadianceY[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance SH(Y) ", eyeLabel, " 0"), froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeAccumulatedRadianceY[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance SH(Y) ", eyeLabel, " 1"), froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeAccumulatedRadianceCoCg[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Co, Cg) ", eyeLabel, " 0"), froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeAccumulatedRadianceCoCg[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Co, Cg) ", eyeLabel, " 1"), froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeAccumulatedRadianceAge[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Age) ", eyeLabel, " 0"), froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeAccumulatedRadianceAge[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Age) ", eyeLabel, " 1"), froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeReservoirs[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume reservoir ", eyeLabel, " 0"), restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
-      m_volumeReservoirs[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume reservoir ", eyeLabel, " 1"), restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceY[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance SH(Y) ", eyeLabel, " 0").c_str(), froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceY[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance SH(Y) ", eyeLabel, " 1").c_str(), froxelGridFullDimensions, VK_FORMAT_R16G16B16A16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceCoCg[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Co, Cg) ", eyeLabel, " 0").c_str(), froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceCoCg[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Co, Cg) ", eyeLabel, " 1").c_str(), froxelGridFullDimensions, VK_FORMAT_R16G16_SFLOAT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceAge[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Age) ", eyeLabel, " 0").c_str(), froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeAccumulatedRadianceAge[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume accumulated radiance (Age) ", eyeLabel, " 1").c_str(), froxelGridFullDimensions, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeReservoirs[eyeIndex][0] = Resources::createImageResource(ctx, str::format("volume reservoir ", eyeLabel, " 0").c_str(), restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
+      m_volumeReservoirs[eyeIndex][1] = Resources::createImageResource(ctx, str::format("volume reservoir ", eyeLabel, " 1").c_str(), restirFroxelGridFullDimensions, VK_FORMAT_R32G32B32A32_UINT, 1, VK_IMAGE_TYPE_3D, VK_IMAGE_VIEW_TYPE_3D);
     }
 
     m_rebuildFroxels = false;
