@@ -118,6 +118,10 @@ namespace dxvk {
       for (auto& eye : eyes)
         eye = std::make_unique<EyeState>(device);
     }
+
+    bool anyEyeRendering() const {
+      return eyes[0]->rendering || eyes[1]->rendering;
+    }
   };
 
   RtxNumos::RtxNumos(DxvkDevice* device)
@@ -361,10 +365,12 @@ namespace dxvk {
         }
       }
       if (m_impl->eyes[m_activeEyeIndex]->rendering) {
-        dropLights();
         m_impl->eyes[m_activeEyeIndex]->rendering = false;
-        LightBvh::setSkyProviderRendering(false);
+        // A failed eye must not remove the shared emitted lights while its sibling still renders.
+        if (!m_impl->anyEyeRendering())
+          dropLights();
       }
+      LightBvh::setSkyProviderRendering(m_impl->anyEyeRendering());
       m_impl->eyes[m_activeEyeIndex]->gpu->endFrame();
       return;
     }
@@ -486,7 +492,7 @@ namespace dxvk {
     constants.skyRadianceUnscale = PreExposure::get() / radianceScale;
     constants.skyArgsProbe = argsProbe() ? (out.args.cloudRenderFrameIdx | 0x80000000u) : 0u;
     m_impl->eyes[m_activeEyeIndex]->rendering = true;
-    LightBvh::setSkyProviderRendering(true);
+    LightBvh::setSkyProviderRendering(m_impl->anyEyeRendering());
   }
 
   void RtxNumos::dropLights() {
