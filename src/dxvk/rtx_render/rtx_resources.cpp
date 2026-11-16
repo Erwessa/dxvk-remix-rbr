@@ -705,21 +705,26 @@ namespace dxvk {
     }
   }
 
-  void Resources::createConstantsBuffer() {
+  void Resources::createConstantsBuffer(uint32_t eyeIndex) {
+    assert(eyeIndex < 2);
     DxvkBufferCreateInfo info;
     info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     info.stages = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
     info.access = VK_ACCESS_TRANSFER_WRITE_BIT;
     info.size = sizeof(RaytraceArgs);
-    m_constants = m_device->createBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "Common raytracing args constant buffer");
+    const char* bufferName = eyeIndex == 0
+      ? "Left-eye raytracing args constant buffer"
+      : "Right-eye raytracing args constant buffer";
+    m_constants[eyeIndex] = m_device->createBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, bufferName);
   }
 
-  Rc<DxvkBuffer> Resources::getConstantsBuffer() {
-    if (m_constants == nullptr) {
-      createConstantsBuffer();
+  Rc<DxvkBuffer> Resources::getConstantsBuffer(uint32_t eyeIndex) {
+    assert(eyeIndex < 2);
+    if (m_constants[eyeIndex] == nullptr) {
+      createConstantsBuffer(eyeIndex);
     }
-    assert(m_constants != nullptr);
-    return m_constants;
+    assert(m_constants[eyeIndex] != nullptr);
+    return m_constants[eyeIndex];
   }
 
   void Resources::createBlueNoiseTexture(dxvk::Rc<DxvkContext> ctx) {
