@@ -60,7 +60,12 @@ namespace dxvk {
 
     // Check if accumulation needs to be reset
     if (resetOnCameraTransformChange && m_numAccumulatedFrames > 0) {
-      const RtCamera& camera = ctx.getSceneManager().getCamera();
+      const uint32_t frameId = ctx.getDevice()->getCurrentFrameId();
+      const CameraManager& cameraManager = ctx.getSceneManager().getCameraManager();
+      // In stereo, accumulation follows the HMD view rather than the game's mono camera.
+      const RtCamera& camera = cameraManager.areVrEyeCamerasValid(frameId)
+        ? cameraManager.getVrEyeCamera(RtxEye::Left)
+        : ctx.getSceneManager().getCamera();
       const Matrix4d prevWorldToProjection = camera.getPreviousViewToProjection() * camera.getPreviousWorldToView();
       const Matrix4d worldToProjection = camera.getViewToProjection() * camera.getWorldToView();
       const bool hasCameraChanged = memcmp(&prevWorldToProjection, &worldToProjection, sizeof(Matrix4d)) != 0;
