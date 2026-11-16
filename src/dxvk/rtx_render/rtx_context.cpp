@@ -844,26 +844,10 @@ namespace dxvk {
         dispatchNeeCache(rtOutput);
         recordGpuStageTiming("NEECache");
 
-        // Volumetric Lighting
-        dispatchVolumetrics(rtOutput);
-        recordGpuStageTiming("Volumetrics");
-        preGateFlush(3);
-        
-        // Rain map (RBR-RTX, after xoxor4d): the wetness model reads it in the G-buffer pass
-        fork_hooks::dispatchRainMap(*this, rtOutput);
-
-        // Path Tracing
-        // Keep the eye-local G-buffer boundary visible at the frame-pipeline level.
-        // A stereo path can render both eyes' G-buffers before advancing either eye.
-        dispatchGBuffer(rtOutput);
-        preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
-        midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
-        dispatchPathTracingPreparationAfterGBuffer(rtOutput);
-        dispatchPathTracingIntegration(rtOutput);
+        // Eye-local path tracing starts after the logical-frame NEE cache update.
+        // Keep all passes that consume or write the active eye's resources together.
+        dispatchEyePathTracing(rtOutput);
         frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
-
-        // Per-eye post-depth work must consume this eye's freshly written G-buffer.
-        dispatchPostDepthForEye(rtOutput);
 
         // Mono currently trains immediately; stereo will move this logical-frame operation
         // after both eyes have generated their Integration query paths.
@@ -2781,6 +2765,23 @@ namespace dxvk {
 
     // Integration Raytracing produces the NRC query paths consumed by logical-frame training.
     dispatchIntegrate(rtOutput);
+  }
+
+  void RtxContext::dispatchEyePathTracing(Resources::RaytracingOutput& rtOutput) {
+    // Volumetrics own per-eye histories and must use the currently selected eye.
+    dispatchVolumetrics(rtOutput);
+    recordGpuStageTiming("Volumetrics");
+    preGateFlush(3);
+
+    // Rain map feeds this eye's G-buffer wetness inputs.
+    fork_hooks::dispatchRainMap(*this, rtOutput);
+
+    dispatchGBuffer(rtOutput);
+    preGateFlush(4); // Before midFrameFlush(1), so the pre-gate list is the frame's first RT submit.
+    midFrameFlush(1); // rtx.present.midFrameFlushes bit 1, after the G-buffer pass
+    dispatchPathTracingPreparationAfterGBuffer(rtOutput);
+    dispatchPathTracingIntegration(rtOutput);
+    dispatchPostDepthForEye(rtOutput);
   }
 
   void RtxContext::dispatchPostDepthForEye(const Resources::RaytracingOutput& rtOutput) {
