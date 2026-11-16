@@ -220,7 +220,7 @@ namespace dxvk {
 
     // Updates NRC constants in raytraceArgs. 
     // This must be called after onFrameBegin() in a frame
-    void setRaytraceArgs(RaytraceArgs& constants);
+    void setRaytraceArgs(RaytraceArgs& constants, uint32_t eyeIndex);
 
     DxvkBufferSlice getBufferSlice(RtxContext& ctx, ResourceType resourceType);
 
@@ -306,6 +306,9 @@ namespace dxvk {
     Resources::AliasedResource    m_queryPathData1[2];
     Resources::AliasedResource    m_trainingPathData1[2];
 
+    // SDK dimensions span a horizontal two-eye atlas; these remain eye-local for dispatch and resources.
+    nrc_uint2              m_eyeFrameDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
+    nrc_uint2              m_eyeTrainingDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
     nrc_uint2              m_activeTrainingDimensions = nrc_uint2 { UINT32_MAX, UINT32_MAX };
     std::atomic<bool>       m_isActiveForStats = false;
     std::atomic<uint32_t>   m_numberOfTrainingRecords = 0;   // Number of training records reported by NRC - reported with kMaxFramesInFlight frame delay
