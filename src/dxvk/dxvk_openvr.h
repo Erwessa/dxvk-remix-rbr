@@ -143,6 +143,12 @@ namespace dxvk {
     // around this call because WaitGetPoses may access the Vulkan queue.
     bool acquireFrame(OpenVrFrameState& frame);
 
+    // Submits a completed left/right Vulkan image pair. The caller must hold
+    // DxvkDevice's submission queue gate for the duration of this call.
+    bool submitFrame(
+      const std::array<vr::VRVulkanTextureData_t, 2>& textures,
+      vr::EColorSpace colorSpace);
+
     // Lower-level accessors retained for diagnostics and staged integration.
     bool waitGetPoses(std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses);
     bool getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height);
