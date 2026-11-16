@@ -23,6 +23,7 @@
 #include "rtx_resources.h"
 #include "dxvk_device.h"
 #include "dxvk_context.h"
+#include "../dxvk_openvr.h"
 #include "../util/util_blueNoise_128x128x64.h"
 #include <rtxdi/RtxdiParameters.h>
 #include "rtx/pass/raytrace_args.h"
@@ -514,7 +515,10 @@ namespace dxvk {
   }
 
   bool Resources::needsNrdDenoisingGuideResources() const {
-    return !device()->getCommon()->metaRayReconstruction().useRayReconstruction() &&
+    // Ray Reconstruction is intentionally not used in VR; keep the standard NRD guides available there.
+    const bool rayReconstructionEnabled = !VrInstance::s_instance.isSceneSessionActive()
+      && device()->getCommon()->metaRayReconstruction().useRayReconstruction();
+    return !rayReconstructionEnabled &&
            RtxOptions::useDenoiser() &&
            !RtxOptions::useDenoiserReferenceMode();
   }
