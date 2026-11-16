@@ -517,8 +517,11 @@ namespace dxvk {
       RtCamera& camera,
       bool isAntiCullingSupported,
       bool parallelScan,
-      uint32_t keptCutFrame) {
-    translator::LifetimeFrame lifetime = translator::LifetimeFrame::read(camera, isAntiCullingSupported, false);
+      uint32_t keptCutFrame,
+      RtCamera* leftEyeCamera,
+      RtCamera* rightEyeCamera) {
+    translator::LifetimeFrame lifetime = translator::LifetimeFrame::read(
+        camera, isAntiCullingSupported, false, leftEyeCamera, rightEyeCamera);
     lifetime.keptCutFrame = keptCutFrame;
     collectReplacementInstances(lifetime, parallelScan);
   }
