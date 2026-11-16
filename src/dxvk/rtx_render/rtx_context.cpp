@@ -379,6 +379,7 @@ namespace dxvk {
     setActiveEyeIndex(0);
     m_logicalFrameFeatures = {};
     m_frameFeaturesEyeMask = 0;
+    m_logicalPostPathTracingDispatched = false;
 
     auto logRenderPassRaytraceModeRayQuery = [=](const char* renderPassName, auto mode) {
       switch (mode) {
@@ -2730,11 +2731,10 @@ namespace dxvk {
     // This is a logical-frame barrier, not an eye pass. In stereo it must be called only
     // after every eye has completed Integration, because NRC's SDK buffers are shared.
     // Guard the shared readback and training dispatch against accidental per-eye callers.
-    const uint32_t frameId = m_device->getCurrentFrameId();
-    if (m_logicalPostPathTracingFrame == frameId) {
+    if (m_logicalPostPathTracingDispatched) {
       return;
     }
-    m_logicalPostPathTracingFrame = frameId;
+    m_logicalPostPathTracingDispatched = true;
 
     frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
     m_common->metaNeuralRadianceCache().dispatchTraining(*this);
