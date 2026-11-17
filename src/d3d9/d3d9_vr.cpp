@@ -152,6 +152,10 @@ public:
         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
         entry.originalStages, entry.originalAccess);
 
+    // Ensure the CS thread has emitted the restore transitions before
+    // another external queue user can synchronize and acquire the queue.
+    m_device->SynchronizeCsThread();
+
     m_vrImages.clear();
     m_vrSubmitActive.store(false, std::memory_order_release);
     m_submissionQueueThreadId.store(0, std::memory_order_release);
@@ -177,6 +181,9 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE WaitDeviceIdle(BOOL flush) {
+    if (m_submissionQueueThreadId.load(std::memory_order_acquire) == GetCurrentThreadId())
+      return D3DERR_INVALIDCALL;
+    D3D9DeviceLock lock = m_device->LockDevice();
     if (flush) {
       m_device->Flush();
       m_device->SynchronizeCsThread();
@@ -186,6 +193,9 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE WaitGraphicsQueueIdle(BOOL flush) {
+    if (m_submissionQueueThreadId.load(std::memory_order_acquire) == GetCurrentThreadId())
+      return D3DERR_INVALIDCALL;
+    D3D9DeviceLock lock = m_device->LockDevice();
     if (flush) {
       m_device->Flush();
       m_device->SynchronizeCsThread();
@@ -221,7 +231,9 @@ public:
     if (m_submissionQueueThreadId.load(std::memory_order_acquire) == threadId)
       return D3DERR_INVALIDCALL;
 
+    D3D9DeviceLock deviceLock = m_device->LockDevice();
     m_device->GetDXVKDevice()->lockSubmission();
+    m_submissionQueueDeviceLock = std::move(deviceLock);
     m_submissionQueueThreadId.store(threadId, std::memory_order_release);
     return D3D_OK;
   }
@@ -233,6 +245,7 @@ public:
 
     m_submissionQueueThreadId.store(0, std::memory_order_release);
     m_device->GetDXVKDevice()->unlockSubmission();
+    m_submissionQueueDeviceLock = D3D9DeviceLock();
     return D3D_OK;
   }
 
@@ -444,6 +457,7 @@ private:
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
   D3D9DeviceLock m_vrSubmitDeviceLock;
+  D3D9DeviceLock m_submissionQueueDeviceLock;
   std::atomic<uint32_t> m_submissionQueueThreadId = { 0 };
   std::atomic<bool> m_vrSubmitActive = { false };
   struct VrImageLayout {
