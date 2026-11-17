@@ -1527,6 +1527,7 @@ namespace dxvk {
       viewIndex = m_module.newVar(ptrType, spv::StorageClassInput);
       m_module.setDebugName(viewIndex, "ViewIndex");
       m_module.decorateBuiltIn(viewIndex, spv::BuiltInViewIndex);
+      m_entryPointInterfaces.push_back(viewIndex);
     }
 
     emitLightTypeDecl();
