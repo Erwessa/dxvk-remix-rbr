@@ -2,6 +2,8 @@
 
 #include "d3d9_device_base.h"
 #include "d3d9_surface.h"
+#include "d3d9_vertexshader.h"
+#include "d3d9_util.h"
 #include "d3d9vr.h"
 #include "util_common.h"
 #include "util_devicecommand.h"
@@ -120,16 +122,147 @@ public:
   HRESULT STDMETHODCALLTYPE ImportFence(HANDLE, uint64_t) override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE SignalFence(uint64_t) override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9*, char**) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9*, const uint32_t*, uint32_t) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE CreateMultiViewRenderTarget(UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD, BOOL, IDirect3DSurface9**, HANDLE*, UINT) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD, BOOL, IDirect3DSurface9**, HANDLE*, UINT) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9*, IDirect3DSurface9**, UINT) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE GetSPIRVShaderCode(IDirect3DVertexShader9*, uint32_t*, uint32_t*) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE GetShaderConstantCount(IDirect3DVertexShader9*, uint32_t*) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE SetShaderConstantCount(IDirect3DVertexShader9*, uint32_t) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE EnableMultiView(bool) override { return D3DERR_NOTAVAILABLE; }
+
+  HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9* shader, const uint32_t* data, uint32_t size) override {
+    if (!shader || !data || !size)
+      return D3DERR_INVALIDCALL;
+    auto* bridgeShader = bridge_cast<Direct3DVertexShader9_LSS*>(shader);
+    if (!bridgeShader)
+      return D3DERR_INVALIDCALL;
+    return invoke(D3D9VRCommand::PatchSPIRVToVertexShader, [&](ClientMessage& c) {
+      c.send_many(static_cast<uint32_t>(bridgeShader->getId()), size);
+      c.send_data(size * sizeof(uint32_t), data);
+    });
+  }
+
+  HRESULT STDMETHODCALLTYPE CreateMultiViewRenderTarget(UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample, DWORD quality, BOOL lockable, IDirect3DSurface9** out, HANDLE* sharedHandle, UINT views) override {
+    return createMultiViewSurface(width, height, format, multiSample, quality, lockable, out, sharedHandle, views, false);
+  }
+
+  HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample, DWORD quality, BOOL discard, IDirect3DSurface9** out, HANDLE* sharedHandle, UINT views) override {
+    return createMultiViewSurface(width, height, format, multiSample, quality, discard, out, sharedHandle, views, true);
+  }
+
+  HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9* source, IDirect3DSurface9** destinations, UINT count) override {
+    if (!source || !destinations || count == 0)
+      return D3DERR_INVALIDCALL;
+    auto* src = bridge_cast<Direct3DSurface9_LSS*>(source);
+    if (!src)
+      return D3DERR_INVALIDCALL;
+    std::vector<uint32_t> ids;
+    ids.reserve(count);
+    for (UINT i = 0; i < count; i++) {
+      auto* dst = bridge_cast<Direct3DSurface9_LSS*>(destinations[i]);
+      if (!dst)
+        return D3DERR_INVALIDCALL;
+      ids.push_back(static_cast<uint32_t>(dst->getId()));
+    }
+    return invoke(D3D9VRCommand::CopySurfaceLayers, [&](ClientMessage& c) {
+      c.send_many(static_cast<uint32_t>(src->getId()), count);
+      for (auto id : ids)
+        c.send_data(id);
+    });
+  }
+
+  HRESULT STDMETHODCALLTYPE GetSPIRVShaderCode(IDirect3DVertexShader9* shader, uint32_t* out, uint32_t* size) override {
+    if (!shader || !size)
+      return D3DERR_INVALIDCALL;
+    auto* bridgeShader = bridge_cast<Direct3DVertexShader9_LSS*>(shader);
+    if (!bridgeShader)
+      return D3DERR_INVALIDCALL;
+
+    DeviceBridge::ResponseTransaction transaction;
+    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+    const auto uid = command.get_uid();
+    command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode),
+                      static_cast<uint32_t>(bridgeShader->getId()), *size);
+    if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
+      return E_FAIL;
+    const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
+    const uint32_t required = DeviceBridge::get_data();
+    if (required > 16u * 1024u * 1024u) {
+      DeviceBridge::pop_front();
+      return E_OUTOFMEMORY;
+    }
+    *size = required;
+    if (SUCCEEDED(result) && out && required) {
+      void* data = nullptr;
+      const size_t bytes = DeviceBridge::get_data(&data);
+      if (bytes != size_t(required) * sizeof(uint32_t) || !data) {
+        DeviceBridge::pop_front();
+        return E_FAIL;
+      }
+      std::memcpy(out, data, bytes);
+    }
+    DeviceBridge::pop_front();
+    return result;
+  }
+
+  HRESULT STDMETHODCALLTYPE GetShaderConstantCount(IDirect3DVertexShader9* shader, uint32_t* out) override {
+    if (!shader || !out)
+      return D3DERR_INVALIDCALL;
+    auto* bridgeShader = bridge_cast<Direct3DVertexShader9_LSS*>(shader);
+    if (!bridgeShader)
+      return D3DERR_INVALIDCALL;
+    DeviceBridge::ResponseTransaction transaction;
+    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+    const auto uid = command.get_uid();
+    command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetShaderConstantCount),
+                      static_cast<uint32_t>(bridgeShader->getId()));
+    if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
+      return E_FAIL;
+    const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
+    if (SUCCEEDED(result))
+      *out = DeviceBridge::get_data();
+    DeviceBridge::pop_front();
+    return result;
+  }
+
+  HRESULT STDMETHODCALLTYPE SetShaderConstantCount(IDirect3DVertexShader9* shader, uint32_t count) override {
+    if (!shader)
+      return D3DERR_INVALIDCALL;
+    auto* bridgeShader = bridge_cast<Direct3DVertexShader9_LSS*>(shader);
+    if (!bridgeShader)
+      return D3DERR_INVALIDCALL;
+    return invoke(D3D9VRCommand::SetShaderConstantCount, [&](ClientMessage& c) {
+      c.send_many(static_cast<uint32_t>(bridgeShader->getId()), count);
+    });
+  }
+
+  HRESULT STDMETHODCALLTYPE EnableMultiView(bool enable) override {
+    return invoke(D3D9VRCommand::EnableMultiView, [&](ClientMessage& c) {
+      c.send_data(static_cast<uint32_t>(enable));
+    });
+  }
   HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9*, uint32_t) override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE CreateTextureFromNTHandle(UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL, IDirect3DTexture9**, HANDLE*) override { return D3DERR_NOTAVAILABLE; }
+
+  HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9* shader, char** out) override {
+    if (!shader || !out)
+      return D3DERR_INVALIDCALL;
+    auto* bridgeShader = bridge_cast<Direct3DVertexShader9_LSS*>(shader);
+    if (!bridgeShader)
+      return D3DERR_INVALIDCALL;
+    DeviceBridge::ResponseTransaction transaction;
+    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+    const auto uid = command.get_uid();
+    command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetShaderHash),
+                      static_cast<uint32_t>(bridgeShader->getId()));
+    if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
+      return E_FAIL;
+    const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
+    if (SUCCEEDED(result)) {
+      void* data = nullptr;
+      const size_t bytes = DeviceBridge::get_data(&data);
+      if (bytes != 64 || !data) {
+        DeviceBridge::pop_front();
+        return E_FAIL;
+      }
+      std::memcpy(reinterpret_cast<char*>(out), data, bytes);
+    }
+    DeviceBridge::pop_front();
+    return result;
+  }
 
   HRESULT STDMETHODCALLTYPE InitializeOpenVRScene() override {
     return invoke(D3D9VRCommand::InitializeOpenVRScene);
@@ -166,6 +299,42 @@ public:
   }
 
 private:
+  HRESULT createMultiViewSurface(UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample,
+      DWORD quality, BOOL flag, IDirect3DSurface9** out, HANDLE* sharedHandle, UINT views, bool depthStencil) {
+    if (!out || width == 0 || height == 0 || views != 2)
+      return D3DERR_INVALIDCALL;
+    *out = nullptr;
+    if (sharedHandle)
+      *sharedHandle = nullptr;
+
+    D3DSURFACE_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.Format = format;
+    desc.MultiSampleType = multiSample;
+    desc.MultiSampleQuality = quality;
+    desc.Usage = depthStencil ? D3DUSAGE_DEPTHSTENCIL : D3DUSAGE_RENDERTARGET;
+    desc.Pool = D3DPOOL_DEFAULT;
+    desc.Type = D3DRTYPE_SURFACE;
+
+    auto* surface = trackWrapper(new Direct3DSurface9_LSS(m_device, desc));
+    if (!surface)
+      return E_OUTOFMEMORY;
+    const HRESULT result = invoke(depthStencil
+        ? D3D9VRCommand::CreateMultiViewDepthStencilSurface
+        : D3D9VRCommand::CreateMultiViewRenderTarget,
+      [&](ClientMessage& c) {
+        c.send_many(width, height, static_cast<uint32_t>(format), static_cast<uint32_t>(multiSample),
+                    quality, static_cast<uint32_t>(flag), static_cast<uint32_t>(surface->getId()), views);
+      });
+    if (FAILED(result)) {
+      surface->Release();
+      return result;
+    }
+    *out = surface;
+    return D3D_OK;
+  }
+
   ~Direct3DVR9_LSS() {
     m_device->Release();
   }

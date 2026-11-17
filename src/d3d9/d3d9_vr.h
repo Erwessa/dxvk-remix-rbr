@@ -21,29 +21,6 @@ struct D3D9_TEXTURE_VR_DESC {
   uint32_t SampleCount;
 };
 
-struct D3D9_OPENVR_FRAME_STATE {
-  uint32_t Version;
-  uint32_t Flags;
-  uint64_t FrameIndex;
-  float DeviceToAbsoluteTracking[12];
-};
-
-struct D3D9_OPENVR_FRAME_TIMING {
-  float GpuPreSubmit;
-  float GpuPostSubmit;
-  float CompositorGpu;
-  float CompositorCpu;
-  float CompositorSubmitFrame;
-  float GpuTotal;
-  float FrameInterval;
-  float WaitForPresent;
-  float CpuPresentCall;
-  float CpuWaitForPresent;
-  uint32_t ReprojectionFlags;
-  uint32_t MispresentedFrames;
-  uint32_t DroppedFrames;
-};
-
 struct OXR_VK_DEVICE_DESC {
   VkDevice Device;
   VkPhysicalDevice PhysicalDevice;
