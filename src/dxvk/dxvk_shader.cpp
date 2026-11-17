@@ -157,8 +157,48 @@ namespace dxvk {
       }
     }
   }
-  
-  
+
+
+  void DxvkShader::replaceCode(SpirvCodeBuffer code) {
+    m_code = SpirvCompressedBuffer(code);
+    m_idOffsets.clear();
+    m_o1IdxOffset = 0;
+    m_o1LocOffset = 0;
+    m_flags = DxvkShaderFlags();
+
+    uint32_t o1VarId = 0;
+    for (auto ins : code) {
+      if (ins.opCode() == spv::OpDecorate) {
+        if (ins.arg(2) == spv::DecorationBinding
+         || ins.arg(2) == spv::DecorationSpecId)
+          m_idOffsets.push_back(ins.offset() + 3);
+
+        if (ins.arg(2) == spv::DecorationLocation && ins.arg(3) == 1) {
+          m_o1LocOffset = ins.offset() + 3;
+          o1VarId = ins.arg(1);
+        }
+
+        if (ins.arg(2) == spv::DecorationIndex && ins.arg(1) == o1VarId)
+          m_o1IdxOffset = ins.offset() + 3;
+      }
+
+      if (ins.opCode() == spv::OpExecutionMode) {
+        if (ins.arg(2) == spv::ExecutionModeStencilRefReplacingEXT)
+          m_flags.set(DxvkShaderFlag::ExportsStencilRef);
+        if (ins.arg(2) == spv::ExecutionModeXfb)
+          m_flags.set(DxvkShaderFlag::HasTransformFeedback);
+      }
+
+      if (ins.opCode() == spv::OpCapability) {
+        if (ins.arg(1) == spv::CapabilitySampleRateShading)
+          m_flags.set(DxvkShaderFlag::HasSampleRateShading);
+        if (ins.arg(1) == spv::CapabilityShaderViewportIndexLayerEXT)
+          m_flags.set(DxvkShaderFlag::ExportsViewportIndexLayerFromVertexStage);
+      }
+    }
+  }
+
+
   DxvkShader::~DxvkShader() {
     
   }

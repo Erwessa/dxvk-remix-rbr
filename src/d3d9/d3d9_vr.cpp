@@ -167,7 +167,20 @@ public:
     buffer[key.size()] = '\0';
     return D3D_OK;
   }
-  HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9*, const uint32_t*, uint32_t) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(
+      IDirect3DVertexShader9* d3dShader, const uint32_t* data, uint32_t size) {
+    if (d3dShader == nullptr || data == nullptr || size < 5
+     || data[0] != spv::MagicNumber)
+      return D3DERR_INVALIDCALL;
+
+    auto* shader = static_cast<D3D9Shader<IDirect3DVertexShader9>*>(d3dShader);
+    auto dxvkShader = shader->GetCommonShader()->GetShader(D3D9ShaderPermutations::None);
+    if (dxvkShader == nullptr || dxvkShader->stage() != VK_SHADER_STAGE_VERTEX_BIT)
+      return D3DERR_INVALIDCALL;
+
+    dxvkShader->replaceCode(SpirvCodeBuffer(size, data));
+    return D3D_OK;
+  }
   HRESULT STDMETHODCALLTYPE CreateMultiViewRenderTarget(
       UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample,
       DWORD multisampleQuality, BOOL lockable, IDirect3DSurface9** surface,

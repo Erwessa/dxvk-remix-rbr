@@ -244,6 +244,12 @@ namespace dxvk {
     SpirvCodeBuffer getRawCode() const {
       return m_code.decompress();
     }
+
+    /**
+     * \brief Replaces the shader module code while preserving its resource layout.
+     * Rebuilds metadata used to remap descriptor and specialization IDs.
+     */
+    void replaceCode(SpirvCodeBuffer code);
     
     /**
      * \brief Sets the shader key
