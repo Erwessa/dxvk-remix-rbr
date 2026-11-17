@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "d3d9_device_base.h"
+#include "d3d9_lss.h"
 #include "d3d9_surface.h"
 #include "d3d9_vertexshader.h"
 #include "d3d9_util.h"
@@ -117,11 +118,31 @@ public:
   }
   HRESULT STDMETHODCALLTYPE WaitGraphicsQueueIdle(BOOL) override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE GetOXRVkDeviceDesc(OXR_VK_DEVICE_DESC*) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE Flush() override { return D3DERR_NOTAVAILABLE; }
+  HRESULT STDMETHODCALLTYPE Flush() override {
+    return invoke(D3D9VRCommand::Flush);
+  }
   HRESULT STDMETHODCALLTYPE LockSubmissionQueue() override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE UnlockSubmissionQueue() override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE ImportFence(HANDLE, uint64_t) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE SignalFence(uint64_t) override { return D3DERR_NOTAVAILABLE; }
+  HRESULT STDMETHODCALLTYPE ImportFence(HANDLE sharedHandle, uint64_t value) override {
+    if (!sharedHandle || sharedHandle == INVALID_HANDLE_VALUE || !gpServer || !gpServer->isLaunched())
+      return D3DERR_INVALIDCALL;
+
+    HANDLE serverHandle = nullptr;
+    if (!DuplicateHandle(GetCurrentProcess(), sharedHandle,
+        gpServer->GetServerProcessHandle(), &serverHandle,
+        0, FALSE, DUPLICATE_SAME_ACCESS))
+      return HRESULT_FROM_WIN32(GetLastError());
+
+    const uint64_t handleValue = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(serverHandle));
+    return invoke(D3D9VRCommand::ImportFence, [&](ClientMessage& c) {
+      c.send_many(handleValue, value);
+    });
+  }
+  HRESULT STDMETHODCALLTYPE SignalFence(uint64_t value) override {
+    return invoke(D3D9VRCommand::SignalFence, [&](ClientMessage& c) {
+      c.send_data(value);
+    });
+  }
 
   HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9* shader, const uint32_t* data, uint32_t size) override {
     if (!shader || !data || !size)
