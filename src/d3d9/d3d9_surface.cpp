@@ -185,6 +185,18 @@ namespace dxvk {
   }
 
 
+  HRESULT D3D9Surface::SetMultiviewSurfaceLayer(UINT layer) {
+    if (layer >= m_texture->Desc()->ArraySize || layer > 0xff)
+      return D3DERR_INVALIDCALL;
+
+    m_face = layer;
+    m_sampleView = D3D9ColorView();
+    m_renderTargetView = D3D9ColorView();
+    m_depthStencilView = nullptr;
+    return D3D_OK;
+  }
+
+
   void D3D9Surface::ClearContainer() {
     m_container = nullptr;
   }
