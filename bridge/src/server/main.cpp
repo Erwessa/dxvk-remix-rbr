@@ -56,6 +56,7 @@
 #include <algorithm>
 #include <iostream>
 #include <d3d9.h>
+#include <d3d9vr.h>
 #include <assert.h>
 #include <map>
 #include <atomic>
@@ -171,6 +172,7 @@ std::unordered_map<uint32_t, IDirect3DVertexShader9*> gpD3DVertexShaders;
 std::unordered_map<uint32_t, IDirect3DPixelShader9*> gpD3DPixelShaders;
 std::unordered_map<uint32_t, IDirect3DSwapChain9*> gpD3DSwapChains;
 std::unordered_map<uint32_t, IDirect3DQuery9*> gpD3DQuery;
+std::unordered_map<uint32_t, IDirect3DVR9*> gpD3DVRInterfaces;
 std::unordered_map<uint32_t, void*> gMapRemixApi;
 
 // Global state
@@ -3144,6 +3146,249 @@ void ProcessDeviceCommandQueue() {
       /*
        * Other commands
        */
+      case D3D9VR_Create:
+      {
+        GET_HND(vrHandle);
+        PULL_U(deviceHandle);
+        HRESULT hresult = E_FAIL;
+        IDirect3DVR9* vrInterface = nullptr;
+        const auto deviceIt = gpD3DDevices.find(deviceHandle);
+        using Direct3DCreateVRFn = HRESULT (WINAPI*)(IDirect3DDevice9*, IDirect3DVR9**);
+        const auto createVR = ghModule
+          ? reinterpret_cast<Direct3DCreateVRFn>(GetProcAddress(ghModule, "Direct3DCreateVR"))
+          : nullptr;
+        if (deviceIt != gpD3DDevices.end() && deviceIt->second && createVR) {
+          hresult = createVR(deviceIt->second, &vrInterface);
+        }
+        if (SUCCEEDED(hresult) && vrInterface) {
+          const auto existing = gpD3DVRInterfaces.find(vrHandle);
+          if (existing != gpD3DVRInterfaces.end()) {
+            existing->second->Release();
+            gpD3DVRInterfaces.erase(existing);
+          }
+          gpD3DVRInterfaces[vrHandle] = vrInterface;
+        } else if (SUCCEEDED(hresult)) {
+          hresult = E_FAIL;
+        }
+        ServerMessage response(Commands::Bridge_Response, currentUID);
+        response.send_data(static_cast<uint32_t>(hresult));
+        break;
+      }
+      case D3D9VR_Destroy:
+      {
+        GET_HND(vrHandle);
+        const auto it = gpD3DVRInterfaces.find(vrHandle);
+        if (it != gpD3DVRInterfaces.end()) {
+          it->second->Release();
+          gpD3DVRInterfaces.erase(it);
+        }
+        break;
+      }
+      case D3D9VR_Invoke:
+      {
+        GET_HND(vrHandle);
+        PULL_U(methodValue);
+        const auto vrIt = gpD3DVRInterfaces.find(vrHandle);
+        IDirect3DVR9* vrInterface = vrIt == gpD3DVRInterfaces.end() ? nullptr : vrIt->second;
+        HRESULT hresult = D3DERR_INVALIDCALL;
+        ServerMessage response(Commands::Bridge_Response, currentUID);
+
+        if (vrInterface) {
+          switch (static_cast<D3D9VRCommand>(methodValue)) {
+          case D3D9VRCommand::InitializeOpenVRScene:
+            hresult = vrInterface->InitializeOpenVRScene();
+            break;
+
+          case D3D9VRCommand::AcquireOpenVRFrame:
+          {
+            D3D9_OPENVR_FRAME_STATE frame = {};
+            hresult = vrInterface->AcquireOpenVRFrame(&frame);
+            response.send_data(static_cast<uint32_t>(hresult));
+            if (SUCCEEDED(hresult))
+              response.send_data(sizeof(frame), &frame);
+            break;
+          }
+
+          case D3D9VRCommand::SubmitOpenVRFrame:
+          {
+            PULL_U(leftId);
+            PULL_U(rightId);
+            const auto leftIt = gpD3DResources.find(leftId);
+            const auto rightIt = gpD3DResources.find(rightId);
+            if (leftIt != gpD3DResources.end() && rightIt != gpD3DResources.end()) {
+              hresult = vrInterface->SubmitOpenVRFrame(
+                static_cast<IDirect3DSurface9*>(leftIt->second),
+                static_cast<IDirect3DSurface9*>(rightIt->second));
+            }
+            break;
+          }
+
+          case D3D9VRCommand::ResetOpenVRView:
+            hresult = vrInterface->ResetOpenVRView();
+            break;
+
+          case D3D9VRCommand::GetOpenVRFrameTiming:
+          {
+            D3D9_OPENVR_FRAME_TIMING timing = {};
+            hresult = vrInterface->GetOpenVRFrameTiming(&timing);
+            response.send_data(static_cast<uint32_t>(hresult));
+            if (SUCCEEDED(hresult))
+              response.send_data(sizeof(timing), &timing);
+            break;
+          }
+
+          case D3D9VRCommand::WaitDeviceIdle:
+          {
+            PULL(BOOL, flush);
+            hresult = vrInterface->WaitDeviceIdle(flush);
+            break;
+          }
+
+          case D3D9VRCommand::CopySurfaceLayers:
+          {
+            PULL_U(sourceId);
+            PULL_U(layerCount);
+            std::vector<IDirect3DSurface9*> destinations(layerCount, nullptr);
+            for (UINT i = 0; i < layerCount; i++) {
+              PULL_U(destinationId);
+              const auto destinationIt = gpD3DResources.find(destinationId);
+              if (destinationIt != gpD3DResources.end())
+                destinations[i] = static_cast<IDirect3DSurface9*>(destinationIt->second);
+            }
+            const auto sourceIt = gpD3DResources.find(sourceId);
+            if (sourceIt != gpD3DResources.end()
+             && std::all_of(destinations.begin(), destinations.end(), [](auto* surface) { return surface != nullptr; })) {
+              hresult = vrInterface->CopySurfaceLayers(
+                static_cast<IDirect3DSurface9*>(sourceIt->second), destinations.data(), layerCount);
+            }
+            break;
+          }
+
+          case D3D9VRCommand::GetSPIRVShaderCode:
+          {
+            PULL_U(shaderId);
+            PULL_U(capacity);
+            const auto shaderIt = gpD3DVertexShaders.find(shaderId);
+            uint32_t required = capacity;
+            std::vector<uint32_t> code(capacity);
+            if (shaderIt != gpD3DVertexShaders.end()) {
+              hresult = vrInterface->GetSPIRVShaderCode(
+                shaderIt->second, capacity ? code.data() : nullptr, &required);
+            }
+            response.send_data(static_cast<uint32_t>(hresult));
+            response.send_data(required);
+            if (SUCCEEDED(hresult) && capacity && required)
+              response.send_data(required * sizeof(uint32_t), code.data());
+            break;
+          }
+
+          case D3D9VRCommand::PatchSPIRVToVertexShader:
+          {
+            PULL_U(shaderId);
+            PULL_U(wordCount);
+            uint32_t* code = nullptr;
+            PULL_DATA(wordCount * sizeof(uint32_t), code);
+            const auto shaderIt = gpD3DVertexShaders.find(shaderId);
+            if (shaderIt != gpD3DVertexShaders.end() && code && wordCount)
+              hresult = vrInterface->PatchSPIRVToVertexShader(shaderIt->second, code, wordCount);
+            break;
+          }
+
+          case D3D9VRCommand::GetShaderConstantCount:
+          {
+            PULL_U(shaderId);
+            const auto shaderIt = gpD3DVertexShaders.find(shaderId);
+            uint32_t count = 0;
+            if (shaderIt != gpD3DVertexShaders.end())
+              hresult = vrInterface->GetShaderConstantCount(shaderIt->second, &count);
+            response.send_data(static_cast<uint32_t>(hresult));
+            if (SUCCEEDED(hresult))
+              response.send_data(count);
+            break;
+          }
+
+          case D3D9VRCommand::SetShaderConstantCount:
+          {
+            PULL_U(shaderId);
+            PULL_U(count);
+            const auto shaderIt = gpD3DVertexShaders.find(shaderId);
+            if (shaderIt != gpD3DVertexShaders.end())
+              hresult = vrInterface->SetShaderConstantCount(shaderIt->second, count);
+            break;
+          }
+
+          case D3D9VRCommand::GetShaderHash:
+          {
+            PULL_U(shaderId);
+            const auto shaderIt = gpD3DVertexShaders.find(shaderId);
+            char hash[64] = {};
+            if (shaderIt != gpD3DVertexShaders.end())
+              hresult = vrInterface->GetShaderHash(shaderIt->second, reinterpret_cast<char**>(hash));
+            response.send_data(static_cast<uint32_t>(hresult));
+            if (SUCCEEDED(hresult))
+              response.send_data(sizeof(hash), hash);
+            break;
+          }
+
+          case D3D9VRCommand::EnableMultiView:
+          {
+            PULL_U(enable);
+            hresult = vrInterface->EnableMultiView(enable != 0);
+            break;
+          }
+
+          case D3D9VRCommand::CreateMultiViewRenderTarget:
+          {
+            PULL_U(width);
+            PULL_U(height);
+            PULL(D3DFORMAT, format);
+            PULL(D3DMULTISAMPLE_TYPE, multiSample);
+            PULL_U(quality);
+            PULL(BOOL, lockable);
+            PULL_U(surfaceId);
+            PULL_U(views);
+            IDirect3DSurface9* surface = nullptr;
+            hresult = vrInterface->CreateMultiViewRenderTarget(
+              width, height, format, multiSample, quality, lockable, &surface, nullptr, views);
+            if (SUCCEEDED(hresult) && surface)
+              gpD3DResources[surfaceId] = surface;
+            break;
+          }
+
+          case D3D9VRCommand::CreateMultiViewDepthStencilSurface:
+          {
+            PULL_U(width);
+            PULL_U(height);
+            PULL(D3DFORMAT, format);
+            PULL(D3DMULTISAMPLE_TYPE, multiSample);
+            PULL_U(quality);
+            PULL(BOOL, discard);
+            PULL_U(surfaceId);
+            PULL_U(views);
+            IDirect3DSurface9* surface = nullptr;
+            hresult = vrInterface->CreateMultiViewDepthStencilSurface(
+              width, height, format, multiSample, quality, discard, &surface, nullptr, views);
+            if (SUCCEEDED(hresult) && surface)
+              gpD3DResources[surfaceId] = surface;
+            break;
+          }
+
+          default:
+            hresult = E_NOTIMPL;
+            break;
+          }
+        }
+
+        // Output-bearing operations send their own response payload above.
+        if (methodValue != static_cast<uint32_t>(D3D9VRCommand::AcquireOpenVRFrame)
+         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetOpenVRFrameTiming)
+         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode)
+         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetShaderConstantCount)
+         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetShaderHash)) {
+          response.send_data(static_cast<uint32_t>(hresult));
+        }
+        break;
+      }
       case Bridge_DebugMessage:
       {
         PULL_U(i);
