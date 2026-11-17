@@ -109,7 +109,8 @@ public:
       m_device->SynchronizeCsThread();
     }
     auto device = m_device->GetDXVKDevice();
-    return hresult(device->vkd()->vkQueueWaitIdle(device->queues().graphics.queueHandle));
+    const VkResult result = device->vkd()->vkQueueWaitIdle(device->queues().graphics.queueHandle);
+    return result == VK_SUCCESS ? D3D_OK : D3DERR_NOTAVAILABLE;
   }
 
   HRESULT STDMETHODCALLTYPE GetOXRVkDeviceDesc(OXR_VK_DEVICE_DESC* desc) {
