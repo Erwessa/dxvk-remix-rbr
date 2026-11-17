@@ -6,6 +6,7 @@
 #include "d3d9_device.h"
 #include "d3d9_shader.h"
 
+#include <atomic>
 #include <vector>
 
 namespace dxvk {
@@ -115,10 +116,14 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE BeginVRSubmit() {
+    const uint32_t threadId = GetCurrentThreadId();
+    if (m_submissionQueueThreadId.load(std::memory_order_acquire) == threadId)
+      return D3DERR_INVALIDCALL;
+
     // Acquire into a local first: checking m_vrSubmitActive before taking
     // the device lock lets concurrent callers both pass the check.
     D3D9DeviceLock submitLock = m_device->LockDevice();
-    if (m_vrSubmitActive)
+    if (m_vrSubmitActive.load(std::memory_order_acquire))
       return D3DERR_INVALIDCALL;
 
     // Keep D3D9 commands out of the interval in which the external
@@ -126,14 +131,15 @@ public:
     m_device->SynchronizeCsThread();
     m_device->GetDXVKDevice()->lockSubmission();
     m_vrSubmitDeviceLock = std::move(submitLock);
-    m_vrSubmitThreadId = GetCurrentThreadId();
-    m_vrSubmitActive = true;
+    m_submissionQueueThreadId.store(threadId, std::memory_order_release);
+    m_vrSubmitActive.store(true, std::memory_order_release);
     AddRefPrivate();
     return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE EndVRSubmit() {
-    if (!m_vrSubmitActive || m_vrSubmitThreadId != GetCurrentThreadId())
+    if (!m_vrSubmitActive.load(std::memory_order_acquire)
+     || m_submissionQueueThreadId.load(std::memory_order_acquire) != GetCurrentThreadId())
       return D3DERR_INVALIDCALL;
 
     m_device->GetDXVKDevice()->unlockSubmission();
@@ -147,8 +153,8 @@ public:
         entry.originalStages, entry.originalAccess);
 
     m_vrImages.clear();
-    m_vrSubmitActive = false;
-    m_vrSubmitThreadId = 0;
+    m_vrSubmitActive.store(false, std::memory_order_release);
+    m_submissionQueueThreadId.store(0, std::memory_order_release);
     m_vrSubmitDeviceLock = D3D9DeviceLock();
     ReleasePrivate();
     return D3D_OK;
@@ -211,11 +217,21 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE LockSubmissionQueue() {
+    const uint32_t threadId = GetCurrentThreadId();
+    if (m_submissionQueueThreadId.load(std::memory_order_acquire) == threadId)
+      return D3DERR_INVALIDCALL;
+
     m_device->GetDXVKDevice()->lockSubmission();
+    m_submissionQueueThreadId.store(threadId, std::memory_order_release);
     return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE UnlockSubmissionQueue() {
+    if (m_vrSubmitActive.load(std::memory_order_acquire)
+     || m_submissionQueueThreadId.load(std::memory_order_acquire) != GetCurrentThreadId())
+      return D3DERR_INVALIDCALL;
+
+    m_submissionQueueThreadId.store(0, std::memory_order_release);
     m_device->GetDXVKDevice()->unlockSubmission();
     return D3D_OK;
   }
@@ -428,8 +444,8 @@ private:
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
   D3D9DeviceLock m_vrSubmitDeviceLock;
-  uint32_t m_vrSubmitThreadId = 0;
-  bool m_vrSubmitActive = false;
+  std::atomic<uint32_t> m_submissionQueueThreadId = { 0 };
+  std::atomic<bool> m_vrSubmitActive = { false };
   struct VrImageLayout {
     Rc<DxvkImage> image;
     VkImageLayout originalLayout;
