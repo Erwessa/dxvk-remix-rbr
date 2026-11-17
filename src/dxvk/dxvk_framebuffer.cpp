@@ -59,9 +59,17 @@ namespace dxvk {
 
 
   bool DxvkFramebufferInfo::isFullSize(const Rc<DxvkImageView>& view) const {
+    uint32_t requiredLayers = 0;
+    for (uint32_t mask = m_renderTargets.viewMask; mask; mask >>= 1)
+      requiredLayers++;
+
+    const bool layersMatch = m_renderTargets.viewMask != 0
+      ? view->info().numLayers >= requiredLayers
+      : m_renderSize.layers == view->info().numLayers;
+
     return m_renderSize.width  == view->mipLevelExtent(0).width
         && m_renderSize.height == view->mipLevelExtent(0).height
-        && m_renderSize.layers == view->info().numLayers;
+        && layersMatch;
   }
 
 
