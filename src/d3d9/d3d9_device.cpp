@@ -1289,7 +1289,12 @@ namespace dxvk {
                   && extent == mipExtent;
     }
 
-    Rc<DxvkImageView> rtView = dst->GetRenderTargetView(false);
+    const bool useMultiview = m_multiViewFF
+      && GetDXVKDevice()->features().vulkan11Features.multiview
+      && dst->GetCommonTexture()->Desc()->ArraySize >= 2;
+    Rc<DxvkImageView> rtView = useMultiview
+      ? dst->GetMultiviewRenderTargetView(false)
+      : dst->GetRenderTargetView(false);
 
     VkClearValue clearValue;
     DecodeD3DCOLOR(Color, clearValue.color.float32);
@@ -1688,14 +1693,26 @@ namespace dxvk {
       VkOffset3D         offset,
       VkExtent3D         extent) {
       // Clear depth if we need to.
-      if (depthAspectMask != 0)
-        ClearImageView(alignment, offset, extent, m_state.depthStencil->GetDepthStencilView(), depthAspectMask, clearValueDepth);
+      if (depthAspectMask != 0) {
+        const bool useMultiview = m_multiViewFF
+          && GetDXVKDevice()->features().vulkan11Features.multiview
+          && m_state.depthStencil->GetCommonTexture()->Desc()->ArraySize >= 2;
+        const auto& dsv = useMultiview
+          ? m_state.depthStencil->GetMultiviewDepthStencilView()
+          : m_state.depthStencil->GetDepthStencilView();
+        ClearImageView(alignment, offset, extent, dsv, depthAspectMask, clearValueDepth);
+      }
 
       // Clear render targets if we need to.
       if (Flags & D3DCLEAR_TARGET) {
         for (uint32_t rt : bit::BitMask(m_boundRTs)) {
           const auto& rts = m_state.renderTargets[rt];
-          const auto& rtv = rts->GetRenderTargetView(srgb);
+          const bool useMultiview = m_multiViewFF
+            && GetDXVKDevice()->features().vulkan11Features.multiview
+            && rts->GetCommonTexture()->Desc()->ArraySize >= 2;
+          const auto& rtv = useMultiview
+            ? rts->GetMultiviewRenderTargetView(srgb)
+            : rts->GetRenderTargetView(srgb);
 
           if (likely(rtv != nullptr)) {
             ClearImageView(alignment, offset, extent, rtv, VK_IMAGE_ASPECT_COLOR_BIT, clearValueColor);
