@@ -3263,7 +3263,9 @@ void ProcessDeviceCommandQueue() {
             PULL(uint64_t, fenceValue);
             const HANDLE sharedHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(handleValue));
             hresult = vrInterface->ImportFence(sharedHandle, fenceValue);
-            if (FAILED(hresult))
+            // Vulkan imports the payload but does not take ownership of the
+            // Win32 NT handle; close the Bridge-side duplicate after import.
+            if (sharedHandle && sharedHandle != INVALID_HANDLE_VALUE)
               CloseHandle(sharedHandle);
             break;
           }
