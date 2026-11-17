@@ -29,6 +29,7 @@ namespace dxvk {
     VkResult signal(uint64_t value);
 
   private:
+    DxvkDevice* m_device;
     Rc<vk::DeviceFn> m_vkd;
     VkSemaphore m_semaphore = VK_NULL_HANDLE;
   };

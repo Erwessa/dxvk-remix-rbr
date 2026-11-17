@@ -4,7 +4,7 @@
 namespace dxvk {
 
   DxvkFence::DxvkFence(DxvkDevice* device, const DxvkFenceCreateInfo& info)
-  : m_vkd(device->vkd()) {
+  : m_device(device), m_vkd(device->vkd()) {
     VkSemaphoreTypeCreateInfo typeInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO };
     typeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     typeInfo.initialValue = info.initialValue;
@@ -69,10 +69,17 @@ namespace dxvk {
 
 
   VkResult DxvkFence::signal(uint64_t value) {
-    VkSemaphoreSignalInfo signalInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO };
-    signalInfo.semaphore = m_semaphore;
-    signalInfo.value = value;
-    return m_vkd->vkSignalSemaphore(m_vkd->device(), &signalInfo);
+    VkTimelineSemaphoreSubmitInfo timelineInfo = { VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO };
+    timelineInfo.signalSemaphoreValueCount = 1;
+    timelineInfo.pSignalSemaphoreValues = &value;
+
+    VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO, &timelineInfo };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &m_semaphore;
+
+    // The caller holds DxvkDevice::lockSubmission(), so this submission is
+    // serialized with DXVK and ordered after previously queued GPU work.
+    return m_vkd->vkQueueSubmit(m_device->queues().graphics.queueHandle, 1, &submitInfo, VK_NULL_HANDLE);
   }
 
 }
