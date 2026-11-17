@@ -8,6 +8,8 @@
 
 #include <openvr/openvr.hpp>
 
+#include <cstring>
+
 using VR_InitInternalProc        = uint32_t (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
 using VR_ShutdownInternalProc    = void  (VR_CALLTYPE *)();
 using VR_GetGenericInterfaceProc = void* (VR_CALLTYPE *)(const char*, vr::EVRInitError*);
@@ -21,6 +23,63 @@ namespace dxvk {
   };
   
   VrFunctions g_vrFunctions;
+
+  namespace {
+
+    bool readRegistryString(HKEY key, const char* name, std::string& value) {
+      DWORD type = 0;
+      DWORD size = 0;
+      LSTATUS status = RegQueryValueExA(key, name, nullptr, &type, nullptr, &size);
+
+      if (status != ERROR_SUCCESS || type != REG_SZ || size == 0) {
+        Logger::err(str::format("OpenVR: invalid registry string ", name,
+          " (status ", status, ", type ", type, ", size ", size, ")"));
+        return false;
+      }
+
+      std::vector<char> buffer(size);
+      DWORD actualType = 0;
+      DWORD actualSize = size;
+      status = RegQueryValueExA(key, name, nullptr, &actualType,
+        reinterpret_cast<BYTE*>(buffer.data()), &actualSize);
+
+      if (status != ERROR_SUCCESS || actualType != REG_SZ
+          || actualSize == 0 || actualSize > buffer.size()
+          || buffer[actualSize - 1] != '\\0'
+          || std::memchr(buffer.data(), '\\0', actualSize - 1) != nullptr) {
+        Logger::err(str::format("OpenVR: malformed registry string ", name,
+          " (status ", status, ", type ", actualType, ", size ", actualSize, ")"));
+        return false;
+      }
+
+      value.assign(buffer.data(), actualSize - 1);
+      return true;
+    }
+
+    template<typename Query>
+    bool queryOpenVrExtensionString(Query query, std::string& value) {
+      const uint32_t bufferSize = query(nullptr, 0);
+      if (!bufferSize) {
+        Logger::err("OpenVR: extension query returned zero buffer size");
+        return false;
+      }
+
+      std::vector<char> buffer(bufferSize, '\\0');
+      const uint32_t actualSize = query(buffer.data(), bufferSize);
+      if (!actualSize || actualSize > bufferSize
+          || buffer[actualSize - 1] != '\\0'
+          || std::memchr(buffer.data(), '\\0', actualSize - 1) != nullptr) {
+        Logger::err(str::format("OpenVR: invalid extension query result (allocated ",
+          bufferSize, ", returned ", actualSize, ")"));
+        return false;
+      }
+
+      value.assign(buffer.data(), actualSize - 1);
+      return true;
+    }
+
+  }
+
   VrInstance VrInstance::s_instance;
 
   VrInstance:: VrInstance() {
@@ -91,11 +150,12 @@ namespace dxvk {
   }
 
   bool VrInstance::waitVrKeyReady() const {
-    DWORD type, value, wait_status, size;
+    DWORD type = 0;
+    DWORD value = 0;
+    DWORD wait_status = WAIT_FAILED;
+    DWORD size = sizeof(value);
     LSTATUS status;
     HANDLE event;
-
-    size = sizeof(value);
     if ((status = RegQueryValueExA(m_vr_key, "state", nullptr, &type, reinterpret_cast<BYTE*>(&value), &size)))
     {
         Logger::err(str::format("OpenVR: could not query value, status ", status));
@@ -111,6 +171,11 @@ namespace dxvk {
         return value == 1;
 
     event = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+    if (!event) {
+      Logger::err(str::format("OpenVR: could not create registry notification event, error ", GetLastError()));
+      return false;
+    }
+
     while (1)
     {
         if (RegNotifyChangeKeyValue(m_vr_key, FALSE, REG_NOTIFY_CHANGE_LAST_SET, event, TRUE))
@@ -122,6 +187,10 @@ namespace dxvk {
         if ((status = RegQueryValueExA(m_vr_key, "state", nullptr, &type, reinterpret_cast<BYTE*>(&value), &size)))
         {
             Logger::err(str::format("OpenVR: could not query value, status ", status));
+            goto done;
+        }
+        if (type != REG_DWORD || size != sizeof(value)) {
+            Logger::err(str::format("OpenVR: invalid state value type or size (type ", type, ", size ", size, ")"));
             goto done;
         }
         if (value)
@@ -142,74 +211,45 @@ namespace dxvk {
   }
 
   DxvkNameSet VrInstance::queryInstanceExtensions() const {
-    std::vector<char> extensionList;
-    DWORD len;
+    std::string extensionList;
 
-    if (m_vr_key)
-    {
-        LSTATUS status;
-        DWORD type;
-
-        if (!this->waitVrKeyReady())
-            return DxvkNameSet();
-
-        len = 0;
-        if ((status = RegQueryValueExA(m_vr_key, "openvr_vulkan_instance_extensions", nullptr, &type, nullptr, &len)))
-        {
-            Logger::err(str::format("OpenVR: could not query value, status ", status));
-            return DxvkNameSet();
-        }
-        extensionList.resize(len);
-        if ((status = RegQueryValueExA(m_vr_key, "openvr_vulkan_instance_extensions", nullptr, &type, reinterpret_cast<BYTE*>(extensionList.data()), &len)))
-        {
-            Logger::err(str::format("OpenVR: could not query value, status ", status));
-            return DxvkNameSet();
-        }
+    if (m_vr_key) {
+      if (!this->waitVrKeyReady()
+          || !readRegistryString(m_vr_key, "openvr_vulkan_instance_extensions", extensionList))
+        return DxvkNameSet();
+    } else {
+      if (!m_compositor || !queryOpenVrExtensionString(
+          [this](char* buffer, uint32_t size) {
+            return m_compositor->GetVulkanInstanceExtensionsRequired(buffer, size);
+          }, extensionList))
+        return DxvkNameSet();
     }
-    else
-    {
-        len = m_compositor->GetVulkanInstanceExtensionsRequired(nullptr, 0);
-        extensionList.resize(len);
-        len = m_compositor->GetVulkanInstanceExtensionsRequired(extensionList.data(), len);
-    }
-    return parseExtensionList(std::string(extensionList.data(), len));
+
+    return parseExtensionList(extensionList);
   }
   
   
   DxvkNameSet VrInstance::queryDeviceExtensions(Rc<DxvkAdapter> adapter) const {
-    std::vector<char> extensionList;
-    DWORD len;
+    std::string extensionList;
 
-    if (m_vr_key)
-    {
-        LSTATUS status;
-        char name[256];
-        DWORD type;
+    if (m_vr_key) {
+      char name[32];
+      const auto& properties = adapter->deviceProperties();
+      sprintf(name, "PCIID:%04x:%04x",
+        static_cast<uint16_t>(properties.vendorID),
+        static_cast<uint16_t>(properties.deviceID));
 
-        if (!this->waitVrKeyReady())
-            return DxvkNameSet();
-
-        sprintf(name, "PCIID:%04x:%04x", adapter->deviceProperties().vendorID, adapter->deviceProperties().deviceID);
-        len = 0;
-        if ((status = RegQueryValueExA(m_vr_key, name, nullptr, &type, nullptr, &len)))
-        {
-            Logger::err(str::format("OpenVR: could not query value, status ", status));
-            return DxvkNameSet();
-        }
-        extensionList.resize(len);
-        if ((status = RegQueryValueExA(m_vr_key, name, nullptr, &type, reinterpret_cast<BYTE*>(extensionList.data()), &len)))
-        {
-            Logger::err(str::format("OpenVR: could not query value, status ", status));
-            return DxvkNameSet();
-        }
+      if (!this->waitVrKeyReady() || !readRegistryString(m_vr_key, name, extensionList))
+        return DxvkNameSet();
+    } else {
+      if (!m_compositor || !queryOpenVrExtensionString(
+          [this, &adapter](char* buffer, uint32_t size) {
+            return m_compositor->GetVulkanDeviceExtensionsRequired(adapter->handle(), buffer, size);
+          }, extensionList))
+        return DxvkNameSet();
     }
-    else
-    {
-        len = m_compositor->GetVulkanDeviceExtensionsRequired(adapter->handle(), nullptr, 0);
-        extensionList.resize(len);
-        len = m_compositor->GetVulkanDeviceExtensionsRequired(adapter->handle(), extensionList.data(), len);
-    }
-    return parseExtensionList(std::string(extensionList.data(), len));
+
+    return parseExtensionList(extensionList);
   }
   
   
