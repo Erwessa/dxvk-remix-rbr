@@ -25,8 +25,10 @@ namespace dxvk {
       if (!(properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT))
         throw DxvkError("External Win32 semaphore import is not supported");
 
-      exportInfo.handleTypes = info.sharedType;
-      typeInfo.pNext = &exportInfo;
+      if (properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) {
+        exportInfo.handleTypes = info.sharedType;
+        typeInfo.pNext = &exportInfo;
+      }
     }
 #endif
 
