@@ -1260,7 +1260,7 @@ namespace dxvk {
   }
 
   void RtxTextureManager::copySamplerFeedbackToHost(DxvkContext* ctx) {
-    auto& res = ctx->getCommonObjects()->getResources().getRaytracingOutput();
+    auto& resources = ctx->getCommonObjects()->getResources();
 
     const auto frameid = m_device->getCurrentFrameId();
 
