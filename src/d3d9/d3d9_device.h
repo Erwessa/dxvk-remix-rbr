@@ -106,6 +106,7 @@ namespace dxvk {
     constexpr static uint32_t NullStreamIdx = caps::MaxStreams;
 
     friend class D3D9SwapChainEx;
+    friend class D3D9VR;
 // NV-DXVK start: external API
     friend class D3D9SwapchainExternal;
 // NV-DXVK end
