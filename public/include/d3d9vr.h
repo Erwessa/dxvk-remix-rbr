@@ -37,6 +37,8 @@ enum class D3D9VRCommand : uint32_t {
   EnableMultiView,
   CreateMultiViewRenderTarget,
   CreateMultiViewDepthStencilSurface,
+  ImportFence,
+  SignalFence,
 };
 
 static_assert(sizeof(D3D9_OPENVR_FRAME_STATE) == 328,
