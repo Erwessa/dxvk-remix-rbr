@@ -115,14 +115,17 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE BeginVRSubmit() {
+    // Acquire into a local first: checking m_vrSubmitActive before taking
+    // the device lock lets concurrent callers both pass the check.
+    D3D9DeviceLock submitLock = m_device->LockDevice();
     if (m_vrSubmitActive)
       return D3DERR_INVALIDCALL;
 
     // Keep D3D9 commands out of the interval in which the external
     // compositor owns the Vulkan queue and the VR images.
-    m_vrSubmitDeviceLock = m_device->LockDevice();
     m_device->SynchronizeCsThread();
     m_device->GetDXVKDevice()->lockSubmission();
+    m_vrSubmitDeviceLock = std::move(submitLock);
     m_vrSubmitActive = true;
     return D3D_OK;
   }
