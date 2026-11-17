@@ -126,12 +126,14 @@ public:
     m_device->SynchronizeCsThread();
     m_device->GetDXVKDevice()->lockSubmission();
     m_vrSubmitDeviceLock = std::move(submitLock);
+    m_vrSubmitThreadId = GetCurrentThreadId();
     m_vrSubmitActive = true;
+    AddRefPrivate();
     return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE EndVRSubmit() {
-    if (!m_vrSubmitActive)
+    if (!m_vrSubmitActive || m_vrSubmitThreadId != GetCurrentThreadId())
       return D3DERR_INVALIDCALL;
 
     m_device->GetDXVKDevice()->unlockSubmission();
@@ -146,7 +148,9 @@ public:
 
     m_vrImages.clear();
     m_vrSubmitActive = false;
+    m_vrSubmitThreadId = 0;
     m_vrSubmitDeviceLock = D3D9DeviceLock();
+    ReleasePrivate();
     return D3D_OK;
   }
 
@@ -424,6 +428,7 @@ private:
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
   D3D9DeviceLock m_vrSubmitDeviceLock;
+  uint32_t m_vrSubmitThreadId = 0;
   bool m_vrSubmitActive = false;
   struct VrImageLayout {
     Rc<DxvkImage> image;
