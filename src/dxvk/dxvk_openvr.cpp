@@ -129,7 +129,12 @@ namespace dxvk {
     if (!m_vr_key && !m_compositor)
       return;
     
-    m_insExtensions = this->queryInstanceExtensions();
+    if (!this->queryInstanceExtensions(m_insExtensions)) {
+      m_extensionQueryFailed = true;
+      this->shutdown();
+      return;
+    }
+
     m_initializedInsExt = true;
   }
 
@@ -137,12 +142,19 @@ namespace dxvk {
   void VrInstance::initDeviceExtensions(const DxvkInstance* instance) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
-    if (m_no_vr || (!m_vr_key && !m_compositor) || m_initializedDevExt)
+    if (m_no_vr || m_extensionQueryFailed || !m_initializedInsExt
+        || (!m_vr_key && !m_compositor) || m_initializedDevExt)
       return;
-    
+
     for (uint32_t i = 0; instance->enumAdapters(i) != nullptr; i++) {
-      m_devExtensions.push_back(this->queryDeviceExtensions(
-        instance->enumAdapters(i)));
+      DxvkNameSet extensions;
+      if (!this->queryDeviceExtensions(instance->enumAdapters(i), extensions)) {
+        m_extensionQueryFailed = true;
+        m_devExtensions.clear();
+        this->shutdown();
+        return;
+      }
+      m_devExtensions.push_back(std::move(extensions));
     }
 
     m_initializedDevExt = true;
@@ -210,26 +222,28 @@ namespace dxvk {
     return value == 1;
   }
 
-  DxvkNameSet VrInstance::queryInstanceExtensions() const {
+  bool VrInstance::queryInstanceExtensions(DxvkNameSet& extensions) const {
     std::string extensionList;
 
     if (m_vr_key) {
       if (!this->waitVrKeyReady()
           || !readRegistryString(m_vr_key, "openvr_vulkan_instance_extensions", extensionList))
-        return DxvkNameSet();
+        return false;
     } else {
       if (!m_compositor || !queryOpenVrExtensionString(
           [this](char* buffer, uint32_t size) {
             return m_compositor->GetVulkanInstanceExtensionsRequired(buffer, size);
           }, extensionList))
-        return DxvkNameSet();
+        return false;
     }
 
-    return parseExtensionList(extensionList);
+    extensions = parseExtensionList(extensionList);
+    return true;
   }
   
   
-  DxvkNameSet VrInstance::queryDeviceExtensions(Rc<DxvkAdapter> adapter) const {
+  bool VrInstance::queryDeviceExtensions(
+      Rc<DxvkAdapter> adapter, DxvkNameSet& extensions) const {
     std::string extensionList;
 
     if (m_vr_key) {
@@ -240,16 +254,17 @@ namespace dxvk {
         static_cast<uint16_t>(properties.deviceID));
 
       if (!this->waitVrKeyReady() || !readRegistryString(m_vr_key, name, extensionList))
-        return DxvkNameSet();
+        return false;
     } else {
       if (!m_compositor || !queryOpenVrExtensionString(
           [this, &adapter](char* buffer, uint32_t size) {
             return m_compositor->GetVulkanDeviceExtensionsRequired(adapter->handle(), buffer, size);
           }, extensionList))
-        return DxvkNameSet();
+        return false;
     }
 
-    return parseExtensionList(extensionList);
+    extensions = parseExtensionList(extensionList);
+    return true;
   }
   
   
@@ -337,6 +352,13 @@ namespace dxvk {
 
     if (m_no_vr || !RtxVr::enable())
       return false;
+
+    // A scene session is only safe after both Vulkan extension queries
+    // completed successfully before instance/device creation.
+    if (!m_initializedInsExt || !m_initializedDevExt || m_extensionQueryFailed) {
+      Logger::warn("OpenVR: Vulkan extension discovery did not complete successfully");
+      return false;
+    }
 
     if (m_sceneSessionActive && m_compositor && m_system) {
       if (m_sceneSessionOwner == owner)
