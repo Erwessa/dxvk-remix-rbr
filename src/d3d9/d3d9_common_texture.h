@@ -78,6 +78,7 @@ namespace dxvk {
   using D3D9SubresourceBitset = bit::bitset<caps::MaxSubresources>;
 
   class D3D9CommonTexture {
+    friend class D3D9Surface;
 
   public:
 
