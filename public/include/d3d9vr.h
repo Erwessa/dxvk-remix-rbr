@@ -38,6 +38,9 @@ enum class D3D9VRCommand : uint32_t {
   CreateMultiViewDepthStencilSurface,
 };
 
+static_assert(sizeof(D3D9_OPENVR_FRAME_STATE) == 328,
+  "D3D9_OPENVR_FRAME_STATE must have an identical x86/x64 wire layout");
+
 struct D3D9_OPENVR_FRAME_TIMING {
   float GpuPreSubmit;
   float GpuPostSubmit;
@@ -53,6 +56,8 @@ struct D3D9_OPENVR_FRAME_TIMING {
   uint32_t MispresentedFrames;
   uint32_t DroppedFrames;
 };
+static_assert(sizeof(D3D9_OPENVR_FRAME_TIMING) == 52,
+  "D3D9_OPENVR_FRAME_TIMING must have an identical x86/x64 wire layout");
 
 // Keep method order and IID synchronized with the Runtime implementation.
 MIDL_INTERFACE("7e272b32-a49c-46c7-b1a4-ef52936bec87")
