@@ -5,6 +5,8 @@
 #include "d3d9_texture.h"
 #include <d3d9types.h>
 
+#include <windows.h>
+
 #include "../util/util_shared_res.h"
 
 #include <algorithm>
@@ -15,6 +17,20 @@
 #include <charconv>
 
 namespace dxvk {
+
+  // D3D9 shared handles are normally global KMT handles. An NT handle
+  // supplied by OpenRBRVR is a D3D11 texture handle from
+  // IDXGIResource1::CreateSharedHandle and must use the D3D11 external
+  // memory handle type when imported into Vulkan.
+  static VkExternalMemoryHandleTypeFlagBits GetSharedTextureHandleType(HANDLE handle) {
+    DWORD handleFlags = 0;
+    if (handle && handle != INVALID_HANDLE_VALUE
+        && ::GetHandleInformation(handle, &handleFlags))
+      return VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT;
+
+    return VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
+  }
+
   D3D9CommonTexture::D3D9CommonTexture(
           D3D9DeviceEx*             pDevice,
     const D3D9_COMMON_TEXTURE_DESC* pDesc,
@@ -259,11 +275,12 @@ namespace dxvk {
     imageInfo.shared          = m_desc.IsBackBuffer;
 
     if (pSharedHandle) {
-      imageInfo.sharing.type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
       imageInfo.sharing.mode = (*pSharedHandle == INVALID_HANDLE_VALUE || *pSharedHandle == nullptr)
         ? DxvkSharedHandleMode::Export
         : DxvkSharedHandleMode::Import;
-      imageInfo.sharing.type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
+      imageInfo.sharing.type = imageInfo.sharing.mode == DxvkSharedHandleMode::Import
+        ? GetSharedTextureHandleType(*pSharedHandle)
+        : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
       imageInfo.sharing.handle = *pSharedHandle;
       imageInfo.shared = true;
       // TODO: validate metadata?
