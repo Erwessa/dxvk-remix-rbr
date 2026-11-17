@@ -418,10 +418,11 @@ namespace dxvk {
     const Rc<DxvkImage>& image,
     VkImageLayout         layout) {
     ScopedCpuProfileZone();
-    if (image->info().layout != layout) {
-      this->spillRenderPass(true);
+    // External users may need an access dependency even when the image layout
+    // does not change, e.g. when SteamVR reads an image already in TRANSFER_SRC_OPTIMAL.
+    this->spillRenderPass(true);
 
-      VkImageSubresourceRange subresources = image->getAvailableSubresources();
+    VkImageSubresourceRange subresources = image->getAvailableSubresources();
 
       this->prepareImage(m_execBarriers, image, subresources);
 
@@ -491,8 +492,7 @@ namespace dxvk {
         }
       }
 
-      m_cmd->trackResource<DxvkAccess::Write>(image);
-    }
+    m_cmd->trackResource<DxvkAccess::Write>(image);
   }
 
 
