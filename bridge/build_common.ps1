@@ -32,8 +32,8 @@ function SetupVS {
 	#
 	If ($vsWhere = Get-Command "vswhere.exe" -ErrorAction SilentlyContinue) {
 	  $vsWhere = $vsWhere.Path
-	} ElseIf (Test-Path "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe") {
-	  $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+	} ElseIf (Test-Path "\${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe") {
+	  $vsWhere = "\${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 	}
 	 Else {
 	  Write-Error "vswhere not found. Aborting." -ErrorAction Stop
@@ -43,14 +43,19 @@ function SetupVS {
 
 	#
 	# Get path to Visual Studio installation using vswhere.
+	# Prefer VS 2026 (18.x), then fall back to VS 2022 / 2019.
 	#
-	$vsPath = &$vsWhere -latest -version "[16.0,18.0)" -products * `
-	 -requires Microsoft.Component.MSBuild `
-	 -property installationPath
-	If ([string]::IsNullOrEmpty("$vsPath")) {
-	  Write-Error "Failed to find Visual Studio 2019 installation. Aborting." -ErrorAction Stop
+	$vsPath = $null
+	foreach ($versionRange in @("[18.0,19.0)", "[16.0,18.0)")) {
+	  $vsPath = &$vsWhere -latest -version $versionRange -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
+	  if (-not [string]::IsNullOrWhiteSpace($vsPath)) {
+	    break
+	  }
 	}
-	Write-Host "Using Visual Studio installation at: ${vsPath}" -ForegroundColor Yellow
+	If ([string]::IsNullOrEmpty("$vsPath")) {
+	  Write-Error "Failed to find Visual Studio 2026, 2022 or 2019 C++ build tools. Aborting." -ErrorAction Stop
+	}
+	Write-Host "Using Visual Studio installation at: \${vsPath}" -ForegroundColor Yellow
 
 	If ( ($Platform -eq "arm64") -or ($Platform -eq "arm64ec") ) {
 		$Platform = "amd64_arm64"
@@ -58,8 +63,8 @@ function SetupVS {
 
 	$vcvarsArgs = $Platform
 	if ( -not [string]::IsNullOrEmpty($VcVarsVer) ) {
-		$vcvarsArgs += " -vcvars_ver=${VcVarsVer}"
-		Write-Host "Pinning MSVC toolset to version: ${VcVarsVer}" -ForegroundColor Yellow
+		$vcvarsArgs += " -vcvars_ver=\${VcVarsVer}"
+		Write-Host "Pinning MSVC toolset to version: \${VcVarsVer}" -ForegroundColor Yellow
 	}
 
 	#
@@ -69,9 +74,9 @@ function SetupVS {
 	#  Write-Host "Visual Studio Command Prompt variables already set." -ForegroundColor Yellow
 	#} Else {
 	  # Load VC vars
-	  Push-Location "${vsPath}\VC\Auxiliary\Build"
+	  Push-Location "\${vsPath}\VC\Auxiliary\Build"
 
-	  cmd /c "vcvarsall.bat ${vcvarsArgs} &set" |
+	  cmd /c "vcvarsall.bat \${vcvarsArgs} &set" |
 		ForEach-Object {
 		  # Skip lines starting with '=' (Windows pseudo-variables like '=C:=...') and
 		  # preserve values containing '=' (e.g. CI_MERGE_REQUEST_DESCRIPTION).
