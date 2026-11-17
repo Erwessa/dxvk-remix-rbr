@@ -3193,6 +3193,14 @@ void ProcessDeviceCommandQueue() {
         HRESULT hresult = D3DERR_INVALIDCALL;
         ServerMessage response(Commands::Bridge_Response, currentUID);
 
+        if (!vrInterface && methodValue == static_cast<uint32_t>(D3D9VRCommand::ImportFence)) {
+          PULL(uint64_t, handleValue);
+          PULL(uint64_t, fenceValue);
+          const HANDLE sharedHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(handleValue));
+          if (sharedHandle && sharedHandle != INVALID_HANDLE_VALUE)
+            CloseHandle(sharedHandle);
+        }
+
         if (vrInterface) {
           switch (static_cast<D3D9VRCommand>(methodValue)) {
           case D3D9VRCommand::InitializeOpenVRScene:
