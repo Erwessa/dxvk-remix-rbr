@@ -32,6 +32,8 @@ public:
     if (surface == nullptr || desc == nullptr)
       return D3DERR_INVALIDCALL;
 
+    D3D9DeviceLock lock = m_device->LockDevice();
+
     auto* d3dSurface = static_cast<D3D9Surface*>(surface);
     auto* texture = d3dSurface->GetCommonTexture();
     const auto& image = texture->GetImage();
@@ -83,6 +85,8 @@ public:
   HRESULT STDMETHODCALLTYPE TransferSurfaceForVR(IDirect3DSurface9* surface) {
     if (surface == nullptr)
       return D3DERR_INVALIDCALL;
+
+    D3D9DeviceLock lock = m_device->LockDevice();
 
     auto* texture = static_cast<D3D9Surface*>(surface)->GetCommonTexture();
     auto image = texture->GetImage();
