@@ -74,8 +74,13 @@ public:
       m_device->SynchronizeCsThread();
 
     const VkImageLayout originalLayout = image->info().layout;
-    m_vrImages.push_back({ image, originalLayout });
-    m_device->TransitionImage(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    const VkPipelineStageFlags originalStages = image->info().stages;
+    const VkAccessFlags originalAccess = image->info().access;
+    m_vrImages.push_back({ image, originalLayout, originalStages, originalAccess });
+    m_device->TransitionImageForVR(
+      image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      originalStages, originalAccess,
+      VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
     return D3D_OK;
   }
 
@@ -91,7 +96,10 @@ public:
     // SteamVR leaves submitted Vulkan images in TRANSFER_SRC_OPTIMAL.
     // Queue their restoration only after releasing the external queue lock.
     for (const auto& entry : m_vrImages)
-      m_device->TransitionImage(entry.image, entry.originalLayout);
+      m_device->TransitionImageForVR(
+        entry.image, entry.originalLayout,
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+        entry.originalStages, entry.originalAccess);
 
     m_vrImages.clear();
     return D3D_OK;
@@ -373,6 +381,8 @@ private:
   struct VrImageLayout {
     Rc<DxvkImage> image;
     VkImageLayout originalLayout;
+    VkPipelineStageFlags originalStages;
+    VkAccessFlags originalAccess;
   };
 
   std::vector<VrImageLayout> m_vrImages;

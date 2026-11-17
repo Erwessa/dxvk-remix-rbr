@@ -290,6 +290,14 @@ namespace dxvk {
     void changeImageLayout(
       const Rc<DxvkImage>&        image,
             VkImageLayout         layout);
+
+    void transitionImageLayout(
+      const Rc<DxvkImage>&        image,
+            VkImageLayout         layout,
+            VkPipelineStageFlags  srcStages,
+            VkAccessFlags         srcAccess,
+            VkPipelineStageFlags  dstStages,
+            VkAccessFlags         dstAccess);
     
     /**
      * \brief Clears a buffer with a fixed value

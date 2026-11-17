@@ -7757,6 +7757,29 @@ namespace dxvk {
     });
   }
 
+  void D3D9DeviceEx::TransitionImageForVR(
+      const Rc<DxvkImage>& image,
+            VkImageLayout   NewLayout,
+            VkPipelineStageFlags SrcStages,
+            VkAccessFlags SrcAccess,
+            VkPipelineStageFlags DstStages,
+            VkAccessFlags DstAccess) {
+    ScopedCpuProfileZone();
+    EmitCs([
+      cImage = image,
+      cNewLayout = NewLayout,
+      cSrcStages = SrcStages,
+      cSrcAccess = SrcAccess,
+      cDstStages = DstStages,
+      cDstAccess = DstAccess
+    ] (DxvkContext* ctx) {
+      ctx->transitionImageLayout(
+        cImage, cNewLayout,
+        cSrcStages, cSrcAccess,
+        cDstStages, cDstAccess);
+    });
+  }
+
 
   void D3D9DeviceEx::TransformImage(
           D3D9CommonTexture*       pResource,

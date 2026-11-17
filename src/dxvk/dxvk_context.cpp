@@ -441,6 +441,35 @@ namespace dxvk {
     }
   }
 
+  void DxvkContext::transitionImageLayout(
+    const Rc<DxvkImage>& image,
+    VkImageLayout         layout,
+    VkPipelineStageFlags  srcStages,
+    VkAccessFlags         srcAccess,
+    VkPipelineStageFlags  dstStages,
+    VkAccessFlags         dstAccess) {
+    ScopedCpuProfileZone();
+    if (image->info().layout != layout) {
+      this->spillRenderPass(true);
+
+      VkImageSubresourceRange subresources = image->getAvailableSubresources();
+
+      this->prepareImage(m_execBarriers, image, subresources);
+
+      if (m_execBarriers.isImageDirty(image, subresources, DxvkAccess::Write))
+        m_execBarriers.recordCommands(m_cmd);
+
+      m_execBarriers.accessImage(image, subresources,
+        image->info().layout,
+        srcStages, srcAccess,
+        layout,
+        dstStages, dstAccess);
+
+      image->setLayout(layout);
+      m_cmd->trackResource<DxvkAccess::Write>(image);
+    }
+  }
+
 
   void DxvkContext::clearBuffer(
     const Rc<DxvkBuffer>&       buffer,

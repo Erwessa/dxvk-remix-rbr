@@ -938,6 +938,13 @@ namespace dxvk {
     void TransitionImage(D3D9CommonTexture* pResource, VkImageLayout NewLayout);
 
     void TransitionImage(const Rc<DxvkImage>& image, VkImageLayout NewLayout);
+    void TransitionImageForVR(
+      const Rc<DxvkImage>& image,
+            VkImageLayout   NewLayout,
+            VkPipelineStageFlags SrcStages,
+            VkAccessFlags SrcAccess,
+            VkPipelineStageFlags DstStages,
+            VkAccessFlags DstAccess);
 
     void TransformImage(
             D3D9CommonTexture*       pResource,
