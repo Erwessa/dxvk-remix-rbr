@@ -172,9 +172,10 @@ public:
       UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample,
       DWORD multisampleQuality, BOOL lockable, IDirect3DSurface9** surface,
       HANDLE* sharedHandle, UINT views) {
-    (void) lockable;
     if (surface == nullptr || views < 2)
       return D3DERR_INVALIDCALL;
+
+    *surface = nullptr;
 
     D3D9_COMMON_TEXTURE_DESC desc = {};
     desc.Width = width;
@@ -190,6 +191,7 @@ public:
     desc.MultisampleQuality = multisampleQuality;
     desc.IsBackBuffer = FALSE;
     desc.IsAttachmentOnly = TRUE;
+    desc.IsLockable = lockable != FALSE;
     return m_device->CreateRenderTargetFromDesc(&desc, surface, sharedHandle);
   }
   HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(
@@ -199,6 +201,7 @@ public:
     if (surface == nullptr || views < 2)
       return D3DERR_INVALIDCALL;
 
+    *surface = nullptr;
     D3D9_COMMON_TEXTURE_DESC desc = {};
     desc.Width = width;
     desc.Height = height;
@@ -213,6 +216,7 @@ public:
     desc.MultisampleQuality = multisampleQuality;
     desc.IsBackBuffer = FALSE;
     desc.IsAttachmentOnly = TRUE;
+    desc.IsLockable = IsLockableDepthStencilFormat(desc.Format);
     return m_device->CreateRenderTargetFromDesc(&desc, surface, sharedHandle);
   }
   HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9* source, IDirect3DSurface9** destinations, UINT layerCount) {
