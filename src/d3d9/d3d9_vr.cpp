@@ -401,7 +401,7 @@ public:
   }
 
 private:
-  D3D9DeviceEx* m_device;
+  Com<D3D9DeviceEx, false> m_device;
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
   struct VrImageLayout {
