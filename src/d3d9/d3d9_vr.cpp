@@ -335,6 +335,7 @@ public:
   HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9* surface, uint32_t layer) {
     if (surface == nullptr)
       return D3DERR_INVALIDCALL;
+    D3D9DeviceLock lock = m_device->LockDevice();
     return static_cast<D3D9Surface*>(surface)->SetMultiviewSurfaceLayer(layer);
   }
 
