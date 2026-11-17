@@ -1154,6 +1154,7 @@ namespace dxvk {
       if (m_multiViewFF != enabled) {
         m_multiViewFF = enabled;
         m_flags.set(D3D9DeviceFlag::DirtyFFVertexShader);
+        m_flags.set(D3D9DeviceFlag::DirtyFramebuffer);
       }
     }
 
