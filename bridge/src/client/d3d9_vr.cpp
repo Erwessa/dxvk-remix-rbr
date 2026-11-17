@@ -167,7 +167,7 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9* source, IDirect3DSurface9** destinations, UINT count) override {
-    if (!source || !destinations || count == 0)
+    if (!source || !destinations || count == 0 || count > 4)
       return D3DERR_INVALIDCALL;
     auto* src = bridge_cast<Direct3DSurface9_LSS*>(source);
     if (!src)
