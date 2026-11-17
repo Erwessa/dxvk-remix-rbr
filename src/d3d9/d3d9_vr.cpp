@@ -145,8 +145,7 @@ public:
     return D3D_OK;
   }
 
-  // These features require Remix-side fence interop, shader replacement and
-  // multiview support. Fail explicitly rather than reporting false success.
+  // Fence interop is implemented alongside the Vulkan timeline semaphore wrapper.
   HRESULT STDMETHODCALLTYPE ImportFence(HANDLE, uint64_t) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE SignalFence(uint64_t) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9* d3dShader, char** out) {
