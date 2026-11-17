@@ -126,6 +126,10 @@ namespace dxvk {
     
     void initInstanceExtensions();
 
+    // Disable optional OpenVR integration if the runtime requests instance extensions
+    // that the active Vulkan loader does not expose.
+    void validateInstanceExtensions(const DxvkNameSet& available);
+
     void initDeviceExtensions(
       const DxvkInstance* instance);
 
