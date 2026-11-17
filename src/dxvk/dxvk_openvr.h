@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <unordered_set>
 #include <vector>
 
 #include <openvr/openvr.hpp>
@@ -139,7 +140,7 @@ namespace dxvk {
 
     // Starts a long-lived OpenVR scene session after Vulkan device creation.
     // If the host already owns a scene session, it is reused and never shut down here.
-    bool initializeSceneSession(const void* owner, uint32_t adapterId);
+    bool initializeSceneSession(const void* owner, uint32_t adapterId, bool force = false);
     void shutdownSceneSession(const void* owner);
 
     vr::IVRSystem* getSystem() const { return m_system; }
@@ -157,6 +158,9 @@ namespace dxvk {
       const std::array<vr::VRVulkanTextureData_t, 2>& textures,
       vr::EColorSpace colorSpace);
 
+    bool getFrameTiming(vr::Compositor_FrameTiming& timing);
+    bool resetView();
+
     // Lower-level accessors retained for diagnostics and staged integration.
     bool waitGetPoses(std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount>& renderPoses);
     bool getRecommendedRenderTargetSize(uint32_t& width, uint32_t& height);
@@ -171,13 +175,15 @@ namespace dxvk {
     HKEY                  m_vr_key     = nullptr;
     vr::IVRCompositor*    m_compositor = nullptr;
     vr::IVRSystem*        m_system = nullptr;
+    vr::IVRChaperone*     m_chaperone = nullptr;
     HMODULE               m_ovrApi     = nullptr;
 
     bool m_no_vr;
     bool m_loadedOvrApi      = false;
     bool m_initializedOpenVr = false;
     bool m_sceneSessionActive = false;
-    const void* m_sceneSessionOwner = nullptr;
+    uint32_t m_sceneSessionAdapterId = UINT32_MAX;
+    std::unordered_set<const void*> m_sceneSessionOwners;
     uint64_t m_frameIndex = 0;
     uint64_t m_waitGetPosesFailures = 0;
     bool m_initializedInsExt = false;

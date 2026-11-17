@@ -400,7 +400,7 @@ namespace dxvk {
   }
 
 
-  bool VrInstance::initializeSceneSession(const void* owner, uint32_t adapterId) {
+  bool VrInstance::initializeSceneSession(const void* owner, uint32_t adapterId, bool force) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
     if (!owner) {
@@ -408,7 +408,7 @@ namespace dxvk {
       return false;
     }
 
-    if (m_no_vr || !RtxVr::enable())
+    if (m_no_vr || (!force && !RtxVr::enable()))
       return false;
 
     // A scene session is only safe after both Vulkan extension queries
@@ -421,10 +421,12 @@ namespace dxvk {
     }
 
     if (m_sceneSessionActive && m_compositor && m_system) {
-      if (m_sceneSessionOwner == owner)
-        return true;
-      Logger::warn("OpenVR: scene session is already owned by another DXVK device");
-      return false;
+      if (m_sceneSessionAdapterId != adapterId) {
+        Logger::warn("OpenVR: refusing to share a scene session across different Vulkan adapters");
+        return false;
+      }
+      m_sceneSessionOwners.insert(owner);
+      return true;
     }
 
     if (!m_ovrApi)
@@ -496,8 +498,14 @@ namespace dxvk {
 
     m_compositor = compositor;
     m_system = system;
+    error = vr::VRInitError_None;
+    m_chaperone = reinterpret_cast<vr::IVRChaperone*>(
+      g_vrFunctions.getGenericInterface(vr::IVRChaperone_Version, &error));
+    if (error != vr::VRInitError_None)
+      m_chaperone = nullptr;
     m_initializedOpenVr = initializedHere;
-    m_sceneSessionOwner = owner;
+    m_sceneSessionAdapterId = adapterId;
+    m_sceneSessionOwners.insert(owner);
     m_sceneSessionActive = true;
     Logger::info("OpenVR: scene session is active");
     return true;
@@ -588,7 +596,26 @@ namespace dxvk {
       }
     }
 
+    m_compositor->PostPresentHandoff();
     return success;
+  }
+
+
+  bool VrInstance::getFrameTiming(vr::Compositor_FrameTiming& timing) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    timing = {};
+    timing.m_nSize = sizeof(timing);
+    return m_sceneSessionActive && m_compositor
+        && m_compositor->GetFrameTiming(&timing);
+  }
+
+
+  bool VrInstance::resetView() {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!m_sceneSessionActive || !m_chaperone)
+      return false;
+    m_chaperone->ResetZeroPose(vr::TrackingUniverseSeated);
+    return true;
   }
 
 
@@ -643,19 +670,25 @@ namespace dxvk {
   void VrInstance::shutdownSceneSession(const void* owner) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
-    if (!owner || owner != m_sceneSessionOwner) {
+    if (!owner || m_sceneSessionOwners.erase(owner) == 0) {
       Logger::warn("OpenVR: ignoring scene session release from a non-owner");
       return;
     }
+
+    // RTX and D3D9VR may share one DxvkDevice and one OpenVR Scene session.
+    // Keep the session alive until its final registered owner releases it.
+    if (!m_sceneSessionOwners.empty())
+      return;
 
     if (m_initializedOpenVr && g_vrFunctions.shutdownInternal)
       g_vrFunctions.shutdownInternal();
 
     m_initializedOpenVr = false;
     m_sceneSessionActive = false;
-    m_sceneSessionOwner = nullptr;
+    m_sceneSessionAdapterId = UINT32_MAX;
     m_compositor = nullptr;
     m_system = nullptr;
+    m_chaperone = nullptr;
 
     if (m_loadedOvrApi)
       this->freeLibrary();
@@ -677,8 +710,10 @@ namespace dxvk {
 
     m_compositor = nullptr;
     m_system = nullptr;
+    m_chaperone = nullptr;
     m_sceneSessionActive = false;
-    m_sceneSessionOwner = nullptr;
+    m_sceneSessionAdapterId = UINT32_MAX;
+    m_sceneSessionOwners.clear();
     m_initializedOpenVr = false;
 
     if (m_loadedOvrApi)
