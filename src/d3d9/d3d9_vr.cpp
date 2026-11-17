@@ -115,18 +115,26 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE BeginVRSubmit() {
-    D3D9DeviceLock lock = m_device->LockDevice();
+    if (m_vrSubmitActive)
+      return D3DERR_INVALIDCALL;
+
+    // Keep D3D9 commands out of the interval in which the external
+    // compositor owns the Vulkan queue and the VR images.
+    m_vrSubmitDeviceLock = m_device->LockDevice();
     m_device->SynchronizeCsThread();
     m_device->GetDXVKDevice()->lockSubmission();
+    m_vrSubmitActive = true;
     return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE EndVRSubmit() {
-    D3D9DeviceLock lock = m_device->LockDevice();
+    if (!m_vrSubmitActive)
+      return D3DERR_INVALIDCALL;
+
     m_device->GetDXVKDevice()->unlockSubmission();
 
-    // SteamVR leaves submitted Vulkan images in TRANSFER_SRC_OPTIMAL.
-    // Queue their restoration only after releasing the external queue lock.
+    // Queue their restoration before allowing another D3D9 thread
+    // to record commands that may access these images.
     for (const auto& entry : m_vrImages)
       m_device->TransitionImageForVR(
         entry.image, entry.originalLayout,
@@ -134,6 +142,8 @@ public:
         entry.originalStages, entry.originalAccess);
 
     m_vrImages.clear();
+    m_vrSubmitActive = false;
+    m_vrSubmitDeviceLock = D3D9DeviceLock();
     return D3D_OK;
   }
 
@@ -410,6 +420,8 @@ private:
   Com<D3D9DeviceEx, false> m_device;
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
+  D3D9DeviceLock m_vrSubmitDeviceLock;
+  bool m_vrSubmitActive = false;
   struct VrImageLayout {
     Rc<DxvkImage> image;
     VkImageLayout originalLayout;
