@@ -766,7 +766,7 @@ namespace dxvk {
             || type != REG_SZ || size < 2 || size > 32768)
           continue;
 
-        std::vector<char> value(size + 1, '\\0');
+        std::vector<char> value(size + 1, '\0');
         DWORD actualSize = size;
         DWORD actualType = 0;
         if (RegQueryValueExA(key, valueName, nullptr, &actualType,
@@ -775,11 +775,11 @@ namespace dxvk {
           continue;
 
         std::string steamPath(value.data());
-        while (!steamPath.empty() && (steamPath.back() == '\\\\' || steamPath.back() == '/'))
+        while (!steamPath.empty() && (steamPath.back() == '\\' || steamPath.back() == '/'))
           steamPath.pop_back();
         for (char& ch : steamPath) {
           if (ch == '/')
-            ch = '\\\\';
+            ch = '\\';
         }
 
         const std::string dllPath = steamPath
