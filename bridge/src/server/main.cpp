@@ -3274,15 +3274,24 @@ void ProcessDeviceCommandQueue() {
             PULL_U(capacity);
             const auto shaderIt = gpD3DVertexShaders.find(shaderId);
             uint32_t required = capacity;
-            std::vector<uint32_t> code(capacity);
-            if (shaderIt != gpD3DVertexShaders.end()) {
+            if (capacity > 16u * 1024u * 1024u) {
+              hresult = E_OUTOFMEMORY;
+            } else if (shaderIt != gpD3DVertexShaders.end()) {
+              std::vector<uint32_t> code(capacity);
               hresult = vrInterface->GetSPIRVShaderCode(
                 shaderIt->second, capacity ? code.data() : nullptr, &required);
+              response.send_data(static_cast<uint32_t>(hresult));
+              response.send_data(required);
+              if (SUCCEEDED(hresult) && capacity && required)
+                response.send_data(required * sizeof(uint32_t), code.data());
+            } else {
+              response.send_data(static_cast<uint32_t>(hresult));
+              response.send_data(required);
             }
-            response.send_data(static_cast<uint32_t>(hresult));
-            response.send_data(required);
-            if (SUCCEEDED(hresult) && capacity && required)
-              response.send_data(required * sizeof(uint32_t), code.data());
+            if (capacity > 16u * 1024u * 1024u) {
+              response.send_data(static_cast<uint32_t>(hresult));
+              response.send_data(required);
+            }
             break;
           }
 

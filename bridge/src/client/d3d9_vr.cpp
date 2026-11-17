@@ -175,7 +175,7 @@ public:
     ClientMessage command(Commands::D3D9VR_Invoke, m_id);
     const auto uid = command.get_uid();
     command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode),
-                      static_cast<uint32_t>(bridgeShader->getId()), *size);
+                      static_cast<uint32_t>(bridgeShader->getId()), out ? *size : 0u);
     if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
       return E_FAIL;
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
