@@ -335,7 +335,7 @@ public:
     desc.MultisampleQuality = multisampleQuality;
     desc.IsBackBuffer = FALSE;
     desc.IsAttachmentOnly = TRUE;
-    desc.IsLockable = lockable != FALSE;
+    // D3D9_COMMON_TEXTURE_DESC has no lockability field; match CreateRenderTargetEx.
     return m_device->CreateRenderTargetFromDesc(&desc, surface, sharedHandle);
   }
   HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(
@@ -360,7 +360,6 @@ public:
     desc.MultisampleQuality = multisampleQuality;
     desc.IsBackBuffer = FALSE;
     desc.IsAttachmentOnly = TRUE;
-    desc.IsLockable = IsLockableDepthStencilFormat(desc.Format);
     return m_device->CreateRenderTargetFromDesc(&desc, surface, sharedHandle);
   }
   HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9* source, IDirect3DSurface9** destinations, UINT layerCount) {
