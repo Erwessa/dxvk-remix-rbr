@@ -139,6 +139,28 @@ namespace dxvk {
   }
 
 
+  void VrInstance::validateInstanceExtensions(const DxvkNameSet& available) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (m_no_vr || m_extensionQueryFailed || !m_initializedInsExt)
+      return;
+
+    const auto requested = m_insExtensions.toNameList();
+    for (uint32_t i = 0; i < requested.count(); i++) {
+      if (!available.supports(requested.name(i))) {
+        Logger::warn(str::format(
+          "OpenVR: requested Vulkan instance extension is unavailable: ",
+          requested.name(i), "; disabling OpenVR integration"));
+
+        m_extensionQueryFailed = true;
+        m_insExtensions = DxvkNameSet();
+        this->shutdown();
+        return;
+      }
+    }
+  }
+
+
   void VrInstance::initDeviceExtensions(const DxvkInstance* instance) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
