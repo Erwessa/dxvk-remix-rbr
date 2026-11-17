@@ -151,7 +151,12 @@ namespace dxvk {
     m_gpuBreadcrumbs = GpuBreadcrumbs::create(this);
 
     // OpenVR is opt-in through rtx.vr.enable. The normal mono path is untouched when it is off.
-    m_openVrSessionOwned = VrInstance::s_instance.initializeSceneSession(this);
+    uint32_t openVrAdapterId = 0;
+    while (instance->enumAdapters(openVrAdapterId) != nullptr
+        && instance->enumAdapters(openVrAdapterId).ptr() != adapter.ptr())
+      openVrAdapterId++;
+
+    m_openVrSessionOwned = VrInstance::s_instance.initializeSceneSession(this, openVrAdapterId);
   }
 
   
