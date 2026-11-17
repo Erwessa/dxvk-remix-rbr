@@ -4918,6 +4918,15 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     bridge_util::Logger::debug("No leaked objects dicovered at Direct3D module eviction.");
   }
 
+  // Release any VR interfaces the client did not explicitly destroy (for
+  // example, when the game exits unexpectedly). D3D9VR owns the OpenVR Scene
+  // session lease and must release it before the Bridge Server process exits.
+  for (auto& entry : gpD3DVRInterfaces) {
+    if (entry.second)
+      entry.second->Release();
+  }
+  gpD3DVRInterfaces.clear();
+
   // Command processing finished, clean up and exit
   Logger::info("Command processing loop finished, cleaning up and exiting...");
   logRuntimeSessionEnd(gbBridgeRunning ? "the game closed the bridge" : "the bridge stopped, bridge64.log names the cause");
