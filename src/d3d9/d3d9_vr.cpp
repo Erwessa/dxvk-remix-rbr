@@ -6,6 +6,8 @@
 #include "d3d9_device.h"
 #include "d3d9_shader.h"
 
+#include <vector>
+
 namespace dxvk {
 
 class D3D9VR final : public ComObjectClamp<IDirect3DVR9> {
@@ -57,14 +59,23 @@ public:
       return D3DERR_INVALIDCALL;
 
     auto* texture = static_cast<D3D9Surface*>(surface)->GetCommonTexture();
-    const auto& image = texture->GetImage();
+    auto image = texture->GetImage();
     if (image == nullptr)
       return D3DERR_INVALIDCALL;
 
-    const VkImageSubresourceRange range = {
-      VK_IMAGE_ASPECT_COLOR_BIT, 0, image->info().mipLevels, 0, image->info().numLayers
-    };
-    m_device->TransformImage(texture, &range, image->info().layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    for (const auto& entry : m_vrImages) {
+      if (entry.image->handle() == image->handle())
+        return D3D_OK;
+    }
+
+    // Wait for the previous frame's restore transition before capturing
+    // the layout to which this image must return after compositor submission.
+    if (m_vrImages.empty())
+      m_device->SynchronizeCsThread();
+
+    const VkImageLayout originalLayout = image->info().layout;
+    m_vrImages.push_back({ image, originalLayout });
+    m_device->TransitionImage(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     return D3D_OK;
   }
 
@@ -76,6 +87,13 @@ public:
 
   HRESULT STDMETHODCALLTYPE EndVRSubmit() {
     m_device->GetDXVKDevice()->unlockSubmission();
+
+    // SteamVR leaves submitted Vulkan images in TRANSFER_SRC_OPTIMAL.
+    // Queue their restoration only after releasing the external queue lock.
+    for (const auto& entry : m_vrImages)
+      m_device->TransitionImage(entry.image, entry.originalLayout);
+
+    m_vrImages.clear();
     return D3D_OK;
   }
 
@@ -352,6 +370,12 @@ private:
   D3D9DeviceEx* m_device;
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
+  struct VrImageLayout {
+    Rc<DxvkImage> image;
+    VkImageLayout originalLayout;
+  };
+
+  std::vector<VrImageLayout> m_vrImages;
   Rc<DxvkFence> m_fence;
 };
 

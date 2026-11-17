@@ -7742,9 +7742,14 @@ namespace dxvk {
 
 
   void D3D9DeviceEx::TransitionImage(D3D9CommonTexture* pResource, VkImageLayout NewLayout) {
+    this->TransitionImage(pResource->GetImage(), NewLayout);
+  }
+
+
+  void D3D9DeviceEx::TransitionImage(const Rc<DxvkImage>& image, VkImageLayout NewLayout) {
     ScopedCpuProfileZone();
     EmitCs([
-      cImage        = pResource->GetImage(),
+      cImage        = image,
       cNewLayout    = NewLayout
     ] (DxvkContext* ctx) {
       ctx->changeImageLayout(
