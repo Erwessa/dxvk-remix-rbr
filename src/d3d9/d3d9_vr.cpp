@@ -325,7 +325,9 @@ public:
     return D3D_OK;
   }
   HRESULT STDMETHODCALLTYPE EnableMultiView(bool enable) {
-    if (enable && !m_device->GetDXVKDevice()->features().vulkan11Features.multiview)
+    D3D9DeviceLock lock = m_device->LockDevice();
+    if (enable && (!m_device->GetDXVKDevice()->features().vulkan11Features.multiview
+                || m_device->GetSoftwareVertexProcessing()))
       return D3DERR_NOTAVAILABLE;
     m_device->SetMultiViewFF(enable);
     return D3D_OK;

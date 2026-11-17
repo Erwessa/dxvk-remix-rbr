@@ -79,7 +79,9 @@ namespace dxvk {
     , m_deviceType     ( DeviceType )
     , m_window         ( hFocusWindow )
     , m_behaviorFlags  ( BehaviorFlags ) // Might want to add a mode to force SWVP?
-    , m_multiViewFF    ( (BehaviorFlags & 0x10000) != 0 && dxvkDevice->features().vulkan11Features.multiview )
+    , m_multiViewFF    ( (BehaviorFlags & 0x10000) != 0
+      && !(BehaviorFlags & D3DCREATE_SOFTWARE_VERTEXPROCESSING)
+      && dxvkDevice->features().vulkan11Features.multiview )
     , m_adapter        ( pAdapter )
     , m_dxvkDevice     ( dxvkDevice )
     , m_shaderModules  ( new D3D9ShaderModuleSet )
@@ -2594,7 +2596,7 @@ namespace dxvk {
   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::SetSoftwareVertexProcessing(BOOL bSoftware) {
     auto lock = LockDevice();
 
-    if (bSoftware && !CanSWVP())
+    if (bSoftware && (!CanSWVP() || m_multiViewFF))
       return D3DERR_INVALIDCALL;
 
     m_isSWVP = bSoftware;
