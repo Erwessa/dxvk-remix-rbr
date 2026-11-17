@@ -37,6 +37,7 @@ enum class D3D9VRCommand : uint32_t {
   EnableMultiView,
   CreateMultiViewRenderTarget,
   CreateMultiViewDepthStencilSurface,
+  Flush,
   ImportFence,
   SignalFence,
 };
