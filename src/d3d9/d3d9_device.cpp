@@ -7309,8 +7309,14 @@ namespace dxvk {
         const Matrix4 Projection2 = m_state.transforms[GetTransformIndex(D3DTS_WORLDMATRIX(11))];
         const Matrix4 WorldView2 = View2 * World;
         data->WorldView2 = WorldView2;
-        data->NormalMatrix2 = inverse(WorldView2);
-        data->InverseView2 = transpose(inverse(View2));
+        Matrix4 NormalMatrix2{};
+        Matrix4 InverseView2{};
+        if (!hasPositionT) {
+          NormalMatrix2 = inverse(WorldView2);
+          InverseView2 = transpose(inverse(View2));
+        }
+        data->NormalMatrix2 = NormalMatrix2;
+        data->InverseView2 = InverseView2;
         data->Projection2 = Projection2;
       }
 
