@@ -729,12 +729,76 @@ namespace dxvk {
 
 
   HMODULE VrInstance::loadLibrary() {
-    HMODULE handle = nullptr;
-    if (!(handle = ::GetModuleHandle("openvr_api.dll"))) {
-      handle = ::LoadLibrary("openvr_api_dxvk.dll");
-      m_loadedOvrApi = handle != nullptr;
+    m_loadedOvrApi = false;
+
+    if (HMODULE handle = ::GetModuleHandleA("openvr_api.dll"))
+      return handle;
+
+    if (HMODULE handle = ::LoadLibraryA("openvr_api_dxvk.dll")) {
+      m_loadedOvrApi = true;
+      return handle;
     }
-    return handle;
+
+    // The x86 game process cannot share its loaded openvr_api.dll with the
+    // x64 Bridge Server. Resolve SteamVR's native x64 loader directly from
+    // Steam's registered installation path instead of relying on PATH or the
+    // server's current working directory.
+    struct RegistryLocation {
+      HKEY root;
+      const char* subkey;
+    };
+    constexpr RegistryLocation locations[] = {
+      { HKEY_CURRENT_USER, "Software\\Valve\\Steam" },
+      { HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam" },
+      { HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Valve\\Steam" },
+    };
+    constexpr const char* valueNames[] = { "SteamPath", "InstallPath" };
+
+    for (const auto& location : locations) {
+      HKEY key = nullptr;
+      if (RegOpenKeyExA(location.root, location.subkey, 0, KEY_READ, &key) != ERROR_SUCCESS)
+        continue;
+
+      for (const char* valueName : valueNames) {
+        DWORD type = 0;
+        DWORD size = 0;
+        if (RegQueryValueExA(key, valueName, nullptr, &type, nullptr, &size) != ERROR_SUCCESS
+            || type != REG_SZ || size < 2 || size > 32768)
+          continue;
+
+        std::vector<char> value(size + 1, '\\0');
+        DWORD actualSize = size;
+        DWORD actualType = 0;
+        if (RegQueryValueExA(key, valueName, nullptr, &actualType,
+            reinterpret_cast<BYTE*>(value.data()), &actualSize) != ERROR_SUCCESS
+            || actualType != REG_SZ || actualSize < 2 || actualSize > size)
+          continue;
+
+        std::string steamPath(value.data());
+        while (!steamPath.empty() && (steamPath.back() == '\\\\' || steamPath.back() == '/'))
+          steamPath.pop_back();
+        for (char& ch : steamPath) {
+          if (ch == '/')
+            ch = '\\\\';
+        }
+
+        const std::string dllPath = steamPath
+          + "\\steamapps\\common\\SteamVR\\bin\\win64\\openvr_api.dll";
+        HMODULE handle = ::LoadLibraryExA(dllPath.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+        if (handle) {
+          m_loadedOvrApi = true;
+          RegCloseKey(key);
+          Logger::info(str::format("OpenVR: loaded x64 API from ", dllPath));
+          return handle;
+        }
+      }
+
+      RegCloseKey(key);
+    }
+
+    Logger::warn(str::format("OpenVR: could not locate x64 openvr_api.dll (last error ",
+      ::GetLastError(), ")"));
+    return nullptr;
   }
 
 
