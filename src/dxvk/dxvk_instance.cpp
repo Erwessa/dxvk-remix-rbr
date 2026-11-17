@@ -817,6 +817,10 @@ namespace dxvk {
 
     // Attempt to enable additional extensions if necessary
 
+    // OpenVR extensions are optional for the ordinary renderer. Do not pass
+    // runtime-requested names to vkCreateInstance unless the loader exposes them.
+    VrInstance::s_instance.validateInstanceExtensions(extensionsAvailable);
+
     for (const auto& provider : m_extProviders)
       extensionsEnabled.merge(provider->getInstanceExtensions());
 
