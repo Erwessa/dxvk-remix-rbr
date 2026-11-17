@@ -115,12 +115,14 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE BeginVRSubmit() {
+    D3D9DeviceLock lock = m_device->LockDevice();
     m_device->SynchronizeCsThread();
     m_device->GetDXVKDevice()->lockSubmission();
     return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE EndVRSubmit() {
+    D3D9DeviceLock lock = m_device->LockDevice();
     m_device->GetDXVKDevice()->unlockSubmission();
 
     // SteamVR leaves submitted Vulkan images in TRANSFER_SRC_OPTIMAL.
