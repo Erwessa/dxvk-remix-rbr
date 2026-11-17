@@ -134,7 +134,7 @@ namespace dxvk {
     for (uint32_t eyeIndex = 0; eyeIndex < m_taaFeedbackTexture.size(); ++eyeIndex) {
       for (uint32_t frameIndex = 0; frameIndex < m_taaFeedbackTexture[eyeIndex].size(); ++frameIndex) {
         m_taaFeedbackTexture[eyeIndex][frameIndex] = Resources::createImageResource(
-          ctx, str::format("TAA feedback texture eye ", eyeIndex, " frame ", frameIndex),
+          ctx, str::format("TAA feedback texture eye ", eyeIndex, " frame ", frameIndex).c_str(),
           targetExtent, VK_FORMAT_R32G32B32A32_SFLOAT);
       }
     }
