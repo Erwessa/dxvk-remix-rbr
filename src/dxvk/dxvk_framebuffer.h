@@ -40,6 +40,7 @@ namespace dxvk {
   struct DxvkRenderTargets {
     DxvkAttachment depth;
     DxvkAttachment color[MaxNumRenderTargets];
+    uint32_t viewMask = 0;
   };
 
 

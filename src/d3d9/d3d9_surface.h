@@ -59,11 +59,16 @@ namespace dxvk {
 
     HRESULT SetMultiviewSurfaceLayer(UINT layer);
 
+    const Rc<DxvkImageView>& GetMultiviewRenderTargetView(bool Srgb);
+    const Rc<DxvkImageView>& GetMultiviewDepthStencilView();
+
     void ClearContainer();
 
   private:
 
     D3D9GDIDesc m_dcDesc;
+    D3D9ColorView m_multiviewRenderTargetView;
+    Rc<DxvkImageView> m_multiviewDepthStencilView;
 
   };
 }

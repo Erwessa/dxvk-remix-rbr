@@ -32,6 +32,7 @@ namespace dxvk {
    */
   struct DxvkRenderPassFormat {
     VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
+    uint32_t              viewMask = 0;
     DxvkAttachmentFormat  depth;
     DxvkAttachmentFormat  color[MaxNumRenderTargets];
     

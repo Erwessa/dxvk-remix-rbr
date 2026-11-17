@@ -46,7 +46,8 @@ namespace dxvk {
 
   bool DxvkFramebufferInfo::hasTargets(const DxvkRenderTargets& renderTargets) {
     bool eq = m_renderTargets.depth.view   == renderTargets.depth.view
-           && m_renderTargets.depth.layout == renderTargets.depth.layout;
+           && m_renderTargets.depth.layout == renderTargets.depth.layout
+           && m_renderTargets.viewMask      == renderTargets.viewMask;
 
     for (uint32_t i = 0; i < MaxNumRenderTargets && eq; i++) {
       eq &= m_renderTargets.color[i].view   == renderTargets.color[i].view
@@ -90,6 +91,7 @@ namespace dxvk {
 
   DxvkRenderPassFormat DxvkFramebufferInfo::getRenderPassFormat(const DxvkRenderTargets& renderTargets) {
     DxvkRenderPassFormat format;
+    format.viewMask = renderTargets.viewMask;
 
     for (uint32_t i = 0; i < MaxNumRenderTargets; i++) {
       if (renderTargets.color[i].view != nullptr) {
@@ -167,7 +169,8 @@ namespace dxvk {
     fbInfo.pAttachments         = views.data();
     fbInfo.width                = info.size().width;
     fbInfo.height               = info.size().height;
-    fbInfo.layers               = info.size().layers;
+    fbInfo.layers               = info.renderPass()->format().viewMask != 0
+      ? 1 : info.size().layers;
     
     if (m_vkd->vkCreateFramebuffer(m_vkd->device(), &fbInfo, nullptr, &m_handle) != VK_SUCCESS)
       Logger::err("DxvkFramebuffer: Failed to create framebuffer object");

@@ -6,7 +6,8 @@
 namespace dxvk {
   
   bool DxvkRenderPassFormat::eq(const DxvkRenderPassFormat& fmt) const {
-    bool eq = sampleCount == fmt.sampleCount;
+    bool eq = sampleCount == fmt.sampleCount
+           && viewMask == fmt.viewMask;
     
     for (uint32_t i = 0; i < MaxNumRenderTargets && eq; i++) {
       eq &= color[i].format == fmt.color[i].format
@@ -23,6 +24,7 @@ namespace dxvk {
   size_t DxvkRenderPassFormat::hash() const {
     DxvkHashState state;
     state.add(uint32_t(sampleCount));
+    state.add(viewMask);
 
     for (uint32_t i = 0; i < MaxNumRenderTargets; i++) {
       state.add(uint32_t(color[i].format));
@@ -199,9 +201,19 @@ namespace dxvk {
       writeAccess,
       VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, 0 };
     
+    VkRenderPassMultiviewCreateInfo multiviewInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO };
+    uint32_t viewMasks[] = { m_format.viewMask };
+    uint32_t correlationMasks[] = { m_format.viewMask };
+    if (m_format.viewMask != 0) {
+      multiviewInfo.subpassCount = 1;
+      multiviewInfo.pViewMasks = viewMasks;
+      multiviewInfo.correlationMaskCount = 1;
+      multiviewInfo.pCorrelationMasks = correlationMasks;
+    }
+
     VkRenderPassCreateInfo info;
     info.sType                        = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    info.pNext                        = nullptr;
+    info.pNext                        = m_format.viewMask != 0 ? &multiviewInfo : nullptr;
     info.flags                        = 0;
     info.attachmentCount              = attachments.size();
     info.pAttachments                 = attachments.data();

@@ -185,6 +185,21 @@ namespace dxvk {
   }
 
 
+  const Rc<DxvkImageView>& D3D9Surface::GetMultiviewRenderTargetView(bool Srgb) {
+    Rc<DxvkImageView>& view = m_multiviewRenderTargetView.Pick(Srgb);
+    if (unlikely(view == nullptr && !IsNull()))
+      view = m_texture->CreateView(D3D9CommonTexture::AllLayers, m_mipLevel, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, Srgb);
+    return view;
+  }
+
+
+  const Rc<DxvkImageView>& D3D9Surface::GetMultiviewDepthStencilView() {
+    if (unlikely(m_multiviewDepthStencilView == nullptr))
+      m_multiviewDepthStencilView = m_texture->CreateView(D3D9CommonTexture::AllLayers, m_mipLevel, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false);
+    return m_multiviewDepthStencilView;
+  }
+
+
   HRESULT D3D9Surface::SetMultiviewSurfaceLayer(UINT layer) {
     if (layer >= m_texture->Desc()->ArraySize || layer > 0xff)
       return D3DERR_INVALIDCALL;

@@ -6113,6 +6113,18 @@ namespace dxvk {
     // target bindings are updated. Set up the attachments.
     VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
 
+    bool useMultiview = m_multiViewFF
+      && GetDXVKDevice()->features().vulkan11Features.multiview;
+
+    if (useMultiview) {
+      for (uint32_t i : bit::BitMask(m_boundRTs))
+        useMultiview &= m_state.renderTargets[i]->GetCommonTexture()->Desc()->ArraySize >= 2;
+      if (m_state.depthStencil != nullptr)
+        useMultiview &= m_state.depthStencil->GetCommonTexture()->Desc()->ArraySize >= 2;
+    }
+
+    attachments.viewMask = useMultiview ? 0x3u : 0u;
+
     for (uint32_t i : bit::BitMask(m_boundRTs)) {
       const DxvkImageCreateInfo& rtImageInfo = m_state.renderTargets[i]->GetCommonTexture()->GetImage()->info();
 
@@ -6122,7 +6134,9 @@ namespace dxvk {
         continue;
 
       attachments.color[i] = {
-        m_state.renderTargets[i]->GetRenderTargetView(srgb),
+        useMultiview
+          ? m_state.renderTargets[i]->GetMultiviewRenderTargetView(srgb)
+          : m_state.renderTargets[i]->GetRenderTargetView(srgb),
         m_state.renderTargets[i]->GetRenderTargetLayout() };
     }
 
@@ -6132,7 +6146,9 @@ namespace dxvk {
 
       if (likely(sampleCount == VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM || sampleCount == dsImageInfo.sampleCount)) {
         attachments.depth = {
-          m_state.depthStencil->GetDepthStencilView(),
+          useMultiview
+            ? m_state.depthStencil->GetMultiviewDepthStencilView()
+            : m_state.depthStencil->GetDepthStencilView(),
           m_state.depthStencil->GetDepthStencilLayout(depthWrite, m_activeHazardsDS != 0) };
       }
     }

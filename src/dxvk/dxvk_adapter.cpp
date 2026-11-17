@@ -450,6 +450,7 @@ namespace dxvk {
     enabledFeatures.extVertexAttributeDivisor.vertexAttributeInstanceRateDivisor |= m_deviceFeatures.extVertexAttributeDivisor.vertexAttributeInstanceRateDivisor;
     enabledFeatures.extVertexAttributeDivisor.vertexAttributeInstanceRateZeroDivisor |= m_deviceFeatures.extVertexAttributeDivisor.vertexAttributeInstanceRateZeroDivisor;
     enabledFeatures.vulkan11Features.shaderDrawParameters |= m_deviceFeatures.vulkan11Features.shaderDrawParameters;
+    enabledFeatures.vulkan11Features.multiview |= m_deviceFeatures.vulkan11Features.multiview;
     enabledFeatures.vulkan12Features.drawIndirectCount |= m_deviceFeatures.vulkan12Features.drawIndirectCount;
     enabledFeatures.vulkan12Features.hostQueryReset |= m_deviceFeatures.vulkan12Features.hostQueryReset;
     enabledFeatures.vulkan12Features.samplerMirrorClampToEdge |= m_deviceFeatures.vulkan12Features.samplerMirrorClampToEdge;
