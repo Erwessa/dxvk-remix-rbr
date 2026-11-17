@@ -5,6 +5,7 @@
 #include "d3d9_surface.h"
 #include "d3d9_device.h"
 #include "d3d9_shader.h"
+#include "../dxvk/dxvk_openvr.h"
 
 #include <atomic>
 #include <vector>
@@ -15,6 +16,11 @@ class D3D9VR final : public ComObjectClamp<IDirect3DVR9> {
 public:
   explicit D3D9VR(IDirect3DDevice9* device)
   : m_device(static_cast<D3D9DeviceEx*>(device)) { }
+
+  ~D3D9VR() {
+    if (m_openVrSceneSession)
+      VrInstance::s_instance.shutdownSceneSession(this);
+  }
 
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) {
     if (ppvObject == nullptr)
@@ -457,8 +463,133 @@ public:
     return static_cast<D3D9Surface*>(surface)->SetMultiviewSurfaceLayer(layer);
   }
 
+  HRESULT STDMETHODCALLTYPE InitializeOpenVRScene() {
+    if (m_openVrSceneSession)
+      return D3D_OK;
+
+    D3DDEVICE_CREATION_PARAMETERS params = {};
+    const HRESULT paramsResult = m_device->GetCreationParameters(&params);
+    if (FAILED(paramsResult))
+      return paramsResult;
+
+    if (!VrInstance::s_instance.initializeSceneSession(this, params.AdapterOrdinal, true))
+      return D3DERR_NOTAVAILABLE;
+
+    m_openVrSceneSession = true;
+    return D3D_OK;
+  }
+
+  HRESULT STDMETHODCALLTYPE AcquireOpenVRFrame(D3D9_OPENVR_FRAME_STATE* frame) {
+    if (frame == nullptr)
+      return D3DERR_INVALIDCALL;
+    if (!m_openVrSceneSession)
+      return D3DERR_NOTAVAILABLE;
+
+    auto device = m_device->GetDXVKDevice();
+    device->lockSubmission();
+    OpenVrFrameState snapshot = {};
+    const bool acquired = VrInstance::s_instance.acquireFrame(snapshot);
+    device->unlockSubmission();
+    if (!acquired)
+      return D3DERR_NOTAVAILABLE;
+
+    const auto& pose = snapshot.renderPoses[vr::k_unTrackedDeviceIndex_Hmd];
+    frame->Version = 1;
+    frame->Flags = pose.bPoseIsValid ? 1u : 0u;
+    frame->FrameIndex = snapshot.frameIndex;
+    for (uint32_t row = 0; row < 3; row++)
+      for (uint32_t column = 0; column < 4; column++)
+        frame->DeviceToAbsoluteTracking[row * 4 + column] = pose.mDeviceToAbsoluteTracking.m[row][column];
+    return D3D_OK;
+  }
+
+  HRESULT STDMETHODCALLTYPE SubmitOpenVRFrame(IDirect3DSurface9* left, IDirect3DSurface9* right) {
+    if (!left || !right || !m_openVrSceneSession)
+      return D3DERR_INVALIDCALL;
+
+    const HRESULT leftTransfer = TransferSurfaceForVR(left);
+    if (FAILED(leftTransfer))
+      return leftTransfer;
+
+    const HRESULT rightTransfer = TransferSurfaceForVR(right);
+    if (FAILED(rightTransfer)) {
+      const HRESULT begin = BeginVRSubmit();
+      if (SUCCEEDED(begin))
+        EndVRSubmit();
+      return rightTransfer;
+    }
+
+    D3D9_TEXTURE_VR_DESC descriptors[2] = {};
+    HRESULT result = GetVRDesc(left, &descriptors[0]);
+    if (SUCCEEDED(result))
+      result = GetVRDesc(right, &descriptors[1]);
+    if (FAILED(result)) {
+      const HRESULT begin = BeginVRSubmit();
+      if (SUCCEEDED(begin))
+        EndVRSubmit();
+      return result;
+    }
+
+    std::array<vr::VRVulkanTextureData_t, 2> textures = {};
+    for (size_t i = 0; i < textures.size(); i++) {
+      textures[i].m_nImage = descriptors[i].Image;
+      textures[i].m_pDevice = reinterpret_cast<VkDevice_T*>(descriptors[i].Device);
+      textures[i].m_pPhysicalDevice = reinterpret_cast<VkPhysicalDevice_T*>(descriptors[i].PhysicalDevice);
+      textures[i].m_pInstance = reinterpret_cast<VkInstance_T*>(descriptors[i].Instance);
+      textures[i].m_pQueue = reinterpret_cast<VkQueue_T*>(descriptors[i].Queue);
+      textures[i].m_nQueueFamilyIndex = descriptors[i].QueueFamilyIndex;
+      textures[i].m_nWidth = descriptors[i].Width;
+      textures[i].m_nHeight = descriptors[i].Height;
+      textures[i].m_nFormat = static_cast<uint32_t>(descriptors[i].Format);
+      textures[i].m_nSampleCount = descriptors[i].SampleCount;
+    }
+
+    const HRESULT beginResult = BeginVRSubmit();
+    if (FAILED(beginResult))
+      return beginResult;
+
+    const bool submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Auto);
+    const HRESULT endResult = EndVRSubmit();
+    if (FAILED(endResult))
+      return endResult;
+    return submitted ? D3D_OK : D3DERR_NOTAVAILABLE;
+  }
+
+  HRESULT STDMETHODCALLTYPE ResetOpenVRView() {
+    if (!m_openVrSceneSession)
+      return D3DERR_NOTAVAILABLE;
+    return VrInstance::s_instance.resetView() ? D3D_OK : D3DERR_NOTAVAILABLE;
+  }
+
+  HRESULT STDMETHODCALLTYPE GetOpenVRFrameTiming(D3D9_OPENVR_FRAME_TIMING* timing) {
+    if (timing == nullptr)
+      return D3DERR_INVALIDCALL;
+    *timing = {};
+    if (!m_openVrSceneSession)
+      return D3DERR_NOTAVAILABLE;
+
+    vr::Compositor_FrameTiming frameTiming = {};
+    if (!VrInstance::s_instance.getFrameTiming(frameTiming))
+      return D3DERR_NOTAVAILABLE;
+
+    timing->GpuPreSubmit = frameTiming.m_flPreSubmitGpuMs;
+    timing->GpuPostSubmit = frameTiming.m_flPostSubmitGpuMs;
+    timing->CompositorGpu = frameTiming.m_flCompositorRenderGpuMs;
+    timing->CompositorCpu = frameTiming.m_flCompositorRenderCpuMs;
+    timing->CompositorSubmitFrame = frameTiming.m_flSubmitFrameMs;
+    timing->GpuTotal = frameTiming.m_flTotalRenderGpuMs;
+    timing->FrameInterval = frameTiming.m_flClientFrameIntervalMs;
+    timing->CpuPresentCall = frameTiming.m_flPresentCallCpuMs;
+    timing->CpuWaitForPresent = frameTiming.m_flWaitForPresentCpuMs;
+    timing->ReprojectionFlags = frameTiming.m_nReprojectionFlags;
+    timing->MispresentedFrames = frameTiming.m_nNumMisPresented;
+    timing->DroppedFrames = frameTiming.m_nNumDroppedFrames;
+    return D3D_OK;
+  }
+
 private:
   Com<D3D9DeviceEx, false> m_device;
+  bool m_openVrSceneSession = false;
   D3D9DeviceLock m_deviceLock;
   std::atomic<bool> m_deviceLockHeld = { false };
   std::atomic<uint32_t> m_deviceLockThreadId = { 0 };

@@ -21,6 +21,29 @@ struct D3D9_TEXTURE_VR_DESC {
   uint32_t SampleCount;
 };
 
+struct D3D9_OPENVR_FRAME_STATE {
+  uint32_t Version;
+  uint32_t Flags;
+  uint64_t FrameIndex;
+  float DeviceToAbsoluteTracking[12];
+};
+
+struct D3D9_OPENVR_FRAME_TIMING {
+  float GpuPreSubmit;
+  float GpuPostSubmit;
+  float CompositorGpu;
+  float CompositorCpu;
+  float CompositorSubmitFrame;
+  float GpuTotal;
+  float FrameInterval;
+  float WaitForPresent;
+  float CpuPresentCall;
+  float CpuWaitForPresent;
+  uint32_t ReprojectionFlags;
+  uint32_t MispresentedFrames;
+  uint32_t DroppedFrames;
+};
+
 struct OXR_VK_DEVICE_DESC {
   VkDevice Device;
   VkPhysicalDevice PhysicalDevice;
@@ -58,6 +81,11 @@ IDirect3DVR9 : public IUnknown {
   virtual HRESULT STDMETHODCALLTYPE EnableMultiView(bool enable) = 0;
   virtual HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9* pSurface, uint32_t layer) = 0;
   virtual HRESULT STDMETHODCALLTYPE CreateTextureFromNTHandle(UINT Width, UINT Height, UINT Levels, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool, IDirect3DTexture9** ppTexture, HANDLE* pSharedHandle) = 0;
+  virtual HRESULT STDMETHODCALLTYPE InitializeOpenVRScene() = 0;
+  virtual HRESULT STDMETHODCALLTYPE AcquireOpenVRFrame(D3D9_OPENVR_FRAME_STATE* frame) = 0;
+  virtual HRESULT STDMETHODCALLTYPE SubmitOpenVRFrame(IDirect3DSurface9* left, IDirect3DSurface9* right) = 0;
+  virtual HRESULT STDMETHODCALLTYPE ResetOpenVRView() = 0;
+  virtual HRESULT STDMETHODCALLTYPE GetOpenVRFrameTiming(D3D9_OPENVR_FRAME_TIMING* timing) = 0;
 };
 
 #ifdef _MSC_VER
