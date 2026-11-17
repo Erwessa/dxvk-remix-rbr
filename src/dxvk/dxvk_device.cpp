@@ -275,6 +275,11 @@ namespace dxvk {
   }
 
 
+  Rc<DxvkFence> DxvkDevice::createFence(const DxvkFenceCreateInfo& info) {
+    return new DxvkFence(this, info);
+  }
+
+
   Rc<DxvkGpuQuery> DxvkDevice::createGpuQuery(
           VkQueryType           type,
           VkQueryControlFlags   flags,

@@ -87,6 +87,7 @@ dxvk_src = files([
   'dxvk_device_info.h',
   'dxvk_extension_provider.h',
   'dxvk_extensions.cpp',
+  'dxvk_fence.cpp',
   'dxvk_extensions.h',
   'dxvk_format.cpp',
   'dxvk_format.h',

@@ -28,6 +28,7 @@
 #include "dxvk_context.h"
 #include "dxvk_extensions.h"
 #include "dxvk_framebuffer.h"
+#include "dxvk_fence.h"
 #include "dxvk_image.h"
 #include "dxvk_instance.h"
 #include "dxvk_memory.h"
@@ -305,6 +306,13 @@ namespace dxvk {
      * \returns New GPU event
      */
     Rc<DxvkGpuEvent> createGpuEvent();
+
+    /**
+     * \\brief Creates an externally shareable timeline fence
+     * \\param [in] info Fence creation and import parameters
+     * \\returns New fence
+     */
+    Rc<DxvkFence> createFence(const DxvkFenceCreateInfo& info);
 
     /**
      * \brief Creates a query

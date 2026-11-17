@@ -145,9 +145,31 @@ public:
     return D3D_OK;
   }
 
-  // Fence interop is implemented alongside the Vulkan timeline semaphore wrapper.
-  HRESULT STDMETHODCALLTYPE ImportFence(HANDLE, uint64_t) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE SignalFence(uint64_t) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE ImportFence(HANDLE handle, uint64_t value) {
+    if (handle == nullptr || handle == INVALID_HANDLE_VALUE)
+      return D3DERR_INVALIDCALL;
+
+    DxvkFenceCreateInfo info = {};
+    info.initialValue = value;
+    info.sharedType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D11_FENCE_BIT;
+    info.sharedHandle = handle;
+
+    try {
+      m_fence = m_device->GetDXVKDevice()->createFence(info);
+    } catch (const DxvkError&) {
+      m_fence = nullptr;
+      return E_FAIL;
+    }
+
+    return D3D_OK;
+  }
+
+  HRESULT STDMETHODCALLTYPE SignalFence(uint64_t value) {
+    if (m_fence == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    return m_fence->signal(value) == VK_SUCCESS ? D3D_OK : E_FAIL;
+  }
   HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9* d3dShader, char** out) {
     if (d3dShader == nullptr || out == nullptr)
       return D3DERR_INVALIDCALL;
@@ -316,6 +338,7 @@ private:
   D3D9DeviceEx* m_device;
   D3D9DeviceLock m_deviceLock;
   bool m_deviceLockHeld = false;
+  Rc<DxvkFence> m_fence;
 };
 
 }
