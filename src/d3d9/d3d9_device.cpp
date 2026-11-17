@@ -3781,6 +3781,33 @@ namespace dxvk {
   }
 
 
+  HRESULT D3D9DeviceEx::CreateRenderTargetFromDesc(
+          const D3D9_COMMON_TEXTURE_DESC* pDesc,
+          IDirect3DSurface9**              ppSurface,
+          HANDLE*                          pSharedHandle) {
+    InitReturnPtr(ppSurface);
+
+    if (pDesc == nullptr || ppSurface == nullptr || pDesc->ArraySize == 0)
+      return D3DERR_INVALIDCALL;
+
+    D3D9DeviceLock lock = LockDevice();
+    D3D9_COMMON_TEXTURE_DESC desc = *pDesc;
+    if (FAILED(D3D9CommonTexture::NormalizeTextureProperties(this, &desc)))
+      return D3DERR_INVALIDCALL;
+
+    try {
+      const Com<D3D9Surface> surface = new D3D9Surface(this, &desc, nullptr, pSharedHandle);
+      m_initializer->InitTexture(surface->GetCommonTexture());
+      *ppSurface = surface.ref();
+      return D3D_OK;
+    }
+    catch (const DxvkError& e) {
+      Logger::err(e.message());
+      return D3DERR_OUTOFVIDEOMEMORY;
+    }
+  }
+
+
   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::CreateRenderTargetEx(
           UINT                Width,
           UINT                Height,
