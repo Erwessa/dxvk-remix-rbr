@@ -62,6 +62,7 @@ namespace bridge_util {
     bool RegisterExitCallback(ProcessExitCallback callback);
     void UnregisterExitCallback();
     HANDLE GetCurrentProcessHandle();
+    HANDLE GetServerProcessHandle() const { return hProcess; }
 
     bool isLaunched() const {
       return hProcess != NULL;
