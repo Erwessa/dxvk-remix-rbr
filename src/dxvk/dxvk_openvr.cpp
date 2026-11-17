@@ -619,7 +619,7 @@ namespace dxvk {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
     if (!m_sceneSessionActive || !m_chaperone)
       return false;
-    m_chaperone->ResetZeroPose(vr::TrackingUniverseSeated);
+    m_chaperone->ResetZeroPose(vr::TrackingUniverseStanding);
     return true;
   }
 
