@@ -301,6 +301,7 @@ namespace dxvk {
     
     if (!g_vrFunctions.getGenericInterface) {
       Logger::warn("OpenVR: VR_GetGenericInterface not found");
+      this->shutdown();
       return nullptr;
     }
     
@@ -314,6 +315,7 @@ namespace dxvk {
       if (!g_vrFunctions.initInternal
        || !g_vrFunctions.shutdownInternal) {
         Logger::warn("OpenVR: VR_InitInternal or VR_ShutdownInternal not found");
+        this->shutdown();
         return nullptr;
       }
 
@@ -324,6 +326,7 @@ namespace dxvk {
 
       if (error != vr::VRInitError_None) {
         Logger::warn("OpenVR: Failed to initialize OpenVR");
+        this->shutdown();
         return nullptr;
       }
 
