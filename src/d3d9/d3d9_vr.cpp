@@ -110,7 +110,9 @@ public:
       m_device->SynchronizeCsThread();
     }
     auto device = m_device->GetDXVKDevice();
+    device->lockSubmission();
     const VkResult result = device->vkd()->vkQueueWaitIdle(device->queues().graphics.queueHandle);
+    device->unlockSubmission();
     return result == VK_SUCCESS ? D3D_OK : D3DERR_NOTAVAILABLE;
   }
 
