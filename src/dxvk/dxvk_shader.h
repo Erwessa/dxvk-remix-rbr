@@ -236,6 +236,14 @@ namespace dxvk {
      * \param [in] outputStream Stream to write to 
      */
     void dump(std::ostream& outputStream) const;
+
+    /**
+     * \brief Retrieves the original, uncompressed SPIR-V code.
+     * The returned buffer owns its storage and can be modified by the caller.
+     */
+    SpirvCodeBuffer getRawCode() const {
+      return m_code.decompress();
+    }
     
     /**
      * \brief Sets the shader key
