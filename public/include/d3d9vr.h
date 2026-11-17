@@ -19,6 +19,7 @@ struct D3D9_OPENVR_FRAME_STATE {
   float ProjectionRaw[2][4];
   float ProjectionMatrix[2][16];
 };
+constexpr uint32_t D3D9_OPENVR_FRAME_STATE_VERSION = 2;
 
 enum class D3D9VRCommand : uint32_t {
   InitializeOpenVRScene = 1,

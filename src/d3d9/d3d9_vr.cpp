@@ -495,7 +495,7 @@ public:
       return D3DERR_NOTAVAILABLE;
 
     const auto& pose = snapshot.renderPoses[vr::k_unTrackedDeviceIndex_Hmd];
-    frame->Version = 1;
+    frame->Version = D3D9_OPENVR_FRAME_STATE_VERSION;
     frame->Flags = pose.bPoseIsValid ? 1u : 0u;
     frame->FrameIndex = snapshot.frameIndex;
     frame->RecommendedWidth = snapshot.recommendedWidth;
