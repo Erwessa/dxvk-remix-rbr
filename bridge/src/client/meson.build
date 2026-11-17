@@ -32,6 +32,7 @@ d3d9_src = files([
   'd3d9_cubetexture.cpp',
   'd3d9_device_base.cpp',
   'd3d9_device.cpp',
+  'd3d9_vr.cpp',
   'd3d9_indexbuffer.cpp',
   'd3d9_lss.cpp',
   'd3d9_module.cpp',

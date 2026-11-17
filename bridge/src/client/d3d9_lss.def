@@ -15,6 +15,7 @@ EXPORTS
 
   Direct3DCreate9 @ 37
   Direct3DCreate9Ex @ 38
+  Direct3DCreateVR
 
   DetourFinishHelperProcess @ 1
 
