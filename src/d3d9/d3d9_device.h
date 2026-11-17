@@ -1149,6 +1149,14 @@ namespace dxvk {
 
     void UpdateFixedFunctionPS();
 
+    bool MultiViewFF() const { return m_multiViewFF; }
+    void SetMultiViewFF(bool enabled) {
+      if (m_multiViewFF != enabled) {
+        m_multiViewFF = enabled;
+        m_flags.set(D3D9DeviceFlag::DirtyFFVertexShader);
+      }
+    }
+
     void ApplyPrimitiveType(
       DxvkContext*      pContext,
       D3DPRIMITIVETYPE  PrimType);
