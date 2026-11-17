@@ -164,7 +164,7 @@ public:
 
     char* buffer = reinterpret_cast<char*>(out);
     std::memcpy(buffer, key.data(), key.size());
-    buffer[key.size()] = '\\0';
+    buffer[key.size()] = '\0';
     return D3D_OK;
   }
   HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9*, const uint32_t*, uint32_t) { return E_NOTIMPL; }
