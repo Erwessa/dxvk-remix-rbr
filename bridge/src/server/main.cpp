@@ -3254,6 +3254,8 @@ void ProcessDeviceCommandQueue() {
             PULL(uint64_t, fenceValue);
             const HANDLE sharedHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(handleValue));
             hresult = vrInterface->ImportFence(sharedHandle, fenceValue);
+            if (FAILED(hresult))
+              CloseHandle(sharedHandle);
             break;
           }
 
