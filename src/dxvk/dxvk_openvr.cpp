@@ -102,7 +102,9 @@ namespace dxvk {
   DxvkNameSet VrInstance::getDeviceExtensions(uint32_t adapterId) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
     
-    if (adapterId < m_devExtensions.size())
+    if (adapterId < m_devExtensions.size()
+        && adapterId < m_devExtensionsValid.size()
+        && m_devExtensionsValid[adapterId])
       return m_devExtensions[adapterId];
     
     return DxvkNameSet();
@@ -177,11 +179,36 @@ namespace dxvk {
         return;
       }
       m_devExtensions.push_back(std::move(extensions));
+      m_devExtensionsValid.push_back(true);
     }
 
     m_initializedDevExt = true;
     this->shutdown();
   }
+
+  void VrInstance::validateDeviceExtensions(uint32_t adapterId, const DxvkAdapter& adapter) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+    if (m_no_vr || m_extensionQueryFailed || !m_initializedDevExt
+        || adapterId >= m_devExtensions.size()
+        || adapterId >= m_devExtensionsValid.size()
+        || !m_devExtensionsValid[adapterId])
+      return;
+
+    const auto requested = m_devExtensions[adapterId].toNameList();
+    for (uint32_t i = 0; i < requested.count(); i++) {
+      if (!adapter.supportsExtension(requested.name(i))) {
+        Logger::warn(str::format(
+          "OpenVR: requested Vulkan device extension is unavailable for adapter ",
+          adapterId, ": ", requested.name(i), "; disabling OpenVR on this adapter"));
+
+        m_devExtensions[adapterId] = DxvkNameSet();
+        m_devExtensionsValid[adapterId] = false;
+        return;
+      }
+    }
+  }
+
 
   bool VrInstance::waitVrKeyReady() const {
     DWORD type = 0;
@@ -367,7 +394,7 @@ namespace dxvk {
   }
 
 
-  bool VrInstance::initializeSceneSession(const void* owner) {
+  bool VrInstance::initializeSceneSession(const void* owner, uint32_t adapterId) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
     if (!owner) {
@@ -380,7 +407,9 @@ namespace dxvk {
 
     // A scene session is only safe after both Vulkan extension queries
     // completed successfully before instance/device creation.
-    if (!m_initializedInsExt || !m_initializedDevExt || m_extensionQueryFailed) {
+    if (!m_initializedInsExt || !m_initializedDevExt || m_extensionQueryFailed
+        || adapterId >= m_devExtensionsValid.size()
+        || !m_devExtensionsValid[adapterId]) {
       Logger::warn("OpenVR: Vulkan extension discovery did not complete successfully");
       return false;
     }
