@@ -498,6 +498,7 @@ namespace dxvk {
     }
 
     m_compositor = compositor;
+    m_compositor->SetTrackingSpace(vr::TrackingUniverseStanding);
     m_system = system;
     error = vr::VRInitError_None;
     m_chaperone = reinterpret_cast<vr::IVRChaperone*>(
