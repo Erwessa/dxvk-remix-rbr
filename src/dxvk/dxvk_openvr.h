@@ -103,6 +103,7 @@ namespace dxvk {
   };
 
   class DxvkInstance;
+  class DxvkAdapter;
 
   /**
    * \brief OpenVR instance
@@ -133,9 +134,12 @@ namespace dxvk {
     void initDeviceExtensions(
       const DxvkInstance* instance);
 
+    // Filter per-adapter OpenVR extensions against that physical device.
+    void validateDeviceExtensions(uint32_t adapterId, const DxvkAdapter& adapter);
+
     // Starts a long-lived OpenVR scene session after Vulkan device creation.
     // If the host already owns a scene session, it is reused and never shut down here.
-    bool initializeSceneSession(const void* owner);
+    bool initializeSceneSession(const void* owner, uint32_t adapterId);
     void shutdownSceneSession(const void* owner);
 
     vr::IVRSystem* getSystem() const { return m_system; }
@@ -182,6 +186,7 @@ namespace dxvk {
 
     DxvkNameSet              m_insExtensions;
     std::vector<DxvkNameSet> m_devExtensions;
+    std::vector<bool> m_devExtensionsValid;
     
     bool queryInstanceExtensions(DxvkNameSet& extensions) const;
 
