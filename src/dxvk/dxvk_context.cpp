@@ -747,7 +747,8 @@ namespace dxvk {
       clearRect.rect.extent.width   = imageView->mipLevelExtent(0).width;
       clearRect.rect.extent.height  = imageView->mipLevelExtent(0).height;
       clearRect.baseArrayLayer      = 0;
-      clearRect.layerCount          = imageView->info().numLayers;
+      clearRect.layerCount          = m_state.om.framebufferInfo.attachments().viewMask
+        ? 1 : imageView->info().numLayers;
 
       m_cmd->cmdClearAttachments(1, &clearInfo, 1, &clearRect);
     } else
@@ -3516,7 +3517,8 @@ namespace dxvk {
     clearRect.rect.extent.width = extent.width;
     clearRect.rect.extent.height = extent.height;
     clearRect.baseArrayLayer = 0;
-    clearRect.layerCount = imageView->info().numLayers;
+    clearRect.layerCount = m_state.om.framebufferInfo.attachments().viewMask
+      ? 1 : imageView->info().numLayers;
 
     clearAttachments(clearInfo, clearRect);
 
