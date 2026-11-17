@@ -83,7 +83,7 @@ if (-not (Test-Path -LiteralPath $bridgeConfig -PathType Leaf)) {
 }
 
 $configLines = @(Get-Content -LiteralPath $bridgeConfig)
-$targetLine = "client.targetProcess = "$GameExecutable""
+$targetLine = 'client.targetProcess = "' + $GameExecutable + '"'
 $targetPattern = '^\s*#?\s*client\.targetProcess\s*=.*$'
 $targetFound = $false
 for ($i = 0; $i -lt $configLines.Count; $i++) {
@@ -99,7 +99,7 @@ if (-not $targetFound) {
 [IO.File]::WriteAllLines(
     $bridgeConfig,
     [string[]]$configLines,
-    (New-Object System.Text.UTF8Encoding($false))
+    [System.Text.UTF8Encoding]::new($false)
 )
 
 Write-Host ''
