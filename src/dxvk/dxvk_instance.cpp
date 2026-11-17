@@ -575,6 +575,11 @@ namespace dxvk {
     for (const auto& provider : m_extProviders)
       provider->initDeviceExtensions(this);
 
+    // Validate OpenVR's adapter-specific requirements before merging them into
+    // the device extension list; unsupported runtime names must not reach vkCreateDevice.
+    for (uint32_t i = 0; i < m_adapters.size(); i++)
+      VrInstance::s_instance.validateDeviceExtensions(i, *m_adapters[i]);
+
     for (uint32_t i = 0; i < m_adapters.size(); i++) {
       for (const auto& provider : m_extProviders) {
         m_adapters[i]->enableExtensions(
