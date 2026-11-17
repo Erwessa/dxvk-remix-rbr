@@ -57,6 +57,7 @@ IDirect3DVR9 : public IUnknown {
   virtual HRESULT STDMETHODCALLTYPE SetShaderConstantCount(IDirect3DVertexShader9* d3dShader, uint32_t constantCount) = 0;
   virtual HRESULT STDMETHODCALLTYPE EnableMultiView(bool enable) = 0;
   virtual HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9* pSurface, uint32_t layer) = 0;
+  virtual HRESULT STDMETHODCALLTYPE CreateTextureFromNTHandle(UINT Width, UINT Height, UINT Levels, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool, IDirect3DTexture9** ppTexture, HANDLE* pSharedHandle) = 0;
 };
 
 #ifdef _MSC_VER

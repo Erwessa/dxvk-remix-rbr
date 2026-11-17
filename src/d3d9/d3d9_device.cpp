@@ -491,6 +491,21 @@ namespace dxvk {
           D3DPOOL             Pool,
           IDirect3DTexture9** ppTexture,
           HANDLE*             pSharedHandle) {
+    return CreateTextureWithHandleType(Width, Height, Levels, Usage, Format, Pool,
+      ppTexture, pSharedHandle, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT);
+  }
+
+
+  HRESULT D3D9DeviceEx::CreateTextureWithHandleType(
+          UINT                Width,
+          UINT                Height,
+          UINT                Levels,
+          DWORD               Usage,
+          D3DFORMAT           Format,
+          D3DPOOL             Pool,
+          IDirect3DTexture9** ppTexture,
+          HANDLE*             pSharedHandle,
+          VkExternalMemoryHandleTypeFlagBits handleType) {
     ScopedCpuProfileZone();
     InitReturnPtr(ppTexture);
 
@@ -526,7 +541,7 @@ namespace dxvk {
       if (pSharedHandle != nullptr && Pool != D3DPOOL_DEFAULT)
         return D3DERR_INVALIDCALL;
 
-      const Com<D3D9Texture2D> texture = new D3D9Texture2D(this, &desc, pSharedHandle);
+      const Com<D3D9Texture2D> texture = new D3D9Texture2D(this, &desc, pSharedHandle, handleType);
 
       m_initializer->InitTexture(texture->GetCommonTexture(), initialData);
       *ppTexture = texture.ref();

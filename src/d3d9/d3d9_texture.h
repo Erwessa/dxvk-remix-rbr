@@ -24,9 +24,10 @@ namespace dxvk {
             D3D9DeviceEx*             pDevice,
       const D3D9_COMMON_TEXTURE_DESC* pDesc,
             D3DRESOURCETYPE           ResourceType,
-            HANDLE*                   pSharedHandle)
+            HANDLE*                   pSharedHandle,
+            VkExternalMemoryHandleTypeFlagBits sharedHandleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT)
       : D3D9Resource<Base...> ( pDevice )
-      , m_texture             ( pDevice, pDesc, ResourceType, pSharedHandle )
+      , m_texture             ( pDevice, pDesc, ResourceType, pSharedHandle, sharedHandleType )
       , m_lod                 ( 0 ) {
       const uint32_t arraySlices = m_texture.Desc()->ArraySize;
       const uint32_t mipLevels   = m_texture.Desc()->MipLevels;
@@ -132,7 +133,8 @@ namespace dxvk {
     D3D9Texture2D(
             D3D9DeviceEx*             pDevice,
       const D3D9_COMMON_TEXTURE_DESC* pDesc,
-            HANDLE*                   pSharedHandle);
+            HANDLE*                   pSharedHandle,
+            VkExternalMemoryHandleTypeFlagBits sharedHandleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
 

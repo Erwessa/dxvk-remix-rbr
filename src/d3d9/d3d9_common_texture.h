@@ -85,7 +85,8 @@ namespace dxvk {
             D3D9DeviceEx*             pDevice,
       const D3D9_COMMON_TEXTURE_DESC* pDesc,
             D3DRESOURCETYPE           ResourceType,
-            HANDLE*                   pSharedHandle);
+            HANDLE*                   pSharedHandle,
+            VkExternalMemoryHandleTypeFlagBits sharedHandleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT);
 
     ~D3D9CommonTexture();
 
@@ -534,7 +535,7 @@ namespace dxvk {
      */
     VkDeviceSize GetMipSize(UINT Subresource) const;
 
-    Rc<DxvkImage> CreatePrimaryImage(D3DRESOURCETYPE ResourceType, bool TryOffscreenRT, HANDLE* pSharedHandle) const;
+    Rc<DxvkImage> CreatePrimaryImage(D3DRESOURCETYPE ResourceType, bool TryOffscreenRT, HANDLE* pSharedHandle, VkExternalMemoryHandleTypeFlagBits sharedHandleType) const;
 
     Rc<DxvkImage> CreateResolveImage() const;
 

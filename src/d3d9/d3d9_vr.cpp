@@ -332,6 +332,15 @@ public:
     m_device->SetMultiViewFF(enable);
     return D3D_OK;
   }
+  HRESULT STDMETHODCALLTYPE CreateTextureFromNTHandle(
+      UINT width, UINT height, UINT levels, DWORD usage, D3DFORMAT format,
+      D3DPOOL pool, IDirect3DTexture9** texture, HANDLE* sharedHandle) {
+    if (sharedHandle == nullptr || *sharedHandle == nullptr || *sharedHandle == INVALID_HANDLE_VALUE)
+      return D3DERR_INVALIDCALL;
+    return m_device->CreateTextureWithHandleType(width, height, levels, usage, format, pool,
+      texture, sharedHandle, VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT);
+  }
+
   HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9* surface, uint32_t layer) {
     if (surface == nullptr)
       return D3DERR_INVALIDCALL;

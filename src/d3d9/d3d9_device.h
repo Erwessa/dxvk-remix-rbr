@@ -194,6 +194,17 @@ namespace dxvk {
             IDirect3DTexture9** ppTexture,
             HANDLE*             pSharedHandle);
 
+    HRESULT CreateTextureWithHandleType(
+            UINT                Width,
+            UINT                Height,
+            UINT                Levels,
+            DWORD               Usage,
+            D3DFORMAT           Format,
+            D3DPOOL             Pool,
+            IDirect3DTexture9** ppTexture,
+            HANDLE*             pSharedHandle,
+            VkExternalMemoryHandleTypeFlagBits handleType);
+
     HRESULT STDMETHODCALLTYPE CreateVolumeTexture(
             UINT                      Width,
             UINT                      Height,
