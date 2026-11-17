@@ -9,6 +9,7 @@
 #include <openvr/openvr.hpp>
 
 #include <cstring>
+#include <fstream>
 
 using VR_InitInternalProc        = uint32_t (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
 using VR_ShutdownInternalProc    = void  (VR_CALLTYPE *)();
@@ -782,14 +783,52 @@ namespace dxvk {
             ch = '\\';
         }
 
-        const std::string dllPath = steamPath
-          + "\\steamapps\\common\\SteamVR\\bin\\win64\\openvr_api.dll";
-        HMODULE handle = ::LoadLibraryExA(dllPath.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
-        if (handle) {
-          m_loadedOvrApi = true;
+        const auto tryLoadFromLibrary = [&](const std::string& libraryPath) -> HMODULE {
+          const std::string dllPath = libraryPath
+            + "\\steamapps\\common\\SteamVR\\bin\\win64\\openvr_api.dll";
+          HMODULE loaded = ::LoadLibraryExA(dllPath.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+          if (loaded) {
+            m_loadedOvrApi = true;
+            Logger::info(str::format("OpenVR: loaded x64 API from ", dllPath));
+          }
+          return loaded;
+        };
+
+        if (HMODULE handle = tryLoadFromLibrary(steamPath)) {
           RegCloseKey(key);
-          Logger::info(str::format("OpenVR: loaded x64 API from ", dllPath));
           return handle;
+        }
+
+        // SteamVR may live in a secondary Steam library. Read the registered
+        // library roots instead of assuming the default steamapps directory.
+        std::ifstream libraryFolders(steamPath + "\\steamapps\\libraryfolders.vdf");
+        std::string line;
+        while (std::getline(libraryFolders, line)) {
+          const size_t pathKey = line.find("\"path\"");
+          if (pathKey == std::string::npos)
+            continue;
+          const size_t valueStart = line.find('"', pathKey + 6);
+          const size_t valueEnd = valueStart == std::string::npos
+            ? std::string::npos : line.find('"', valueStart + 1);
+          if (valueStart == std::string::npos || valueEnd == std::string::npos)
+            continue;
+
+          std::string libraryPath = line.substr(valueStart + 1, valueEnd - valueStart - 1);
+          for (size_t i = 0; i + 1 < libraryPath.size();) {
+            if (libraryPath[i] == '\\' && libraryPath[i + 1] == '\\')
+              libraryPath.erase(i, 1);
+            else
+              i++;
+          }
+          for (char& ch : libraryPath) {
+            if (ch == '/')
+              ch = '\\';
+          }
+
+          if (HMODULE handle = tryLoadFromLibrary(libraryPath)) {
+            RegCloseKey(key);
+            return handle;
+          }
         }
       }
 
