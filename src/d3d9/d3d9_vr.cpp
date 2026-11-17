@@ -4,6 +4,7 @@
 #include "d3d9_include.h"
 #include "d3d9_surface.h"
 #include "d3d9_device.h"
+#include "d3d9_shader.h"
 
 namespace dxvk {
 
@@ -146,14 +147,68 @@ public:
   // multiview support. Fail explicitly rather than reporting false success.
   HRESULT STDMETHODCALLTYPE ImportFence(HANDLE, uint64_t) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE SignalFence(uint64_t) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9*, char**) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9* d3dShader, char** out) {
+    if (d3dShader == nullptr || out == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    auto* shader = reinterpret_cast<D3D9Shader<IDirect3DVertexShader9>*>(d3dShader);
+    auto dxvkShader = shader->GetCommonShader()->GetShader(D3D9ShaderPermutations::None);
+    if (dxvkShader == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    const std::string key = dxvkShader->getShaderKey().toString();
+    if (key.size() >= 64)
+      return D3DERR_INVALIDCALL;
+
+    char* buffer = reinterpret_cast<char*>(out);
+    std::memcpy(buffer, key.data(), key.size());
+    buffer[key.size()] = '\\0';
+    return D3D_OK;
+  }
   HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9*, const uint32_t*, uint32_t) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE CreateMultiViewRenderTarget(UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD, BOOL, IDirect3DSurface9**, HANDLE*, UINT) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD, BOOL, IDirect3DSurface9**, HANDLE*, UINT) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9*, IDirect3DSurface9**, UINT) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE GetSPIRVShaderCode(IDirect3DVertexShader9*, uint32_t*, uint32_t*) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE GetShaderConstantCount(IDirect3DVertexShader9*, uint32_t*) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE SetShaderConstantCount(IDirect3DVertexShader9*, uint32_t) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE GetSPIRVShaderCode(IDirect3DVertexShader9* d3dShader, uint32_t* out, uint32_t* size) {
+    if (d3dShader == nullptr || size == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    auto* shader = reinterpret_cast<D3D9Shader<IDirect3DVertexShader9>*>(d3dShader);
+    auto dxvkShader = shader->GetCommonShader()->GetShader(D3D9ShaderPermutations::None);
+    if (dxvkShader == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    const SpirvCodeBuffer code = dxvkShader->getRawCode();
+    const uint32_t required = code.dwords();
+    if (out == nullptr) {
+      *size = required;
+      return D3D_OK;
+    }
+    if (*size < required) {
+      *size = required;
+      return D3DERR_MOREDATA;
+    }
+
+    std::memcpy(out, code.data(), code.size());
+    *size = required;
+    return D3D_OK;
+  }
+  HRESULT STDMETHODCALLTYPE GetShaderConstantCount(IDirect3DVertexShader9* d3dShader, uint32_t* out) {
+    if (d3dShader == nullptr || out == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    auto* shader = reinterpret_cast<D3D9Shader<IDirect3DVertexShader9>*>(d3dShader);
+    *out = shader->GetCommonShader()->GetMeta().maxConstIndexF;
+    return D3D_OK;
+  }
+  HRESULT STDMETHODCALLTYPE SetShaderConstantCount(IDirect3DVertexShader9* d3dShader, uint32_t count) {
+    if (d3dShader == nullptr)
+      return D3DERR_INVALIDCALL;
+
+    auto* shader = reinterpret_cast<D3D9Shader<IDirect3DVertexShader9>*>(d3dShader);
+    shader->GetCommonShader_mut()->SetMaxFloatConstantIndex(count);
+    return D3D_OK;
+  }
   HRESULT STDMETHODCALLTYPE EnableMultiView(bool) { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9*, uint32_t) { return E_NOTIMPL; }
 
