@@ -709,6 +709,13 @@ namespace dxvk {
        || !data.read(imageLayout, version))
         return false;
 
+      if (version >= 13) {
+        if (!data.read(entry.format.viewMask, version))
+          return false;
+      } else {
+        entry.format.viewMask = 0;
+      }
+
       entry.format.sampleCount = VkSampleCountFlagBits(sampleCount);
       entry.format.depth.format = VkFormat(imageFormat);
       entry.format.depth.layout = unpackImageLayout(imageLayout);
@@ -811,6 +818,7 @@ namespace dxvk {
       data.write(uint8_t(entry.format.sampleCount));
       data.write(uint8_t(entry.format.depth.format));
       data.write(packImageLayout(entry.format.depth.layout));
+      data.write(entry.format.viewMask);
 
       for (uint32_t i = 0; i < MaxNumRenderTargets; i++) {
         data.write(uint8_t(entry.format.color[i].format));
