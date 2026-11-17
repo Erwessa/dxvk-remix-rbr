@@ -317,7 +317,7 @@ private:
     desc.Pool = D3DPOOL_DEFAULT;
     desc.Type = D3DRTYPE_SURFACE;
 
-    auto* surface = trackWrapper(new Direct3DSurface9_LSS(m_device, desc));
+    auto* surface = new (std::nothrow) Direct3DSurface9_LSS(m_device, desc);
     if (!surface)
       return E_OUTOFMEMORY;
     const HRESULT result = invoke(depthStencil

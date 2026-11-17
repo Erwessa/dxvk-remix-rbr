@@ -3248,6 +3248,10 @@ void ProcessDeviceCommandQueue() {
           {
             PULL_U(sourceId);
             PULL_U(layerCount);
+            if (layerCount == 0 || layerCount > 4) {
+              hresult = D3DERR_INVALIDCALL;
+              break;
+            }
             std::vector<IDirect3DSurface9*> destinations(layerCount, nullptr);
             for (UINT i = 0; i < layerCount; i++) {
               PULL_U(destinationId);
@@ -3350,8 +3354,11 @@ void ProcessDeviceCommandQueue() {
             IDirect3DSurface9* surface = nullptr;
             hresult = vrInterface->CreateMultiViewRenderTarget(
               width, height, format, multiSample, quality, lockable, &surface, nullptr, views);
-            if (SUCCEEDED(hresult) && surface)
+            if (SUCCEEDED(hresult) && surface) {
               gpD3DResources[surfaceId] = surface;
+            } else if (SUCCEEDED(hresult)) {
+              hresult = E_FAIL;
+            }
             break;
           }
 
@@ -3368,8 +3375,11 @@ void ProcessDeviceCommandQueue() {
             IDirect3DSurface9* surface = nullptr;
             hresult = vrInterface->CreateMultiViewDepthStencilSurface(
               width, height, format, multiSample, quality, discard, &surface, nullptr, views);
-            if (SUCCEEDED(hresult) && surface)
+            if (SUCCEEDED(hresult) && surface) {
               gpD3DResources[surfaceId] = surface;
+            } else if (SUCCEEDED(hresult)) {
+              hresult = E_FAIL;
+            }
             break;
           }
 
