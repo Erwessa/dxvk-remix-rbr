@@ -3244,6 +3244,37 @@ void ProcessDeviceCommandQueue() {
             break;
           }
 
+          case D3D9VRCommand::Flush:
+            hresult = vrInterface->Flush();
+            break;
+
+          case D3D9VRCommand::ImportFence:
+          {
+            PULL(uint64_t, handleValue);
+            PULL(uint64_t, fenceValue);
+            const HANDLE sharedHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(handleValue));
+            hresult = vrInterface->ImportFence(sharedHandle, fenceValue);
+            break;
+          }
+
+          case D3D9VRCommand::SignalFence:
+          {
+            PULL(uint64_t, fenceValue);
+            // Keep queue locking inside one server-side command. Holding a
+            // lock across separate IPC calls could deadlock if other D3D9
+            // commands were interleaved before the matching unlock.
+            const HRESULT lockResult = vrInterface->LockSubmissionQueue();
+            if (SUCCEEDED(lockResult)) {
+              hresult = vrInterface->SignalFence(fenceValue);
+              const HRESULT unlockResult = vrInterface->UnlockSubmissionQueue();
+              if (SUCCEEDED(hresult))
+                hresult = unlockResult;
+            } else {
+              hresult = lockResult;
+            }
+            break;
+          }
+
           case D3D9VRCommand::CopySurfaceLayers:
           {
             PULL_U(sourceId);
