@@ -174,14 +174,16 @@ namespace dxvk {
     uint64_t m_waitGetPosesFailures = 0;
     bool m_initializedInsExt = false;
     bool m_initializedDevExt = false;
+    bool m_extensionQueryFailed = false;
 
     DxvkNameSet              m_insExtensions;
     std::vector<DxvkNameSet> m_devExtensions;
     
-    DxvkNameSet queryInstanceExtensions() const;
+    bool queryInstanceExtensions(DxvkNameSet& extensions) const;
 
-    DxvkNameSet queryDeviceExtensions(
-            Rc<DxvkAdapter>           adapter) const;
+    bool queryDeviceExtensions(
+            Rc<DxvkAdapter>           adapter,
+            DxvkNameSet&              extensions) const;
 
     DxvkNameSet parseExtensionList(
       const std::string&              str) const;
