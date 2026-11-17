@@ -168,9 +168,84 @@ public:
     return D3D_OK;
   }
   HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9*, const uint32_t*, uint32_t) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE CreateMultiViewRenderTarget(UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD, BOOL, IDirect3DSurface9**, HANDLE*, UINT) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD, BOOL, IDirect3DSurface9**, HANDLE*, UINT) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9*, IDirect3DSurface9**, UINT) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE CreateMultiViewRenderTarget(
+      UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample,
+      DWORD multisampleQuality, BOOL lockable, IDirect3DSurface9** surface,
+      HANDLE* sharedHandle, UINT views) {
+    (void) lockable;
+    if (surface == nullptr || views < 2)
+      return D3DERR_INVALIDCALL;
+
+    D3D9_COMMON_TEXTURE_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.Depth = 1;
+    desc.ArraySize = views;
+    desc.MipLevels = 1;
+    desc.Usage = D3DUSAGE_RENDERTARGET;
+    desc.Format = EnumerateFormat(format);
+    desc.Pool = D3DPOOL_DEFAULT;
+    desc.Discard = FALSE;
+    desc.MultiSample = multiSample;
+    desc.MultisampleQuality = multisampleQuality;
+    desc.IsBackBuffer = FALSE;
+    desc.IsAttachmentOnly = TRUE;
+    return m_device->CreateRenderTargetFromDesc(&desc, surface, sharedHandle);
+  }
+  HRESULT STDMETHODCALLTYPE CreateMultiViewDepthStencilSurface(
+      UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample,
+      DWORD multisampleQuality, BOOL discard, IDirect3DSurface9** surface,
+      HANDLE* sharedHandle, UINT views) {
+    if (surface == nullptr || views < 2)
+      return D3DERR_INVALIDCALL;
+
+    D3D9_COMMON_TEXTURE_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.Depth = 1;
+    desc.ArraySize = views;
+    desc.MipLevels = 1;
+    desc.Usage = D3DUSAGE_DEPTHSTENCIL;
+    desc.Format = EnumerateFormat(format);
+    desc.Pool = D3DPOOL_DEFAULT;
+    desc.Discard = discard != FALSE;
+    desc.MultiSample = multiSample;
+    desc.MultisampleQuality = multisampleQuality;
+    desc.IsBackBuffer = FALSE;
+    desc.IsAttachmentOnly = TRUE;
+    return m_device->CreateRenderTargetFromDesc(&desc, surface, sharedHandle);
+  }
+  HRESULT STDMETHODCALLTYPE CopySurfaceLayers(IDirect3DSurface9* source, IDirect3DSurface9** destinations, UINT layerCount) {
+    if (source == nullptr || destinations == nullptr || layerCount == 0)
+      return D3DERR_INVALIDCALL;
+
+    auto* src = static_cast<D3D9Surface*>(source);
+    const UINT arraySize = src->GetCommonTexture()->Desc()->ArraySize;
+    if (layerCount > arraySize)
+      return D3DERR_INVALIDCALL;
+
+    D3D9DeviceLock lock = m_device->LockDevice();
+    const UINT originalLayer = src->GetFace();
+
+    HRESULT result = D3D_OK;
+    for (UINT layer = 0; layer < layerCount; layer++) {
+      if (destinations[layer] == nullptr) {
+        result = D3DERR_INVALIDCALL;
+        break;
+      }
+
+      result = src->SetMultiviewSurfaceLayer(layer);
+      if (FAILED(result))
+        break;
+
+      result = m_device->StretchRect(source, nullptr, destinations[layer], nullptr, D3DTEXF_NONE);
+      if (FAILED(result))
+        break;
+    }
+
+    const HRESULT restoreResult = src->SetMultiviewSurfaceLayer(originalLayer);
+    return FAILED(result) ? result : restoreResult;
+  }
   HRESULT STDMETHODCALLTYPE GetSPIRVShaderCode(IDirect3DVertexShader9* d3dShader, uint32_t* out, uint32_t* size) {
     if (d3dShader == nullptr || size == nullptr)
       return D3DERR_INVALIDCALL;
@@ -212,7 +287,11 @@ public:
     return D3D_OK;
   }
   HRESULT STDMETHODCALLTYPE EnableMultiView(bool) { return E_NOTIMPL; }
-  HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9*, uint32_t) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9* surface, uint32_t layer) {
+    if (surface == nullptr)
+      return D3DERR_INVALIDCALL;
+    return static_cast<D3D9Surface*>(surface)->SetMultiviewSurfaceLayer(layer);
+  }
 
 private:
   D3D9DeviceEx* m_device;
