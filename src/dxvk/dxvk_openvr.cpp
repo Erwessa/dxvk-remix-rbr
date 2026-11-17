@@ -112,7 +112,7 @@ namespace dxvk {
   void VrInstance::initInstanceExtensions() {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
 
-    if (m_no_vr || m_initializedDevExt)
+    if (m_no_vr || m_extensionQueryFailed || m_initializedDevExt)
         return;
 
     if (!m_vr_key)
