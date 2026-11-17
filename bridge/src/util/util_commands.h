@@ -479,6 +479,11 @@ namespace Commands {
     IDirect3DQuery9_GetDataSize,
     IDirect3DQuery9_Issue,
     IDirect3DQuery9_GetData,
+
+    // D3D9VR interface lifecycle and method dispatch.
+    D3D9VR_Create,
+    D3D9VR_Destroy,
+    D3D9VR_Invoke,
   };
 
   // Maybe this will be useful...  
@@ -558,6 +563,9 @@ namespace Commands {
     
     case Bridge_UnlinkResource: return "Bridge_UnlinkResource";
     case Bridge_UnlinkVolumeResource: return "Bridge_UnlinkVolumeResource";
+    case D3D9VR_Create: return "D3D9VR_Create";
+    case D3D9VR_Destroy: return "D3D9VR_Destroy";
+    case D3D9VR_Invoke: return "D3D9VR_Invoke";
 
     case IDirect3DDevice9Ex_LinkSwapchain: return "IDirect3DDevice9Ex_LinkSwapchain";
     case IDirect3DDevice9Ex_LinkBackBuffer: return "IDirect3DDevice9Ex_LinkBackBuffer";

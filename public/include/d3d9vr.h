@@ -15,6 +15,24 @@ struct D3D9_OPENVR_FRAME_STATE {
   float DeviceToAbsoluteTracking[12];
 };
 
+enum class D3D9VRCommand : uint32_t {
+  InitializeOpenVRScene = 1,
+  AcquireOpenVRFrame,
+  SubmitOpenVRFrame,
+  ResetOpenVRView,
+  GetOpenVRFrameTiming,
+  WaitDeviceIdle,
+  CopySurfaceLayers,
+  GetSPIRVShaderCode,
+  PatchSPIRVToVertexShader,
+  GetShaderConstantCount,
+  SetShaderConstantCount,
+  GetShaderHash,
+  EnableMultiView,
+  CreateMultiViewRenderTarget,
+  CreateMultiViewDepthStencilSurface,
+};
+
 struct D3D9_OPENVR_FRAME_TIMING {
   float GpuPreSubmit;
   float GpuPostSubmit;
