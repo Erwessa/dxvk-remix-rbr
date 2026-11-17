@@ -38,8 +38,34 @@ public:
     if (image == nullptr)
       return D3DERR_INVALIDCALL;
 
+    const auto& imageInfo = image->info();
+    constexpr VkImageUsageFlags requiredUsage =
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    // OpenVR's Vulkan texture descriptor has no array-layer selector.
+    // Only expose a single-layer 2D image with the usage required by SteamVR.
+    if (imageInfo.type != VK_IMAGE_TYPE_2D
+     || imageInfo.extent.depth != 1
+     || imageInfo.numLayers != 1
+     || (imageInfo.usage & requiredUsage) != requiredUsage)
+      return D3DERR_NOTAVAILABLE;
+
+    // Keep this list in sync with Valve's documented Vulkan compositor formats.
+    switch (imageInfo.format) {
+      case VK_FORMAT_R8G8B8A8_UNORM:
+      case VK_FORMAT_R8G8B8A8_SRGB:
+      case VK_FORMAT_B8G8R8A8_UNORM:
+      case VK_FORMAT_B8G8R8A8_SRGB:
+      case VK_FORMAT_R32G32B32A32_SFLOAT:
+      case VK_FORMAT_R32G32B32_SFLOAT:
+      case VK_FORMAT_R16G16B16A16_SFLOAT:
+      case VK_FORMAT_A2R10G10B10_UINT_PACK32:
+        break;
+      default:
+        return D3DERR_NOTAVAILABLE;
+    }
+
     auto device = texture->Device()->GetDXVKDevice();
-    const auto* textureDesc = texture->Desc();
 
     desc->Image = uint64_t(image->handle());
     desc->Device = device->handle();
@@ -47,10 +73,10 @@ public:
     desc->Instance = device->instance()->handle();
     desc->Queue = device->queues().graphics.queueHandle;
     desc->QueueFamilyIndex = device->queues().graphics.queueFamily;
-    desc->Width = textureDesc->Width;
-    desc->Height = textureDesc->Height;
-    desc->Format = texture->GetFormatMapping().FormatColor;
-    desc->SampleCount = uint32_t(image->info().sampleCount);
+    desc->Width = imageInfo.extent.width;
+    desc->Height = imageInfo.extent.height;
+    desc->Format = imageInfo.format;
+    desc->SampleCount = uint32_t(imageInfo.sampleCount);
     return D3D_OK;
   }
 
