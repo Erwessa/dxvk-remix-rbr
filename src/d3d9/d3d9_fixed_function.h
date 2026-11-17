@@ -105,6 +105,7 @@ namespace dxvk {
         uint32_t TransformFlags : 24;
 
         uint32_t LightCount : 4;
+        uint32_t MultiView : 1;
 
         uint32_t TexcoordDeclMask : 24;
         uint32_t HasFog : 1;

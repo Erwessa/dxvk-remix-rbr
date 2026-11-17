@@ -79,6 +79,7 @@ namespace dxvk {
     , m_deviceType     ( DeviceType )
     , m_window         ( hFocusWindow )
     , m_behaviorFlags  ( BehaviorFlags ) // Might want to add a mode to force SWVP?
+    , m_multiViewFF    ( (BehaviorFlags & 0x10000) != 0 )
     , m_adapter        ( pAdapter )
     , m_dxvkDevice     ( dxvkDevice )
     , m_shaderModules  ( new D3D9ShaderModuleSet )
@@ -7138,6 +7139,8 @@ namespace dxvk {
       key.Data.Contents.SpecularSource   = m_state.renderStates[D3DRS_SPECULARMATERIALSOURCE] & mask;
       key.Data.Contents.EmissiveSource   = m_state.renderStates[D3DRS_EMISSIVEMATERIALSOURCE] & mask;
 
+      key.Data.Contents.MultiView = m_multiViewFF;
+
       uint32_t lightCount = 0;
 
       if (key.Data.Contents.UseLighting) {
@@ -7263,6 +7266,17 @@ namespace dxvk {
       data->NormalMatrix = NormalMatrix;
       data->InverseView  = InverseView;
       data->Projection   = Projection;
+
+      if (m_multiViewFF) {
+        // OpenRBRVR supplies the second eye through the reserved world-matrix slots.
+        const Matrix4 View2 = m_state.transforms[GetTransformIndex(D3DTS_WORLDMATRIX(10))];
+        const Matrix4 Projection2 = m_state.transforms[GetTransformIndex(D3DTS_WORLDMATRIX(11))];
+        const Matrix4 WorldView2 = View2 * World;
+        data->WorldView2 = WorldView2;
+        data->NormalMatrix2 = inverse(WorldView2);
+        data->InverseView2 = transpose(inverse(View2));
+        data->Projection2 = Projection2;
+      }
 
       for (uint32_t i = 0; i < data->TexcoordMatrices.size(); i++)
         data->TexcoordMatrices[i] = m_state.transforms[GetTransformIndex(D3DTS_TEXTURE0) + i];

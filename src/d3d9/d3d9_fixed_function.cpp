@@ -457,6 +457,11 @@ namespace dxvk {
     NormalMatrix,
     InverseViewMatrix,
     ProjMatrix,
+
+    WorldViewMatrix2,
+    NormalMatrix2,
+    InverseViewMatrix2,
+    ProjMatrix2,
       
     Texcoord0,
     Texcoord1,
@@ -1329,6 +1334,10 @@ namespace dxvk {
 // NV-DXVK end
       m_mat4Type, // InverseView
       m_mat4Type, // Proj
+      m_mat4Type, // WorldView2
+      m_mat4Type, // Normal2
+      m_mat4Type, // InverseView2
+      m_mat4Type, // Proj2
 
       m_mat4Type, // Texture0
       m_mat4Type, // Texture1
@@ -1407,6 +1416,10 @@ namespace dxvk {
     m_module.setDebugMemberName(structType, member++, "Normal");
     m_module.setDebugMemberName(structType, member++, "InverseView");
     m_module.setDebugMemberName(structType, member++, "Projection");
+    m_module.setDebugMemberName(structType, member++, "WorldView2");
+    m_module.setDebugMemberName(structType, member++, "Normal2");
+    m_module.setDebugMemberName(structType, member++, "InverseView2");
+    m_module.setDebugMemberName(structType, member++, "Projection2");
 
     m_module.setDebugMemberName(structType, member++, "TexcoordTransform0");
     m_module.setDebugMemberName(structType, member++, "TexcoordTransform1");
@@ -1507,6 +1520,16 @@ namespace dxvk {
     // VS Caps
     m_module.enableCapability(spv::CapabilityClipDistance);
 
+    uint32_t viewIndex = 0;
+    if (m_vsKey.Data.Contents.MultiView) {
+      m_module.enableCapability(spv::CapabilityMultiView);
+      m_module.enableCapability(spv::CapabilityVariablePointers);
+      uint32_t ptrType = m_module.defPointerType(m_uint32Type, spv::StorageClassInput);
+      viewIndex = m_module.newVar(ptrType, spv::StorageClassInput);
+      m_module.setDebugName(viewIndex, "ViewIndex");
+      m_module.decorateBuiltIn(viewIndex, spv::BuiltInViewIndex);
+    }
+
     emitLightTypeDecl();
     emitBaseBufferDecl();
 
@@ -1517,6 +1540,19 @@ namespace dxvk {
     auto LoadConstant = [&](uint32_t type, uint32_t idx) {
       uint32_t offset  = m_module.constu32(idx);
       uint32_t typePtr = m_module.defPointerType(type, spv::StorageClassUniform);
+
+      if (m_vsKey.Data.Contents.MultiView
+       && idx >= uint32_t(D3D9FFVSMembers::WorldViewMatrix)
+       && idx <= uint32_t(D3D9FFVSMembers::ProjMatrix)) {
+        uint32_t offset2 = m_module.constu32(idx + 4);
+        uint32_t view1 = m_module.opLoad(type,
+          m_module.opAccessChain(typePtr, m_vs.constantBuffer, 1, &offset));
+        uint32_t view2 = m_module.opLoad(type,
+          m_module.opAccessChain(typePtr, m_vs.constantBuffer, 1, &offset2));
+        uint32_t isLeftEye = m_module.opIEqual(m_boolType,
+          m_module.opLoad(m_uint32Type, viewIndex), m_module.constu32(0));
+        return m_module.opSelect(type, isLeftEye, view1, view2);
+      }
 
       return m_module.opLoad(type,
         m_module.opAccessChain(typePtr, m_vs.constantBuffer, 1, &offset));

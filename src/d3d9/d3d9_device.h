@@ -1192,6 +1192,7 @@ namespace dxvk {
     D3DDEVTYPE                      m_deviceType;
     HWND                            m_window;
     WORD                            m_behaviorFlags;
+    bool                            m_multiViewFF = false;
     D3DPRESENT_PARAMETERS           m_presentParams;
 
     D3D9Adapter*                    m_adapter;
