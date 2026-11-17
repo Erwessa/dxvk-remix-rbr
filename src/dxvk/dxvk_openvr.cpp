@@ -45,8 +45,8 @@ namespace dxvk {
 
       if (status != ERROR_SUCCESS || actualType != REG_SZ
           || actualSize == 0 || actualSize > buffer.size()
-          || buffer[actualSize - 1] != '\\0'
-          || std::memchr(buffer.data(), '\\0', actualSize - 1) != nullptr) {
+          || buffer[actualSize - 1] != '\0'
+          || std::memchr(buffer.data(), '\0', actualSize - 1) != nullptr) {
         Logger::err(str::format("OpenVR: malformed registry string ", name,
           " (status ", status, ", type ", actualType, ", size ", actualSize, ")"));
         return false;
@@ -64,11 +64,11 @@ namespace dxvk {
         return false;
       }
 
-      std::vector<char> buffer(bufferSize, '\\0');
+      std::vector<char> buffer(bufferSize, '\0');
       const uint32_t actualSize = query(buffer.data(), bufferSize);
       if (!actualSize || actualSize > bufferSize
-          || buffer[actualSize - 1] != '\\0'
-          || std::memchr(buffer.data(), '\\0', actualSize - 1) != nullptr) {
+          || buffer[actualSize - 1] != '\0'
+          || std::memchr(buffer.data(), '\0', actualSize - 1) != nullptr) {
         Logger::err(str::format("OpenVR: invalid extension query result (allocated ",
           bufferSize, ", returned ", actualSize, ")"));
         return false;
@@ -161,9 +161,9 @@ namespace dxvk {
         Logger::err(str::format("OpenVR: could not query value, status ", status));
         return false;
     }
-    if (type != REG_DWORD)
+    if (type != REG_DWORD || size != sizeof(value))
     {
-        Logger::err(str::format("OpenVR: unexpected value type ", type));
+        Logger::err(str::format("OpenVR: unexpected state value type or size (type ", type, ", size ", size, ")"));
         return false;
     }
 
