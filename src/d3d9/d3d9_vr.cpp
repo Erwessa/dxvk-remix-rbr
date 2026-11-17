@@ -422,6 +422,6 @@ HRESULT __stdcall Direct3DCreateVRImpl(IDirect3DDevice9* device, IDirect3DVR9** 
     return D3DERR_INVALIDCALL;
 
   *interfaceOut = nullptr;
-  *interfaceOut = new dxvk::D3D9VR(device);
+  *interfaceOut = dxvk::ref(new dxvk::D3D9VR(device));
   return *interfaceOut != nullptr ? D3D_OK : E_OUTOFMEMORY;
 }
