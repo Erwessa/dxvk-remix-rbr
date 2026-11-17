@@ -126,6 +126,8 @@ public:
   HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9* shader, const uint32_t* data, uint32_t size) override {
     if (!shader || !data || !size)
       return D3DERR_INVALIDCALL;
+    if (size > 16u * 1024u * 1024u)
+      return E_OUTOFMEMORY;
     auto* bridgeShader = bridge_cast<Direct3DVertexShader9_LSS*>(shader);
     if (!bridgeShader)
       return D3DERR_INVALIDCALL;
