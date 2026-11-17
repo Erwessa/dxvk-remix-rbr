@@ -3196,6 +3196,7 @@ void ProcessDeviceCommandQueue() {
         if (!vrInterface && methodValue == static_cast<uint32_t>(D3D9VRCommand::ImportFence)) {
           PULL(uint64_t, handleValue);
           PULL(uint64_t, fenceValue);
+          (void)fenceValue;
           const HANDLE sharedHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(handleValue));
           if (sharedHandle && sharedHandle != INVALID_HANDLE_VALUE)
             CloseHandle(sharedHandle);
