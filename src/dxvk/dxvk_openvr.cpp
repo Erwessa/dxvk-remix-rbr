@@ -562,7 +562,9 @@ namespace dxvk {
     // Publish only a complete snapshot. A caller never observes a mixture of
     // poses from one frame and eye parameters from another.
     frame = next;
-    return next.hmdPoseValid;
+    // A successful WaitGetPoses call is a usable snapshot even while the HMD
+    // pose is temporarily invalid. Consumers can retain the last valid pose.
+    return true;
   }
 
 
