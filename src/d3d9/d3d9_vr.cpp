@@ -18,6 +18,7 @@ public:
   : m_device(static_cast<D3D9DeviceEx*>(device)) { }
 
   ~D3D9VR() {
+    restorePendingVrImages();
     if (m_openVrSceneSession)
       VrInstance::s_instance.shutdownSceneSession(this);
   }
@@ -528,9 +529,7 @@ public:
 
     const HRESULT rightTransfer = TransferSurfaceForVR(right);
     if (FAILED(rightTransfer)) {
-      const HRESULT begin = BeginVRSubmit();
-      if (SUCCEEDED(begin))
-        EndVRSubmit();
+      restorePendingVrImages();
       return rightTransfer;
     }
 
@@ -539,9 +538,7 @@ public:
     if (SUCCEEDED(result))
       result = GetVRDesc(right, &descriptors[1]);
     if (FAILED(result)) {
-      const HRESULT begin = BeginVRSubmit();
-      if (SUCCEEDED(begin))
-        EndVRSubmit();
+      restorePendingVrImages();
       return result;
     }
 
@@ -560,8 +557,10 @@ public:
     }
 
     const HRESULT beginResult = BeginVRSubmit();
-    if (FAILED(beginResult))
+    if (FAILED(beginResult)) {
+      restorePendingVrImages();
       return beginResult;
+    }
 
     const bool submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Auto);
     const HRESULT endResult = EndVRSubmit();
@@ -603,6 +602,21 @@ public:
   }
 
 private:
+  void restorePendingVrImages() {
+    if (m_vrImages.empty())
+      return;
+
+    D3D9DeviceLock lock = m_device->LockDevice();
+    m_device->SynchronizeCsThread();
+    for (const auto& entry : m_vrImages) {
+      m_device->TransitionImageForVR(
+        entry.image, entry.originalLayout,
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+        entry.originalStages, entry.originalAccess);
+    }
+    m_vrImages.clear();
+  }
+
   Com<D3D9DeviceEx, false> m_device;
   bool m_openVrSceneSession = false;
   D3D9DeviceLock m_deviceLock;
