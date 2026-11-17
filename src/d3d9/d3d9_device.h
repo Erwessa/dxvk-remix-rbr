@@ -892,6 +892,11 @@ namespace dxvk {
       return m_multithread.AcquireLock();
     }
 
+    HRESULT CreateRenderTargetFromDesc(
+      const D3D9_COMMON_TEXTURE_DESC* desc,
+      IDirect3DSurface9** surface,
+      HANDLE* sharedHandle);
+
     const D3D9Options* GetOptions() const {
       return &m_d3d9Options;
     }
