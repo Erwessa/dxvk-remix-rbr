@@ -320,6 +320,7 @@ private:
     auto* surface = new (std::nothrow) Direct3DSurface9_LSS(m_device, desc);
     if (!surface)
       return E_OUTOFMEMORY;
+    trackWrapper(surface);
     const HRESULT result = invoke(depthStencil
         ? D3D9VRCommand::CreateMultiViewDepthStencilSurface
         : D3D9VRCommand::CreateMultiViewRenderTarget,
