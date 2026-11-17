@@ -172,16 +172,22 @@ namespace dxvk {
 
     for (uint32_t i = 0; instance->enumAdapters(i) != nullptr; i++) {
       DxvkNameSet extensions;
-      if (!this->queryDeviceExtensions(instance->enumAdapters(i), extensions)) {
-        m_extensionQueryFailed = true;
-        m_devExtensions.clear();
-        this->shutdown();
-        return;
+      const bool valid = this->queryDeviceExtensions(instance->enumAdapters(i), extensions);
+
+      // Device extension requirements are adapter-specific. A missing or
+      // malformed entry for one GPU must not disable OpenVR on other GPUs.
+      if (!valid) {
+        Logger::warn(str::format(
+          "OpenVR: failed to query Vulkan device extensions for adapter ", i,
+          "; OpenVR will be unavailable on this adapter"));
       }
+
       m_devExtensions.push_back(std::move(extensions));
-      m_devExtensionsValid.push_back(true);
+      m_devExtensionsValid.push_back(valid);
     }
 
+    // Discovery is complete even if an individual adapter could not provide
+    // its requirements. initializeSceneSession checks the selected adapter.
     m_initializedDevExt = true;
     this->shutdown();
   }
