@@ -152,10 +152,6 @@ public:
         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
         entry.originalStages, entry.originalAccess);
 
-    // Ensure the CS thread has emitted the restore transitions before
-    // another external queue user can synchronize and acquire the queue.
-    m_device->SynchronizeCsThread();
-
     m_vrImages.clear();
     m_vrSubmitActive.store(false, std::memory_order_release);
     m_submissionQueueThreadId.store(0, std::memory_order_release);
@@ -165,18 +161,26 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE LockDevice() {
-    if (m_deviceLockHeld)
+    const uint32_t threadId = GetCurrentThreadId();
+    if (m_deviceLockHeld.exchange(true, std::memory_order_acq_rel))
       return D3DERR_INVALIDCALL;
-    m_deviceLock = m_device->LockDevice();
-    m_deviceLockHeld = true;
+
+    D3D9DeviceLock deviceLock = m_device->LockDevice();
+    m_deviceLock = std::move(deviceLock);
+    m_deviceLockThreadId.store(threadId, std::memory_order_release);
+    AddRefPrivate();
     return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE UnlockDevice() {
-    if (!m_deviceLockHeld)
+    if (!m_deviceLockHeld.load(std::memory_order_acquire)
+     || m_deviceLockThreadId.load(std::memory_order_acquire) != GetCurrentThreadId())
       return D3DERR_INVALIDCALL;
+
+    m_deviceLockHeld.store(false, std::memory_order_release);
+    m_deviceLockThreadId.store(0, std::memory_order_release);
     m_deviceLock = D3D9DeviceLock();
-    m_deviceLockHeld = false;
+    ReleasePrivate();
     return D3D_OK;
   }
 
@@ -235,6 +239,7 @@ public:
     m_device->GetDXVKDevice()->lockSubmission();
     m_submissionQueueDeviceLock = std::move(deviceLock);
     m_submissionQueueThreadId.store(threadId, std::memory_order_release);
+    AddRefPrivate();
     return D3D_OK;
   }
 
@@ -246,6 +251,7 @@ public:
     m_submissionQueueThreadId.store(0, std::memory_order_release);
     m_device->GetDXVKDevice()->unlockSubmission();
     m_submissionQueueDeviceLock = D3D9DeviceLock();
+    ReleasePrivate();
     return D3D_OK;
   }
 
@@ -455,7 +461,8 @@ public:
 private:
   Com<D3D9DeviceEx, false> m_device;
   D3D9DeviceLock m_deviceLock;
-  bool m_deviceLockHeld = false;
+  std::atomic<bool> m_deviceLockHeld = { false };
+  std::atomic<uint32_t> m_deviceLockThreadId = { 0 };
   D3D9DeviceLock m_vrSubmitDeviceLock;
   D3D9DeviceLock m_submissionQueueDeviceLock;
   std::atomic<uint32_t> m_submissionQueueThreadId = { 0 };
