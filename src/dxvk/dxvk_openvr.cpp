@@ -550,6 +550,7 @@ namespace dxvk {
         &next.projection[i].right,
         &next.projection[i].top,
         &next.projection[i].bottom);
+      next.projectionMatrix[i] = m_system->GetProjectionMatrix(eyes[i], 0.01f, 10000.0f, false);
 
       if (next.hmdPoseValid) {
         const auto headFromEye = OpenVrMatrix4::fromHmdMatrix34(next.eyeToHead[i]);

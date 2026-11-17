@@ -79,6 +79,7 @@ namespace dxvk {
     std::array<vr::TrackedDevicePose_t, vr::k_unMaxTrackedDeviceCount> renderPoses = {};
     std::array<vr::HmdMatrix34_t, 2> eyeToHead = {};
     std::array<OpenVrProjectionBounds, 2> projection = {};
+    std::array<vr::HmdMatrix44_t, 2> projectionMatrix = {};
     std::array<OpenVrMatrix4, 2> eyeFromTracking = {};
     OpenVrMatrix4 trackingFromHead = {};
     uint32_t recommendedWidth = 0;

@@ -511,6 +511,9 @@ public:
       frame->ProjectionRaw[eye][1] = snapshot.projection[eye].right;
       frame->ProjectionRaw[eye][2] = snapshot.projection[eye].top;
       frame->ProjectionRaw[eye][3] = snapshot.projection[eye].bottom;
+      for (uint32_t row = 0; row < 4; row++)
+        for (uint32_t column = 0; column < 4; column++)
+          frame->ProjectionMatrix[eye][row * 4 + column] = snapshot.projectionMatrix[eye].m[row][column];
     }
     return D3D_OK;
   }

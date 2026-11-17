@@ -17,6 +17,7 @@ struct D3D9_OPENVR_FRAME_STATE {
   float DeviceToAbsoluteTracking[12];
   float EyeToHead[2][12];
   float ProjectionRaw[2][4];
+  float ProjectionMatrix[2][16];
 };
 
 enum class D3D9VRCommand : uint32_t {
