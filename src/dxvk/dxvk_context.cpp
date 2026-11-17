@@ -453,44 +453,44 @@ namespace dxvk {
     // does not change, e.g. when SteamVR reads an image already in TRANSFER_SRC_OPTIMAL.
     this->spillRenderPass(true);
 
-      VkImageSubresourceRange subresources = image->getAvailableSubresources();
+    VkImageSubresourceRange subresources = image->getAvailableSubresources();
 
-      this->prepareImage(m_execBarriers, image, subresources);
+    this->prepareImage(m_execBarriers, image, subresources);
 
-      if (m_execBarriers.isImageDirty(image, subresources, DxvkAccess::Write))
-        m_execBarriers.recordCommands(m_cmd);
+    if (m_execBarriers.isImageDirty(image, subresources, DxvkAccess::Write))
+      m_execBarriers.recordCommands(m_cmd);
 
-      m_execBarriers.accessImage(image, subresources,
-        image->info().layout,
-        srcStages, srcAccess,
-        layout,
-        dstStages, dstAccess);
+    m_execBarriers.accessImage(image, subresources,
+      image->info().layout,
+      srcStages, srcAccess,
+      layout,
+      dstStages, dstAccess);
 
-      image->setLayout(layout);
+    image->setLayout(layout);
 
-      // Keep suspended render-pass attachment tracking in sync with
-      // externally transitioned images. prepareImage() consults m_rtLayouts
-      // before the next image operation, so leaving it at the pre-handoff
-      // layout would emit a barrier with an obsolete oldLayout.
-      if (m_flags.test(DxvkContextFlag::GpRenderPassSuspended)) {
-        const bool is3D = image->info().type == VK_IMAGE_TYPE_3D;
+    // Keep suspended render-pass attachment tracking in sync with
+    // externally transitioned images. prepareImage() consults m_rtLayouts
+    // before the next image operation, so leaving it at the pre-handoff
+    // layout would emit a barrier with an obsolete oldLayout.
+    if (m_flags.test(DxvkContextFlag::GpRenderPassSuspended)) {
+      const bool is3D = image->info().type == VK_IMAGE_TYPE_3D;
 
-        if (image->info().usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-          for (uint32_t i = 0; i < MaxNumRenderTargets; i++) {
-            const DxvkAttachment& attachment = m_state.om.framebufferInfo.getColorTarget(i);
-
-            if (attachment.view != nullptr && attachment.view->image() == image
-             && (is3D || vk::checkSubresourceRangeOverlap(attachment.view->subresources(), subresources)))
-              m_rtLayouts.color[i] = layout;
-          }
-        } else {
-          const DxvkAttachment& attachment = m_state.om.framebufferInfo.getDepthTarget();
+      if (image->info().usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+        for (uint32_t i = 0; i < MaxNumRenderTargets; i++) {
+          const DxvkAttachment& attachment = m_state.om.framebufferInfo.getColorTarget(i);
 
           if (attachment.view != nullptr && attachment.view->image() == image
            && (is3D || vk::checkSubresourceRangeOverlap(attachment.view->subresources(), subresources)))
-            m_rtLayouts.depth = layout;
+            m_rtLayouts.color[i] = layout;
         }
+      } else {
+        const DxvkAttachment& attachment = m_state.om.framebufferInfo.getDepthTarget();
+
+        if (attachment.view != nullptr && attachment.view->image() == image
+         && (is3D || vk::checkSubresourceRangeOverlap(attachment.view->subresources(), subresources)))
+          m_rtLayouts.depth = layout;
       }
+    }
 
     m_cmd->trackResource<DxvkAccess::Write>(image);
   }
