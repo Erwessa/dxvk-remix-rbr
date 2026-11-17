@@ -9,6 +9,7 @@
 #include "util_devicecommand.h"
 
 #include <atomic>
+#include <vector>
 
 using namespace bridge_util;
 
@@ -121,7 +122,6 @@ public:
   HRESULT STDMETHODCALLTYPE UnlockSubmissionQueue() override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE ImportFence(HANDLE, uint64_t) override { return D3DERR_NOTAVAILABLE; }
   HRESULT STDMETHODCALLTYPE SignalFence(uint64_t) override { return D3DERR_NOTAVAILABLE; }
-  HRESULT STDMETHODCALLTYPE GetShaderHash(IDirect3DVertexShader9*, char**) override { return D3DERR_NOTAVAILABLE; }
 
   HRESULT STDMETHODCALLTYPE PatchSPIRVToVertexShader(IDirect3DVertexShader9* shader, const uint32_t* data, uint32_t size) override {
     if (!shader || !data || !size)
