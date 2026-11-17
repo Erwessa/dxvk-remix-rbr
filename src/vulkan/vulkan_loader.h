@@ -111,6 +111,7 @@ namespace dxvk::vk {
     VULKAN_FN(vkGetPhysicalDeviceFormatProperties);
     VULKAN_FN(vkGetPhysicalDeviceFormatProperties2);
     VULKAN_FN(vkGetPhysicalDeviceProperties2);
+    VULKAN_FN(vkGetPhysicalDeviceExternalSemaphoreProperties);
     VULKAN_FN(vkGetPhysicalDeviceImageFormatProperties);
     VULKAN_FN(vkGetPhysicalDeviceImageFormatProperties2);
     VULKAN_FN(vkGetPhysicalDeviceMemoryProperties);
@@ -501,6 +502,7 @@ namespace dxvk::vk {
 
     #ifdef VK_KHR_external_semaphore_win32
     VULKAN_FN(vkGetSemaphoreWin32HandleKHR);
+    VULKAN_FN(vkImportSemaphoreWin32HandleKHR);
     #endif
 
   };
