@@ -79,7 +79,7 @@ namespace dxvk {
     , m_deviceType     ( DeviceType )
     , m_window         ( hFocusWindow )
     , m_behaviorFlags  ( BehaviorFlags ) // Might want to add a mode to force SWVP?
-    , m_multiViewFF    ( (BehaviorFlags & 0x10000) != 0 )
+    , m_multiViewFF    ( (BehaviorFlags & 0x10000) != 0 && dxvkDevice->features().vulkan11Features.multiview )
     , m_adapter        ( pAdapter )
     , m_dxvkDevice     ( dxvkDevice )
     , m_shaderModules  ( new D3D9ShaderModuleSet )
@@ -4376,6 +4376,7 @@ namespace dxvk {
   DxvkDeviceFeatures D3D9DeviceEx::GetDeviceFeatures(const Rc<DxvkAdapter>& adapter) {
     DxvkDeviceFeatures supported = adapter->features();
     DxvkDeviceFeatures enabled = {};
+    enabled.vulkan11Features.multiview = supported.vulkan11Features.multiview;
 
     // Geometry shaders are used for some meta ops
     enabled.core.features.geometryShader = VK_TRUE;
