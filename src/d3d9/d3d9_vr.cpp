@@ -497,9 +497,21 @@ public:
     frame->Version = 1;
     frame->Flags = pose.bPoseIsValid ? 1u : 0u;
     frame->FrameIndex = snapshot.frameIndex;
-    for (uint32_t row = 0; row < 3; row++)
-      for (uint32_t column = 0; column < 4; column++)
+    frame->RecommendedWidth = snapshot.recommendedWidth;
+    frame->RecommendedHeight = snapshot.recommendedHeight;
+    for (uint32_t row = 0; row < 3; row++) {
+      for (uint32_t column = 0; column < 4; column++) {
         frame->DeviceToAbsoluteTracking[row * 4 + column] = pose.mDeviceToAbsoluteTracking.m[row][column];
+        for (uint32_t eye = 0; eye < 2; eye++)
+          frame->EyeToHead[eye][row * 4 + column] = snapshot.eyeToHead[eye].m[row][column];
+      }
+    }
+    for (uint32_t eye = 0; eye < 2; eye++) {
+      frame->ProjectionRaw[eye][0] = snapshot.projection[eye].left;
+      frame->ProjectionRaw[eye][1] = snapshot.projection[eye].right;
+      frame->ProjectionRaw[eye][2] = snapshot.projection[eye].top;
+      frame->ProjectionRaw[eye][3] = snapshot.projection[eye].bottom;
+    }
     return D3D_OK;
   }
 

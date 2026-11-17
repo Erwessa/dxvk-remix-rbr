@@ -12,7 +12,11 @@ struct D3D9_OPENVR_FRAME_STATE {
   uint32_t Version;
   uint32_t Flags;
   uint64_t FrameIndex;
+  uint32_t RecommendedWidth;
+  uint32_t RecommendedHeight;
   float DeviceToAbsoluteTracking[12];
+  float EyeToHead[2][12];
+  float ProjectionRaw[2][4];
 };
 
 enum class D3D9VRCommand : uint32_t {
@@ -84,6 +88,3 @@ IDirect3DVR9 : public IUnknown {
   virtual HRESULT STDMETHODCALLTYPE GetOpenVRFrameTiming(D3D9_OPENVR_FRAME_TIMING* timing) = 0;
 };
 
-#ifdef _MSC_VER
-struct __declspec(uuid("7e272b32-a49c-46c7-b1a4-ef52936bec87")) IDirect3DVR9;
-#endif
