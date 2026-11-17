@@ -286,7 +286,10 @@ public:
     shader->GetCommonShader_mut()->SetMaxFloatConstantIndex(count);
     return D3D_OK;
   }
-  HRESULT STDMETHODCALLTYPE EnableMultiView(bool) { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE EnableMultiView(bool enable) {
+    m_device->SetMultiViewFF(enable);
+    return D3D_OK;
+  }
   HRESULT STDMETHODCALLTYPE SetMultiviewSurfaceLayer(IDirect3DSurface9* surface, uint32_t layer) {
     if (surface == nullptr)
       return D3DERR_INVALIDCALL;
