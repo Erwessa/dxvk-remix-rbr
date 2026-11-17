@@ -3399,11 +3399,12 @@ void ProcessDeviceCommandQueue() {
         }
 
         // Output-bearing operations send their own response payload above.
-        if (methodValue != static_cast<uint32_t>(D3D9VRCommand::AcquireOpenVRFrame)
-         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetOpenVRFrameTiming)
-         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode)
-         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetShaderConstantCount)
-         && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetShaderHash)) {
+        if (!vrInterface
+         || (methodValue != static_cast<uint32_t>(D3D9VRCommand::AcquireOpenVRFrame)
+          && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetOpenVRFrameTiming)
+          && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode)
+          && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetShaderConstantCount)
+          && methodValue != static_cast<uint32_t>(D3D9VRCommand::GetShaderHash))) {
           response.send_data(static_cast<uint32_t>(hresult));
         }
         break;
