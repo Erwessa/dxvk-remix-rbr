@@ -51,6 +51,11 @@ namespace dxvk {
 
     m_shared = canShareImage(info, createInfo.sharing);
 
+    // A requested shared image must never silently fall back to a local
+    // allocation. Callers rely on the imported/exported handle for interop.
+    if (createInfo.sharing.mode != DxvkSharedHandleMode::None && !m_shared)
+      throw DxvkError("DxvkImage: Requested shared image configuration is not supported");
+
     VkExternalMemoryImageCreateInfo externalInfo;
     if (m_shared) {
       externalInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
