@@ -30,6 +30,7 @@ d3d9_src = [
   'd3d9_cursor.cpp', 
   'd3d9_cursor.h',
   'd3d9_device.cpp',
+  'd3d9_vr.cpp',
   'd3d9_device.h',
   'd3d9_device_child.h',
   'd3d9_fixed_function.cpp',
