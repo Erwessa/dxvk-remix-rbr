@@ -1523,7 +1523,6 @@ namespace dxvk {
     uint32_t viewIndex = 0;
     if (m_vsKey.Data.Contents.MultiView) {
       m_module.enableCapability(spv::CapabilityMultiView);
-      m_module.enableCapability(spv::CapabilityVariablePointers);
       uint32_t ptrType = m_module.defPointerType(m_uint32Type, spv::StorageClassInput);
       viewIndex = m_module.newVar(ptrType, spv::StorageClassInput);
       m_module.setDebugName(viewIndex, "ViewIndex");
