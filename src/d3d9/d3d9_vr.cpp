@@ -206,7 +206,7 @@ public:
       UINT width, UINT height, D3DFORMAT format, D3DMULTISAMPLE_TYPE multiSample,
       DWORD multisampleQuality, BOOL lockable, IDirect3DSurface9** surface,
       HANDLE* sharedHandle, UINT views) {
-    if (surface == nullptr || views < 2)
+    if (surface == nullptr || views != 2)
       return D3DERR_INVALIDCALL;
 
     *surface = nullptr;
