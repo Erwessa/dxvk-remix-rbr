@@ -57,6 +57,8 @@ namespace dxvk {
       };
     }
 
+    HRESULT SetMultiviewSurfaceLayer(UINT layer);
+
     void ClearContainer();
 
   private:
