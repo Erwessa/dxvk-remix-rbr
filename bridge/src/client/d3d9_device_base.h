@@ -194,7 +194,6 @@ protected:
   D3DGAMMARAMP m_gammaRamp;
   D3DPRESENT_PARAMETERS m_previousPresentParams;
   std::unordered_map<UINT, PALETTEENTRY> m_paletteEntries;
-  UINT m_curTexPalette;
   BOOL m_bSoftwareVtxProcessing;
   D3DCLIPSTATUS9 m_clipStatus;
   INT m_gpuThreadPriority;
