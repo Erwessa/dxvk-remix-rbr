@@ -1,4 +1,5 @@
 #include <array>
+#include <utility>
 
 #include "../dxgi/dxgi_adapter.h"
 
@@ -88,9 +89,16 @@ extern "C" {
     
     try {
       Logger::info(str::format("D3D11CoreCreateDevice: Using feature level ", fl));
+      const DxvkDeviceFeatures deviceFeatures = D3D11Device::GetDeviceFeatures(dxvkAdapter, fl);
+      auto dxvkDevice = dxvkAdapter->createDevice(dxvkInstance, deviceFeatures, true);
+      while (!dxvkDevice->tryAddFrontendDevice())
+        dxvkDevice = dxvkAdapter->createDevice(dxvkInstance, deviceFeatures, true);
+
+      DxvkDeviceFrontendRegistration registration(dxvkDevice);
+      Logger::info(str::format("D3D11: shared VkDevice ", dxvkDevice->handle()));
       Com<D3D11DXGIDevice> device = new D3D11DXGIDevice(
-        pAdapter, dxvkInstance, dxvkAdapter, fl, Flags);
-      
+        pAdapter, dxvkInstance, dxvkAdapter, dxvkDevice, std::move(registration), fl, Flags);
+
       return device->QueryInterface(
         __uuidof(ID3D11Device),
         reinterpret_cast<void**>(ppDevice));
