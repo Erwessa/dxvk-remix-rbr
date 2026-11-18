@@ -3494,13 +3494,25 @@ void ProcessDeviceCommandQueue() {
       case Bridge_UnlinkResource:
       {
         GET_HND(pHandle);
-        gpD3DResources.erase(pHandle);
+        // Child surfaces returned by GetSurfaceLevel() carry a COM reference
+        // independent of their parent texture. Drop that reference before
+        // unlinking the child handle; the parent releases its own reference.
+        if (const auto it = gpD3DResources.find(pHandle); it != gpD3DResources.end()) {
+          if (it->second)
+            it->second->Release();
+          gpD3DResources.erase(it);
+        }
         break;
       }
       case Bridge_UnlinkVolumeResource:
       {
         GET_HND(pHandle);
-        gpD3DVolumes.erase(pHandle);
+        // GetVolumeLevel() returns an independently referenced child volume.
+        if (const auto it = gpD3DVolumes.find(pHandle); it != gpD3DVolumes.end()) {
+          if (it->second)
+            it->second->Release();
+          gpD3DVolumes.erase(it);
+        }
         break;
       }
       /*
