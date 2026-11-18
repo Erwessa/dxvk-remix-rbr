@@ -26,6 +26,7 @@
 #include "d3d9_swapchain.h"
 
 #include <algorithm>
+#include <iterator>
 #include "window.h"
 
 #include "util_devicecommand.h"
