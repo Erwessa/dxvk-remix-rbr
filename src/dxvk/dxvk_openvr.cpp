@@ -548,6 +548,11 @@ namespace dxvk {
     if (next.hmdPoseValid) {
       next.trackingFromHead = OpenVrMatrix4::fromHmdMatrix34(
         next.renderPoses[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking);
+      m_lastValidTrackingFromHead = next.trackingFromHead;
+      m_hasLastValidTrackingFromHead = true;
+    } else if (m_hasLastValidTrackingFromHead) {
+      // Match OpenRBRVR's retained-pose fallback when tracking is temporarily invalid.
+      next.trackingFromHead = m_lastValidTrackingFromHead;
     }
 
     constexpr std::array<vr::EVREye, 2> eyes = {
@@ -577,6 +582,50 @@ namespace dxvk {
     frame = next;
     // A successful WaitGetPoses call is a usable snapshot even while the HMD
     // pose is temporarily invalid. Consumers can retain the last valid pose.
+    return true;
+  }
+
+
+  void VrInstance::registerExternalFrameProvider(const void* owner) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (!owner || !m_sceneSessionActive || m_sceneSessionOwners.find(owner) == m_sceneSessionOwners.end()) {
+      Logger::warn("OpenVR: refusing external frame provider registration from a non-owner");
+      return;
+    }
+    if (m_externalFrameProvider && m_externalFrameProvider != owner) {
+      Logger::warn("OpenVR: refusing a second external frame provider");
+      return;
+    }
+    m_externalFrameProvider = owner;
+    m_externalFramePending = false;
+  }
+
+
+  void VrInstance::publishExternalFrame(const void* owner, const OpenVrFrameState& frame) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (owner != m_externalFrameProvider || frame.frameIndex == 0)
+      return;
+    m_externalFrame = frame;
+    m_externalFramePending = true;
+  }
+
+
+  void VrInstance::invalidateExternalFrame(const void* owner) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (owner == m_externalFrameProvider) {
+      m_externalFramePending = false;
+      m_externalFrame = {};
+    }
+  }
+
+
+  bool VrInstance::consumeExternalFrame(OpenVrFrameState& frame, bool& providerActive) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    providerActive = m_externalFrameProvider != nullptr;
+    if (!providerActive || !m_externalFramePending)
+      return false;
+    frame = m_externalFrame;
+    m_externalFramePending = false;
     return true;
   }
 
@@ -694,6 +743,12 @@ namespace dxvk {
       return;
     }
 
+    if (m_externalFrameProvider == owner) {
+      m_externalFrameProvider = nullptr;
+      m_externalFramePending = false;
+      m_externalFrame = {};
+    }
+
     // RTX and D3D9VR may share one DxvkDevice and one OpenVR Scene session.
     // Keep the session alive until its final registered owner releases it.
     if (!m_sceneSessionOwners.empty())
@@ -707,6 +762,11 @@ namespace dxvk {
     m_sceneSessionAdapterId = UINT32_MAX;
     m_compositor = nullptr;
     m_system = nullptr;
+    m_externalFrameProvider = nullptr;
+    m_externalFramePending = false;
+    m_externalFrame = {};
+    m_hasLastValidTrackingFromHead = false;
+    m_lastValidTrackingFromHead = {};
 
     if (m_loadedOvrApi)
       this->freeLibrary();
@@ -731,6 +791,11 @@ namespace dxvk {
     m_sceneSessionActive = false;
     m_sceneSessionAdapterId = UINT32_MAX;
     m_sceneSessionOwners.clear();
+    m_externalFrameProvider = nullptr;
+    m_externalFramePending = false;
+    m_externalFrame = {};
+    m_hasLastValidTrackingFromHead = false;
+    m_lastValidTrackingFromHead = {};
     m_initializedOpenVr = false;
 
     if (m_loadedOvrApi)
