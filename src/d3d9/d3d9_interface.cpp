@@ -30,24 +30,6 @@
 namespace dxvk {
 
   namespace {
-    struct D3D9DeviceRegistration {
-      explicit D3D9DeviceRegistration(const Rc<DxvkDevice>& device)
-      : m_device(device) { }
-
-      ~D3D9DeviceRegistration() {
-        if (m_active && m_device->removeD3D9Device())
-          m_device->getCommon()->onDestroy();
-      }
-
-      void transfer() {
-        m_active = false;
-      }
-
-    private:
-      Rc<DxvkDevice> m_device;
-      bool m_active = true;
-    };
-
     struct D3D9DeviceObjectGuard {
       explicit D3D9DeviceObjectGuard(D3D9DeviceEx* device)
       : m_device(device) { }
@@ -422,9 +404,9 @@ namespace dxvk {
       // Reserve the frontend slot before construction. The reservation and the
       // retirement check share DxvkDevice's lock, so the last old frontend cannot
       // destroy common objects between createDevice() and this new frontend.
-      while (!dxvkDevice->tryAddD3D9Device())
+      while (!dxvkDevice->tryAddFrontendDevice())
         dxvkDevice = dxvkAdapter->createDevice(m_instance, D3D9DeviceEx::GetDeviceFeatures(dxvkAdapter));
-      D3D9DeviceRegistration registration(dxvkDevice);
+      DxvkDeviceFrontendRegistration registration(dxvkDevice);
 
       // NV-DXVK start: Identify the Vulkan device used by each frontend
       Logger::info(str::format("D3D9: shared VkDevice ", dxvkDevice->handle()));
