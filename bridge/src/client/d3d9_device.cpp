@@ -179,20 +179,24 @@ ULONG Direct3DDevice9Ex_LSS<EnableSync>::Release() {
   ZoneScoped;
   LogFunctionCall();
 
+  // Keep the object alive while the public reference is dropped and implicit
+  // children are released. Without this guard, a device with no implicit
+  // wrappers (for example after a failed Reset) could delete itself inside
+  // D3DBase::Release() before this method performs its lifecycle handling.
+  this->template incRef<D3DRefCounted::Ref::Object>();
   const ULONG cnt = D3DBase::Release();
   const bool bDestroy = !m_bIsDestroying && (cnt == m_implicitRefCnt);
+  const ULONG result = cnt > m_implicitRefCnt ? cnt - m_implicitRefCnt : 0;
+
   if (bDestroy) {
     m_bIsDestroying = true;
     // Device is about to be destroyed - release internal objects.
     releaseInternalObjects();
-    return 0;
   }
 
-  if (cnt > m_implicitRefCnt) {
-    return cnt - m_implicitRefCnt;
-  } else {
-    return 0;
-  }
+  // This may destroy the device; do not access members after this point.
+  this->template decRef<D3DRefCounted::Ref::Object>();
+  return bDestroy ? 0 : result;
 }
 
 template<bool EnableSync>
