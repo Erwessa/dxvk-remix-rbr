@@ -539,7 +539,7 @@ namespace dxvk {
   }
   
   
-  void DxvkDevice::waitForIdle() {
+  VkResult DxvkDevice::waitForIdle() {
     ScopedCpuProfileZone();
     this->lockSubmission();
     
@@ -548,9 +548,11 @@ namespace dxvk {
     synchronizePresenter();
     // NV-DXVK end
 
-    if (m_vkd->vkDeviceWaitIdle(m_vkd->device()) != VK_SUCCESS)
+    const VkResult result = m_vkd->vkDeviceWaitIdle(m_vkd->device());
+    if (result != VK_SUCCESS)
       Logger::err("DxvkDevice: waitForIdle: Operation failed");
     this->unlockSubmission();
+    return result;
   }
   
   
