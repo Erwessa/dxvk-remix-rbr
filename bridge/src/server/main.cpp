@@ -2433,7 +2433,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pSurfaceLevel;
         }
-        assert(SUCCEEDED(hresult));
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DTexture9_LockRect:
@@ -2534,7 +2534,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DVolumes[pVolumeLevelHandle] = pVolumeLevel;
         }
-        assert(SUCCEEDED(hresult));
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DVolumeTexture9_LockBox:
@@ -2653,7 +2653,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pCubeMapSurfaceHandle] = pCubeMapSurface;
         }
-        assert(SUCCEEDED(hresult));
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DCubeTexture9_LockRect:
