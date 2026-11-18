@@ -659,6 +659,7 @@ static bool dumpLeakedObjects() {
   bool anyLeaked = false;
 
   anyLeaked |= dumpLeakedObjects("Resource", gpD3DResources);
+  anyLeaked |= dumpLeakedObjects("VR Interface", gpD3DVRInterfaces);
   anyLeaked |= dumpLeakedObjects("Vertex Declaration", gpD3DVertexDeclarations);
   anyLeaked |= dumpLeakedObjects("State Block", gpD3DStateBlocks);
   anyLeaked |= dumpLeakedObjects("Vertex Shader", gpD3DVertexShaders);
