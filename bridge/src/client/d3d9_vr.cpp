@@ -288,7 +288,25 @@ public:
   }
 
   HRESULT STDMETHODCALLTYPE InitializeOpenVRScene() override {
-    return invoke(D3D9VRCommand::InitializeOpenVRScene);
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: entering proxy method\n");
+    DeviceBridge::ResponseTransaction transaction;
+    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+    const auto uid = command.get_uid();
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: command created\n");
+    command.send_data(static_cast<uint32_t>(D3D9VRCommand::InitializeOpenVRScene));
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: command sent; waiting for server\n");
+    const auto waitResult = DeviceBridge::waitForCommand(
+      Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid);
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: server wait returned\n");
+    if (waitResult != Result::Success) {
+      OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: server response wait failed\n");
+      return E_FAIL;
+    }
+    const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: HRESULT response read\n");
+    DeviceBridge::pop_front();
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: completed\n");
+    return result;
   }
 
   HRESULT STDMETHODCALLTYPE AcquireOpenVRFrame(D3D9_OPENVR_FRAME_STATE* frame) override {
