@@ -2782,7 +2782,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(OffsetToLock);
         PULL_U(SizeToLock);
         PULL_D(Flags);
-        const auto pVertexBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pVertexBuffer, gpD3DResources, pHandle, IDirect3DVertexBuffer9*);
 
         // Locate the data first: it must be consumed from the queue even when the upload is skipped
         void* data = nullptr;
@@ -2821,10 +2821,12 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_OBJ(D3DVERTEXBUFFER_DESC, orig_desc);
-        const auto& pVertexBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pHandle];
-        D3DVERTEXBUFFER_DESC pDesc;
-        const auto hresult = pVertexBuffer->GetDesc(OUT & pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pVertexBuffer, gpD3DResources, pHandle, IDirect3DVertexBuffer9*);
+        if (pVertexBuffer != nullptr) {
+          D3DVERTEXBUFFER_DESC pDesc;
+          const auto hresult = pVertexBuffer->GetDesc(OUT & pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
 
@@ -2875,7 +2877,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(OffsetToLock);
         PULL_U(SizeToLock);
         PULL_D(Flags);
-        const auto pIndexBuffer = (IDirect3DIndexBuffer9*) gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pIndexBuffer, gpD3DResources, pHandle, IDirect3DIndexBuffer9*);
 
         // Locate the data first: it must be consumed from the queue even when the upload is skipped
         void* data = nullptr;
@@ -2913,10 +2915,12 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_OBJ(D3DINDEXBUFFER_DESC, orig_desc);
-        const auto& pIndexBuffer = (IDirect3DIndexBuffer9*) gpD3DResources[pHandle];
-        D3DINDEXBUFFER_DESC pDesc;
-        const auto hresult = pIndexBuffer->GetDesc(OUT & pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pIndexBuffer, gpD3DResources, pHandle, IDirect3DIndexBuffer9*);
+        if (pIndexBuffer != nullptr) {
+          D3DINDEXBUFFER_DESC pDesc;
+          const auto hresult = pIndexBuffer->GetDesc(OUT & pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
 
@@ -2959,18 +2963,20 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_OBJ(D3DSURFACE_DESC, orig_desc);
-        const auto& pSurface = (IDirect3DSurface9*) gpD3DResources[pHandle];
-        D3DSURFACE_DESC pDesc;
-        const auto hresult = pSurface->GetDesc(OUT & pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
+        if (pSurface != nullptr) {
+          D3DSURFACE_DESC pDesc;
+          const auto hresult = pSurface->GetDesc(OUT & pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
       case IDirect3DSurface9_LockRect:
       {
         // Currently we only recieve calls for LockRect in cases where backbuffer data is to be copied for screenshots
         GET_HND(pHandle);
-        const auto pSurface = (IDirect3DSurface9*) gpD3DResources[pHandle];
-        HRESULT hresult = ReturnSurfaceDataToClient(pSurface, S_OK, currentUID);
+        GET_RES_OPTIONAL_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
+        HRESULT hresult = ReturnSurfaceDataToClient(pSurface, pSurface != nullptr ? S_OK : E_FAIL, currentUID);
         assert(SUCCEEDED(hresult));
         break;
       }
@@ -2979,7 +2985,7 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pHandle);
         PULL_OBJ(RECT, pRect);
         PULL_D(Flags);
-        const auto pSurface = (IDirect3DSurface9*) gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
         const uint32_t width = pRect->right - pRect->left;
         const uint32_t height = pRect->bottom - pRect->top;
         PULL_D(dFormat);
@@ -3095,10 +3101,12 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_OBJ(D3DVOLUME_DESC, orig_desc);
-        const auto& pVolume = gpD3DVolumes[pHandle];
-        D3DVOLUME_DESC pDesc;
-        const auto hresult = pVolume->GetDesc(OUT & pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pVolume, gpD3DVolumes, pHandle, IDirect3DVolume9*);
+        if (pVolume != nullptr) {
+          D3DVOLUME_DESC pDesc;
+          const auto hresult = pVolume->GetDesc(OUT & pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
       case IDirect3DVolume9_LockBox:
@@ -3111,7 +3119,7 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pHandle);
         PULL_OBJ(D3DBOX, pBox);
         PULL_D(Flags);
-        const auto& pVolume = gpD3DVolumes[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pVolume, gpD3DVolumes, pHandle, IDirect3DVolume9*);
         // Now lock the box so we can copy the data into it
         D3DLOCKED_BOX lockedVolume = {};
         HRESULT hresult = E_FAIL;
