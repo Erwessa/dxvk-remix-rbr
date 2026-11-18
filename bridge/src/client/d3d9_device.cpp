@@ -600,10 +600,11 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetBackBuffer(UINT iSwapChain, UINT iBackBuffer, D3DBACKBUFFER_TYPE Type, IDirect3DSurface9** ppBackBuffer) {
   ZoneScoped;
   LogFunctionCall();
+  if (ppBackBuffer == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   if (m_pSwapchain == nullptr) {
-    if (ppBackBuffer != nullptr) {
-      *ppBackBuffer = nullptr;
-    }
+    *ppBackBuffer = nullptr;
     return D3DERR_DEVICELOST;
   }
   return m_pSwapchain->GetBackBuffer(iBackBuffer, Type, ppBackBuffer);
@@ -613,6 +614,9 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRasterStatus(UINT iSwapChain, D3DRASTER_STATUS* pRasterStatus) {
   ZoneScoped;
   LogFunctionCall();
+  if (pRasterStatus == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   if (m_pSwapchain == nullptr) {
     return D3DERR_DEVICELOST;
   }
