@@ -126,13 +126,16 @@ HRESULT Direct3DTexture9_LSS::GetSurfaceLevel(UINT Level, IDirect3DSurface9** pp
   (*ppSurfaceLevel) = pLssSurface;
 
   // Add handles for both the texture and surface
+  DeviceBridge::ResponseTransaction responseTransaction;
+  UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DTexture9_GetSurfaceLevel, getId());
+    currentUID = c.get_uid();
     c.send_data(Level);
     c.send_data(pLssSurface->getId());
   }
-  
-  return S_OK;
+
+  WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetSurfaceLevel()", D3DERR_INVALIDCALL, currentUID, Level, ppSurfaceLevel);
 }
 
 HRESULT Direct3DTexture9_LSS::LockRect(UINT Level, D3DLOCKED_RECT* pLockedRect, CONST RECT* pRect, DWORD Flags) {
