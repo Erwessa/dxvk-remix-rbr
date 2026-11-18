@@ -10,6 +10,7 @@
 
 #include <cstring>
 #include <fstream>
+#include <windows.h>
 
 using VR_InitInternalProc        = uint32_t (VR_CALLTYPE *)(vr::EVRInitError*, vr::EVRApplicationType);
 using VR_ShutdownInternalProc    = void  (VR_CALLTYPE *)();
@@ -351,10 +352,12 @@ namespace dxvk {
     }
     
     // Load method used to retrieve the IVRCompositor interface
+    OutputDebugStringA("[DXVK x64] scene init: resolving OpenVR entry points\\n");
     g_vrFunctions.initInternal        = reinterpret_cast<VR_InitInternalProc>       (this->getSym("VR_InitInternal"));
     g_vrFunctions.shutdownInternal    = reinterpret_cast<VR_ShutdownInternalProc>   (this->getSym("VR_ShutdownInternal"));
     g_vrFunctions.getGenericInterface = reinterpret_cast<VR_GetGenericInterfaceProc>(this->getSym("VR_GetGenericInterface"));
     
+    OutputDebugStringA(g_vrFunctions.getGenericInterface ? "[DXVK x64] scene init: GetGenericInterface resolved\\n" : "[DXVK x64] scene init: GetGenericInterface missing\\n");
     if (!g_vrFunctions.getGenericInterface) {
       Logger::warn("OpenVR: VR_GetGenericInterface not found");
       this->shutdown();
@@ -386,8 +389,10 @@ namespace dxvk {
         return nullptr;
       }
 
+      OutputDebugStringA("[DXVK x64] scene init: querying compositor after Scene init\\n");
       compositor = reinterpret_cast<vr::IVRCompositor*>(
         g_vrFunctions.getGenericInterface(vr::IVRCompositor_Version, &error));
+      OutputDebugStringA(compositor ? "[DXVK x64] scene init: compositor acquired\\n" : "[DXVK x64] scene init: compositor query failed\\n");
       
       if (error != vr::VRInitError_None || !compositor) {
         Logger::warn("OpenVR: Failed to query compositor interface");
@@ -402,7 +407,9 @@ namespace dxvk {
 
 
   bool VrInstance::initializeSceneSession(const void* owner, uint32_t adapterId, bool force) {
+    OutputDebugStringA("[DXVK x64] initializeSceneSession: entered\\n");
     std::lock_guard<dxvk::mutex> lock(m_mutex);
+    OutputDebugStringA("[DXVK x64] initializeSceneSession: mutex acquired\\n");
 
     if (!owner) {
       Logger::warn("OpenVR: refusing scene session claim without an owner");
@@ -430,8 +437,10 @@ namespace dxvk {
       return true;
     }
 
+    OutputDebugStringA("[DXVK x64] scene init: before loadLibrary\\n");
     if (!m_ovrApi)
       m_ovrApi = this->loadLibrary();
+    OutputDebugStringA(m_ovrApi ? "[DXVK x64] scene init: runtime library loaded\\n" : "[DXVK x64] scene init: runtime library unavailable\\n");
 
     if (!m_ovrApi) {
       Logger::warn("OpenVR: failed to load runtime for scene session");
@@ -460,8 +469,10 @@ namespace dxvk {
     // Prefer an existing host-owned OpenVR scene session. Do not initialize or
     // shut down a second runtime instance when the game already owns one.
     vr::EVRInitError error = vr::VRInitError_None;
+    OutputDebugStringA("[DXVK x64] scene init: querying host compositor interface\\n");
     auto* compositor = reinterpret_cast<vr::IVRCompositor*>(
       g_vrFunctions.getGenericInterface(vr::IVRCompositor_Version, &error));
+    OutputDebugStringA(compositor ? "[DXVK x64] scene init: host compositor found\\n" : "[DXVK x64] scene init: host compositor unavailable\\n");
 
     bool initializedHere = false;
     if (error != vr::VRInitError_None || !compositor) {
@@ -471,7 +482,9 @@ namespace dxvk {
         return false;
       }
 
+      OutputDebugStringA("[DXVK x64] scene init: before VR_InitInternal(Scene)\\n");
       g_vrFunctions.initInternal(&error, vr::VRApplication_Scene);
+      OutputDebugStringA("[DXVK x64] scene init: VR_InitInternal returned\\n");
       if (error != vr::VRInitError_None) {
         Logger::warn(str::format("OpenVR: scene initialization failed: ", static_cast<int>(error)));
         releaseFailedInitialization(false);
@@ -489,14 +502,17 @@ namespace dxvk {
       return false;
     }
 
+    OutputDebugStringA("[DXVK x64] scene init: querying IVRSystem\\n");
     auto* system = reinterpret_cast<vr::IVRSystem*>(
       g_vrFunctions.getGenericInterface(vr::IVRSystem_Version, &error));
+    OutputDebugStringA(system ? "[DXVK x64] scene init: IVRSystem acquired\\n" : "[DXVK x64] scene init: IVRSystem query failed\\n");
     if (error != vr::VRInitError_None || !system) {
       Logger::warn("OpenVR: failed to acquire IVRSystem");
       releaseFailedInitialization(initializedHere);
       return false;
     }
 
+    OutputDebugStringA("[DXVK x64] scene init: publishing scene session state\\n");
     m_compositor = compositor;
     m_compositor->SetTrackingSpace(vr::TrackingUniverseStanding);
     m_system = system;
