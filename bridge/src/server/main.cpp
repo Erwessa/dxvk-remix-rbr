@@ -3641,7 +3641,11 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HDR_VAL(_segmentSize);
         const uint32_t segmentSize = (uint32_t) _segmentSize;
-        SharedHeap::addNewHeapSegment(segmentSize);
+        if (!SharedHeap::addNewHeapSegment(segmentSize)) {
+          Logger::err("[Bridge] Invalid SharedHeap segment metadata; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
         break;
       }
       case Bridge_SharedHeap_Alloc:
