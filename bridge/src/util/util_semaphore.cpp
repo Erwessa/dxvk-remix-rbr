@@ -38,11 +38,11 @@ namespace bridge_util {
     }
     DWORD dwWaitResult = WaitForSingleObject(ghSemaphore, timeoutMS);
     if (dwWaitResult == WAIT_OBJECT_0) {
-      avail--;
+      avail.fetch_sub(1);
       return Result::Success;
     } else if ((dwWaitResult != WAIT_TIMEOUT) || (timeoutMS == INFINITE)) {
       DWORD err = GetLastError();
-      Logger::err(format_string("[%s] WaitForSingleObject failed (0x%x): 0x%x, avail = %zu", baseName.c_str(), dwWaitResult, err, avail));
+      Logger::err(format_string("[%s] WaitForSingleObject failed (0x%x): 0x%x, avail = %zu", baseName.c_str(), dwWaitResult, err, avail.load()));
       return Result::Failure;
     } else {
       return Result::Timeout;
@@ -62,7 +62,7 @@ namespace bridge_util {
       // since increment or decrement usually happens in one process on the client or server and
       // then the reverse happens in the other process without updating the first one, and we can
       // only get the semaphore counter value on release but not on wait.
-      avail += batchSize;
+      avail.fetch_add(static_cast<size_t>(batchSize));
     } else {
       DWORD err = GetLastError();
       // We're filtering out errors coming from releasing the semaphore when it's already at full
@@ -71,7 +71,7 @@ namespace bridge_util {
       // batch, however on the server side when reading it will release the writer semaphore for
       // each item read, which will result in trying to release more often than needed.
       if (err != ERROR_TOO_MANY_POSTS) {
-        Logger::err(format_string("[%s] ReleaseSemaphore failed: 0x%x, avail = %zu", baseName.c_str(), err, avail));
+        Logger::err(format_string("[%s] ReleaseSemaphore failed: 0x%x, avail = %zu", baseName.c_str(), err, avail.load()));
       }
     }
   }
