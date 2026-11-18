@@ -522,29 +522,50 @@ D3DPRESENT_PARAMETERS getPresParamFromRaw(const uint32_t* rawPresentationParamet
 
 // Reads the rows of an UnlockBox from the data queue and copies them into the locked box when pLockedBox is set.
 // The rows of all slices follow in order, in blobs of whole rows.
-static void readVolumeRows(const D3DLOCKED_BOX* pLockedBox, const uint32_t uid) {
+static void readVolumeRows(const D3DLOCKED_BOX* pLockedBox, const uint32_t uid,
+                            const uint32_t expectedRowSize = 0, const uint32_t expectedNumRows = 0,
+                            const uint32_t expectedDepth = 0) {
   PULL_U(rowSize);
   PULL_U(numRows);
   PULL_U(depth);
   const uint64_t totalRows = uint64_t(numRows) * depth;
+  if (rowSize == 0 || numRows == 0 || depth == 0
+      || (expectedRowSize != 0 && rowSize != expectedRowSize)
+      || (expectedNumRows != 0 && numRows != expectedNumRows)
+      || (expectedDepth != 0 && depth != expectedDepth)) {
+    Logger::err(format_string("[Bridge] UnlockBox uid=%u: invalid row layout (%u bytes, %u rows, %u slices); stopping the bridge.",
+                              uid, rowSize, numRows, depth));
+    gbBridgeRunning = false;
+    return;
+  }
+  if (pLockedBox != nullptr
+      && (pLockedBox->RowPitch <= 0 || pLockedBox->SlicePitch <= 0
+          || static_cast<uint32_t>(pLockedBox->RowPitch) < rowSize
+          || numRows > static_cast<uint32_t>(pLockedBox->SlicePitch / pLockedBox->RowPitch))) {
+    Logger::err(format_string("[Bridge] UnlockBox uid=%u: native row/slice pitch cannot contain the upload; stopping the bridge.", uid));
+    gbBridgeRunning = false;
+    return;
+  }
   uint64_t row = 0;
   while (row < totalRows) {
     void* pChunk = nullptr;
     const size_t chunkSize = DeviceBridge::get_data_view(&pChunk);
-    const uint64_t chunkRows = rowSize != 0 ? chunkSize / rowSize : 0;
+    const size_t chunkRows = chunkSize / rowSize;
     if (pChunk == nullptr || chunkRows == 0 || chunkRows > totalRows - row || chunkSize % rowSize != 0) {
       // The data offset check after this command stops the bridge.
       Logger::err(format_string("[Bridge] UnlockBox uid=%u: a blob of %zu bytes does not hold whole rows of %u bytes "
                                 "for the %llu of %llu rows still expected.",
                                 uid, chunkSize, rowSize, totalRows - row, totalRows));
+      gbBridgeRunning = false;
       return;
     }
     if (pLockedBox != nullptr) {
-      for (uint64_t r = 0; r < chunkRows; ++r) {
+      for (size_t r = 0; r < chunkRows; ++r) {
         const uint64_t rowIndex = row + r;
-        uint8_t* const pDst = (uint8_t*) pLockedBox->pBits + (rowIndex / numRows) * pLockedBox->SlicePitch +
-                              (rowIndex % numRows) * pLockedBox->RowPitch;
-        memcpy(pDst, (const uint8_t*) pChunk + r * rowSize, rowSize);
+        const size_t sliceOffset = size_t(rowIndex / numRows) * static_cast<size_t>(pLockedBox->SlicePitch);
+        const size_t rowOffset = size_t(rowIndex % numRows) * static_cast<size_t>(pLockedBox->RowPitch);
+        uint8_t* const pDst = static_cast<uint8_t*>(pLockedBox->pBits) + sliceOffset + rowOffset;
+        memcpy(pDst, static_cast<const uint8_t*>(pChunk) + r * rowSize, rowSize);
       }
     }
     row += chunkRows;
@@ -3121,13 +3142,42 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(D3DBOX, pBox);
         PULL_D(Flags);
         GET_RES_OPTIONAL_BY_HANDLE(pVolume, gpD3DVolumes, pHandle, IDirect3DVolume9*);
+        if (pBox == nullptr || pBox->Left >= pBox->Right || pBox->Top >= pBox->Bottom
+            || pBox->Front >= pBox->Back) {
+          Logger::err("[Bridge] IDirect3DVolume9_UnlockBox received an invalid box; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
+        const uint32_t width = pBox->Right - pBox->Left;
+        const uint32_t height = pBox->Bottom - pBox->Top;
+        const uint32_t boxDepth = pBox->Back - pBox->Front;
+        uint32_t expectedRowSize = 0;
+        uint32_t expectedNumRows = 0;
+        if (pVolume != nullptr) {
+          D3DVOLUME_DESC volumeDesc = {};
+          const HRESULT descResult = pVolume->GetDesc(OUT &volumeDesc);
+          if (FAILED(descResult) || pBox->Right > volumeDesc.Width
+              || pBox->Bottom > volumeDesc.Height || pBox->Back > volumeDesc.Depth) {
+            Logger::err("[Bridge] IDirect3DVolume9_UnlockBox box exceeds the server volume; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
+          expectedRowSize = bridge_util::calcRowSize(width, volumeDesc.Format);
+          expectedNumRows = bridge_util::calcStride(height, volumeDesc.Format);
+          if (expectedRowSize == 0 || expectedNumRows == 0) {
+            Logger::err("[Bridge] IDirect3DVolume9_UnlockBox has unsupported volume dimensions; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
+        }
         // Now lock the box so we can copy the data into it
         D3DLOCKED_BOX lockedVolume = {};
         HRESULT hresult = E_FAIL;
         if (pVolume != nullptr) {
           hresult = pVolume->LockBox(IN & lockedVolume, IN pBox, IN Flags);
         }
-        readVolumeRows(SUCCEEDED(hresult) ? &lockedVolume : nullptr, currentUID);
+        readVolumeRows(SUCCEEDED(hresult) ? &lockedVolume : nullptr, currentUID,
+                       expectedRowSize, expectedNumRows, boxDepth);
         if (SUCCEEDED(hresult)) {
           hresult = pVolume->UnlockBox();
         }
