@@ -266,7 +266,7 @@ public:
   static void releaseReadData();
 
   static Header pop_front();
-  static void syncDataQueue(size_t expectedMemUsage, bool posResetOnLastIndex = false);
+  static bool syncDataQueue(size_t expectedMemUsage, bool posResetOnLastIndex = false);
   static bridge_util::Result ensureQueueEmpty();
 
   //=========================//
@@ -297,7 +297,9 @@ public:
       ZoneScoped;
       if (gbBridgeRunning) {
         prepareWrite(1);
-        syncDataQueue(1, false);
+        if (!gbBridgeRunning || !syncDataQueue(1, false)) {
+          return;
+        }
         const auto result = s_pWriterChannel->data->push(obj);
         if (RESULT_FAILURE(result)) {
           // For now just log when things go wrong, but could use some robustness improvements
@@ -316,7 +318,9 @@ public:
         }
         const size_t memUsed = dataWords + 1;
         prepareWrite(memUsed);
-        syncDataQueue(memUsed, true);
+        if (!gbBridgeRunning || !syncDataQueue(memUsed, true)) {
+          return;
+        }
         const auto result = s_pWriterChannel->data->push(size, obj);
         if (RESULT_FAILURE(result)) {
           // For now just log when things go wrong, but could use some robustness improvements
@@ -331,7 +335,9 @@ public:
       if (gbBridgeRunning) {
         size_t count = sizeof...(Ts);
         prepareWrite(count);
-        syncDataQueue(count, false);
+        if (!gbBridgeRunning || !syncDataQueue(count, false)) {
+          return;
+        }
         const auto result = s_pWriterChannel->data->push_many(objs...);
         if (RESULT_FAILURE(result)) {
           // For now just log when things go wrong, but could use some robustness improvements
@@ -354,7 +360,9 @@ public:
         }
         const size_t memUsed = dataWords + 1;
         prepareWrite(memUsed);
-        syncDataQueue(memUsed, true);
+        if (!gbBridgeRunning || !syncDataQueue(memUsed, true)) {
+          return nullptr;
+        }
         const auto result = s_pWriterChannel->data->begin_blob_push(size, blobPacketPtr);
         if (RESULT_FAILURE(result)) {
           // For now just log when things go wrong, but could use some robustness improvements
