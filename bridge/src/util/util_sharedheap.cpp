@@ -156,7 +156,7 @@ void SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize) {
 
 #ifdef REMIX_BRIDGE_CLIENT
 SharedHeap::AllocId SharedHeap::Instance::allocate(const size_t size) {
-  if (size == 0 || size > kMax32BitHeapSize || m_chunkSize == 0) {
+  if (size == 0 || size > kMax32BitHeapSize || m_chunkSize == 0 || m_defaultSegmentSize == 0) {
     Logger::err(format_string("[SharedHeap][allocate] Unsupported allocation size: %s",
                               bridge_util::toByteUnitString(size).c_str()));
     return kInvalidId;
