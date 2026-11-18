@@ -3386,7 +3386,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateQuery(D3DQUERYTYPE Type, IDirec
     currentUID = c.get_uid();
     c.send_many(Type, (uint32_t) pLssQuery->getId());
   }
-  return S_OK;
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateQuery()", D3DERR_INVALIDCALL, currentUID, ppQuery);
 }
 
 template<bool EnableSync>
