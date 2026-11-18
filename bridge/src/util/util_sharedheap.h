@@ -59,8 +59,8 @@ namespace bridge_util {
     static void deallocate(const AllocId id) {
       get().deallocate(id);
     }
-    static bool addNewHeapSegment(const uint32_t segmentSize) {
-      return get().addNewHeapSegment(segmentSize);
+    static bool addNewHeapSegment(const uint32_t segmentSize, const uint32_t chunkSize) {
+      return get().addNewHeapSegment(segmentSize, chunkSize);
     }
 #endif
 
@@ -83,7 +83,7 @@ namespace bridge_util {
 #ifdef REMIX_BRIDGE_SERVER
       bool allocate(const AllocId id, const ChunkId firstChunk, const uint32_t numChunks);
       void deallocate(const AllocId id);
-      bool addNewHeapSegment(const uint32_t segmentSize);
+      bool addNewHeapSegment(const uint32_t segmentSize, const uint32_t chunkSize);
 #endif
 
     private:
