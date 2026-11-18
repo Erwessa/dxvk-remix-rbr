@@ -55,6 +55,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <cctype>
+#include <exception>
 #include <filesystem>
 #include <sstream>
 #include <stdio.h>
