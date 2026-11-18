@@ -684,10 +684,14 @@ namespace dxvk {
       return true;
     }
 
-    // Returns true once the last D3D9 device on this device has destroyed the common objects.
+    // Returns true once the last frontend has retired this device.
     bool isRetired() const {
       return m_retired.load();
     }
+
+    // Releases the device's optional RTX OpenVR scene-session claim when no
+    // D3D9 or D3D11 frontend can use the device anymore.
+    void releaseOpenVrSceneSession();
 
     // Returns the device-loss diagnostics, or nullptr when the device has neither extension.
     GpuBreadcrumbs* gpuBreadcrumbs() const {
@@ -775,6 +779,7 @@ namespace dxvk {
     ~DxvkDeviceFrontendRegistration() {
       if (m_active && m_device->removeFrontendDevice()) {
         m_device->waitForIdle();
+        m_device->releaseOpenVrSceneSession();
         m_device->getCommon()->onDestroy();
       }
     }
