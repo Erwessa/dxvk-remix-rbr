@@ -3081,13 +3081,16 @@ namespace dxvk {
           IDXGIAdapter*       pAdapter,
     const Rc<DxvkInstance>&   pDxvkInstance,
     const Rc<DxvkAdapter>&    pDxvkAdapter,
+    const Rc<DxvkDevice>&     pDxvkDevice,
+          DxvkDeviceFrontendRegistration registration,
           D3D_FEATURE_LEVEL   FeatureLevel,
           UINT                FeatureFlags)
-  : m_dxgiAdapter   (pAdapter),
-    m_dxvkInstance  (pDxvkInstance),
-    m_dxvkAdapter   (pDxvkAdapter),
-    m_dxvkDevice    (CreateDevice(FeatureLevel)),
-    m_d3d11Device   (this, FeatureLevel, FeatureFlags),
+  : m_dxgiAdapter        (pAdapter),
+    m_dxvkInstance       (pDxvkInstance),
+    m_dxvkAdapter        (pDxvkAdapter),
+    m_dxvkDevice         (pDxvkDevice),
+    m_deviceRegistration (std::move(registration)),
+    m_d3d11Device        (this, FeatureLevel, FeatureFlags),
     m_d3d11DeviceExt(this, &m_d3d11Device),
     m_d3d11Interop  (this, &m_d3d11Device),
     m_d3d11Video    (this, &m_d3d11Device),
@@ -3422,14 +3425,5 @@ namespace dxvk {
     return m_dxvkDevice;
   }
 
-
-  Rc<DxvkDevice> D3D11DXGIDevice::CreateDevice(D3D_FEATURE_LEVEL FeatureLevel) {
-    DxvkDeviceFeatures deviceFeatures = D3D11Device::GetDeviceFeatures(m_dxvkAdapter, FeatureLevel);
-    // NV-DXVK start: D3D11 hosts the shared Remix device
-    auto device = m_dxvkAdapter->createDevice(m_dxvkInstance, deviceFeatures, true);
-    Logger::info(str::format("D3D11: shared VkDevice ", device->handle()));
-    return device;
-    // NV-DXVK end
-  }
 
 }
