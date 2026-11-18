@@ -130,6 +130,20 @@ using namespace remixapi::util;
 
 // NOTE: MSDN states HWNDs are safe to cross x86-->x64 boundary, and that a truncating cast should be used:
 // https://docs.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication?redirectedfrom=MSDN
+#define SAFE_ADDREF_RES(map) \
+            const auto pResourceIt = (map).find(pHandle); \
+            if (pResourceIt != (map).cend() && pResourceIt->second != nullptr) { \
+              pResourceIt->second->AddRef(); \
+            } else { \
+              Logger::warn(format_string("[Bridge] Ignoring AddRef for unknown object handle %u.", (unsigned) pHandle)); \
+            }
+#define SAFE_DESTROY_RES(map) \
+            const auto pResourceIt = (map).find(pHandle); \
+            if (pResourceIt != (map).end()) { \
+              safeDestroy(pResourceIt->second, pHandle); \
+              (map).erase(pResourceIt); \
+            }
+
 #define TRUNCATE_HANDLE(type, input) (type)(size_t)(input)
 
 bool bDxvkModuleLoaded = false;
@@ -2102,9 +2116,7 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DStateBlock9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pSB = gpD3DStateBlocks[pHandle];
-        safeDestroy(pSB, pHandle);
-        gpD3DStateBlocks.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DStateBlocks);
         break;
       }
       case IDirect3DStateBlock9_GetDevice:
@@ -2137,9 +2149,7 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DSwapChain9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pSwapChain = gpD3DSwapChains[pHandle];
-        safeDestroy(pSwapChain, pHandle);
-        gpD3DSwapChains.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DSwapChains);
         break;
       }
       case IDirect3DSwapChain9_Present:
@@ -2259,16 +2269,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DVertexDeclaration9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pVertexDeclaration = gpD3DVertexDeclarations[pHandle];
-        pVertexDeclaration->AddRef();
+        SAFE_ADDREF_RES(gpD3DVertexDeclarations);
         break;
       }
       case IDirect3DVertexDeclaration9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pVertexDeclaration = gpD3DVertexDeclarations[pHandle];
-        safeDestroy(pVertexDeclaration, pHandle);
-        gpD3DVertexDeclarations.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DVertexDeclarations);
         break;
       }
       case IDirect3DVertexDeclaration9_GetDevice:
@@ -2284,16 +2291,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DVertexShader9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pVertexShader = gpD3DVertexShaders[pHandle];
-        pVertexShader->AddRef();
+        SAFE_ADDREF_RES(gpD3DVertexShaders);
         break;
       }
       case IDirect3DVertexShader9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pVertexShader = gpD3DVertexShaders[pHandle];
-        safeDestroy(pVertexShader, pHandle);
-        gpD3DVertexShaders.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DVertexShaders);
         break;
       }
       case IDirect3DVertexShader9_GetDevice:
@@ -2309,16 +2313,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DPixelShader9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pPixelShader = gpD3DPixelShaders[pHandle];
-        pPixelShader->AddRef();
+        SAFE_ADDREF_RES(gpD3DPixelShaders);
         break;
       }
       case IDirect3DPixelShader9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pPixelShader = gpD3DPixelShaders[pHandle];
-        safeDestroy(pPixelShader, pHandle);
-        gpD3DPixelShaders.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DPixelShaders);
         break;
       }
       case IDirect3DPixelShader9_GetDevice:
@@ -2400,16 +2401,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DTexture9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pTexture = (IDirect3DTexture9*) gpD3DResources[pHandle];
-        pTexture->AddRef();
+        SAFE_ADDREF_RES(gpD3DResources);
         break;
       }
       case IDirect3DTexture9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pTexture = (IDirect3DTexture9*) gpD3DResources[pHandle];
-        safeDestroy(pTexture, pHandle);
-        gpD3DResources.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DResources);
         break;
       }
       case IDirect3DTexture9_GetDevice:
@@ -2501,16 +2499,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DVolumeTexture9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pHandle];
-        pVolumeTexture->AddRef();
+        SAFE_ADDREF_RES(gpD3DResources);
         break;
       }
       case IDirect3DVolumeTexture9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pHandle];
-        safeDestroy(pVolumeTexture, pHandle);
-        gpD3DResources.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DResources);
         break;
       }
       case IDirect3DVolumeTexture9_GetDevice:
@@ -2619,16 +2614,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DCubeTexture9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pCubeTexture = (IDirect3DCubeTexture9*) gpD3DResources[pHandle];
-        pCubeTexture->AddRef();
+        SAFE_ADDREF_RES(gpD3DResources);
         break;
       }
       case IDirect3DCubeTexture9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pCubeTexture = (IDirect3DCubeTexture9*) gpD3DResources[pHandle];
-        safeDestroy(pCubeTexture, pHandle);
-        gpD3DResources.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DResources);
         break;
       }
       case IDirect3DCubeTexture9_GetDevice:
@@ -2722,16 +2714,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DVertexBuffer9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pVertexBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pHandle];
-        pVertexBuffer->AddRef();
+        SAFE_ADDREF_RES(gpD3DResources);
         break;
       }
       case IDirect3DVertexBuffer9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pVertexBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pHandle];
-        safeDestroy(pVertexBuffer, pHandle);
-        gpD3DResources.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DResources);
         break;
       }
       case IDirect3DVertexBuffer9_GetDevice:
@@ -2818,16 +2807,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DIndexBuffer9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pIndexBuffer = (IDirect3DIndexBuffer9*) gpD3DResources[pHandle];
-        pIndexBuffer->AddRef();
+        SAFE_ADDREF_RES(gpD3DResources);
         break;
       }
       case IDirect3DIndexBuffer9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pIndexBuffer = (IDirect3DIndexBuffer9*) gpD3DResources[pHandle];
-        safeDestroy(pIndexBuffer, pHandle);
-        gpD3DResources.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DResources);
         break;
       }
       case IDirect3DIndexBuffer9_GetDevice:
@@ -2913,16 +2899,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DSurface9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pSurface = (IDirect3DSurface9*) gpD3DResources[pHandle];
-        pSurface->AddRef();
+        SAFE_ADDREF_RES(gpD3DResources);
         break;
       }
       case IDirect3DSurface9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pSurface = (IDirect3DSurface9*) gpD3DResources[pHandle];
-        safeDestroy(pSurface, pHandle);
-        gpD3DResources.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DResources);
         break;
       }
       case IDirect3DSurface9_GetDevice:
@@ -3060,16 +3043,13 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DVolume9_AddRef:
       {
         GET_HND(pHandle);
-        const auto& pVolume = gpD3DVolumes[pHandle];
-        pVolume->AddRef();
+        SAFE_ADDREF_RES(gpD3DVolumes);
         break;
       }
       case IDirect3DVolume9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pVolume = gpD3DVolumes[pHandle];
-        safeDestroy(pVolume, pHandle);
-        gpD3DVolumes.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DVolumes);
         break;
       }
       case IDirect3DVolume9_GetDevice:
@@ -3128,9 +3108,7 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DQuery9_Destroy:
       {
         GET_HND(pHandle);
-        const auto& pQuery = (IDirect3DQuery9*) gpD3DQuery[pHandle];
-        safeDestroy(pQuery, pHandle);
-        gpD3DQuery.erase(pHandle);
+        SAFE_DESTROY_RES(gpD3DQuery);
         break;
       }
       case IDirect3DQuery9_GetDevice:
