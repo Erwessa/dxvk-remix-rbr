@@ -509,19 +509,15 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::Reset(D3DPRESENT_PARAMETERS* pPresent
         c.send_data(sizeof(D3DPRESENT_PARAMETERS), &presParam);
       }
 
-      // Perform an WAIT_FOR_OPTIONAL_SERVER_RESPONSE but don't return since we still have work to do.
-      if (GlobalOptions::getSendAllServerResponses()) {
-        const uint32_t timeoutMs = GlobalOptions::getAckTimeout();
-        if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, timeoutMs, nullptr, true, currentUID)) {
-          Logger::err("Direct3DDevice9Ex_LSS::Reset() failed with : no response from server.");
-          return D3DERR_DEVICELOST;
-        } else {
-          res = (HRESULT) DeviceBridge::get_data();
-          DeviceBridge::pop_front();
-          if (FAILED(res)) {
-            return res;
-          }
-        }
+      // Reset is a lifecycle barrier: always consume its HRESULT before rebuilding implicit resources.
+      if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+        Logger::err("Direct3DDevice9Ex_LSS::Reset() failed with : no response from server.");
+        return D3DERR_DEVICELOST;
+      }
+      res = (HRESULT) DeviceBridge::get_data();
+      DeviceBridge::pop_front();
+      if (FAILED(res)) {
+        return res;
       }
     }
 
@@ -3713,19 +3709,15 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
         c.send_data(sizeof(D3DDISPLAYMODEEX), pFullscreenDisplayMode);
       }
 
-      // Perform an WAIT_FOR_OPTIONAL_SERVER_RESPONSE but don't return since we still have work to do.
-      if (GlobalOptions::getSendAllServerResponses()) {
-        const uint32_t timeoutMs = GlobalOptions::getAckTimeout();
-        if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, timeoutMs, nullptr, true, currentUID)) {
-          Logger::err("Direct3DDevice9Ex_LSS::ResetEx() failed with : no response from server.");
-          return D3DERR_DEVICELOST;
-        } else {
-          res = (HRESULT) DeviceBridge::get_data();
-          DeviceBridge::pop_front();
-          if (FAILED(res)) {
-            return res;
-          }
-        }
+      // ResetEx is a lifecycle barrier: always consume its HRESULT before rebuilding implicit resources.
+      if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+        Logger::err("Direct3DDevice9Ex_LSS::ResetEx() failed with : no response from server.");
+        return D3DERR_DEVICELOST;
+      }
+      res = (HRESULT) DeviceBridge::get_data();
+      DeviceBridge::pop_front();
+      if (FAILED(res)) {
+        return res;
       }
     }
 
