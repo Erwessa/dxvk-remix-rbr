@@ -92,6 +92,23 @@ extern bool gbBridgeRunning;
     } \
   } 
 
+#define WAIT_FOR_CHILD_CREATE_FUNCTION_SERVER_RESPONSE(func, value, uidVal, childIdx, ppOutput) \
+  { \
+    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uidVal)) { \
+      Logger::err(func " failed with: no response from server."); \
+      *(ppOutput) = nullptr; \
+      removeChild(childIdx); \
+      return value; \
+    } \
+    HRESULT res = (HRESULT) DeviceBridge::get_data(); \
+    DeviceBridge::pop_front(); \
+    if (FAILED(res)) { \
+      *(ppOutput) = nullptr; \
+      removeChild(childIdx); \
+    } \
+    return res; \
+  }
+
 #define WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE(func, value, uidVal, childIdx, ppOutput) \
   { \
     if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) { \
