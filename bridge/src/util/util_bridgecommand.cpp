@@ -229,8 +229,9 @@ DECL_BRIDGE_FUNC(Header, pop_front) {
   // No retries, but wait the same amount of time
   const auto response = getReaderChannel().commands->pull(result, get_default_timeout());
   if (RESULT_FAILURE(result)) {
-    // For now just log when things go wrong, but could use some robustness improvements
-    Logger::err("CommandQueue get_response: Failed to retrieve the command response!");
+    Logger::err("CommandQueue get_response: Failed to retrieve the command response; disabling the bridge to preserve response queue state.");
+    gbBridgeRunning = false;
+    return response;
   }
 #ifdef REMIX_BRIDGE_CLIENT
   if constexpr (kIsDeviceBridge<BridgeId>) {
