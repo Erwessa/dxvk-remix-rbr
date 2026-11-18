@@ -119,15 +119,6 @@ using namespace remixapi::util;
               break; \
             } \
             const auto& name = name##It->second
-#define GET_RES_BY_HANDLE(name, map, handle, type) \
-            const auto name##It = (map).find(handle); \
-            if ((handle) == NULL || name##It == (map).cend() || name##It->second == nullptr) { \
-              Logger::err(format_string("[Bridge] Invalid or unknown object handle %u; stopping the bridge.", (unsigned) (handle))); \
-              gbBridgeRunning = false; \
-              break; \
-            } \
-            const auto name = (type) name##It->second
-
 // NOTE: MSDN states HWNDs are safe to cross x86-->x64 boundary, and that a truncating cast should be used:
 // https://docs.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication?redirectedfrom=MSDN
 #define GET_RES_OPTIONAL_BY_HANDLE(name, map, handle, type) \
