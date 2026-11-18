@@ -181,7 +181,10 @@ HRESULT Direct3DTexture9_LSS::UnlockRect(UINT Level) {
 
 HRESULT Direct3DTexture9_LSS::AddDirtyRect(CONST RECT* pDirtyRect) {
   LogFunctionCall();
-  
+  if (pDirtyRect == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
+
   DeviceBridge::ResponseTransaction responseTransaction;
 
   UID currentUID = 0;
