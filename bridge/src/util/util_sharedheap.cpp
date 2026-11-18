@@ -193,10 +193,10 @@ bool SharedHeap::Instance::addNewHeapSegment() {
       m_segments.emplace_back(shMemName, segmentSize, m_chunkSize, m_nChunks);
       bSuccess = true;
     }
-    catch (const char* const errMsg) {
+    catch (const std::exception& errMsg) {
       Logger::debug(format_string(
-        "[SharedHeap][addNewHeapSegment] Failed to create SharedHeap segment of size: %s",
-        bridge_util::toByteUnitString(segmentSize).c_str()));
+        "[SharedHeap][addNewHeapSegment] Failed to create SharedHeap segment of size: %s (%s)",
+        bridge_util::toByteUnitString(segmentSize).c_str(), errMsg.what()));
       segmentSize = (segmentSize >> 1) & ~(m_chunkSize - 1); // halve and preserve chunk alignment
     }
   }
@@ -237,10 +237,10 @@ bool SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize, const u
       std::string("SharedHeap_data_") + std::to_string(m_segments.size());
     m_segments.emplace_back(shMemName, segmentSize, m_chunkSize, m_nChunks);
   }
-  catch (const char* const errMsg) {
+  catch (const std::exception& errMsg) {
     Logger::err(format_string(
-      "[SharedHeap][addNewHeapSegment] Failed to create SharedHeap segment of size: %s",
-      bridge_util::toByteUnitString(segmentSize).c_str()));
+      "[SharedHeap][addNewHeapSegment] Failed to create SharedHeap segment of size: %s (%s)",
+      bridge_util::toByteUnitString(segmentSize).c_str(), errMsg.what()));
     return false;
   }
   const auto newSegId = m_segments.size() - 1;
