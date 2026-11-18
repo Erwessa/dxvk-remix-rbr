@@ -100,6 +100,12 @@ protected:
 
   ~LockableBuffer() {
     if (m_bUseSharedHeap) {
+      while (!m_lockInfos.empty()) {
+        const auto discardedBufferId = m_lockInfos.front().discardedBufferId;
+        if (discardedBufferId != SharedHeap::kInvalidId)
+          SharedHeap::deallocate(discardedBufferId);
+        m_lockInfos.pop();
+      }
       if (m_bufferId != SharedHeap::kInvalidId) {
         SharedHeap::deallocate(m_bufferId);
       }
