@@ -3060,6 +3060,11 @@ void ProcessDeviceCommandQueue() {
         const uint8_t* pHeapData = nullptr;
         if (useSharedHeap) {
           PULL_U(allocId);
+          if (size_t(numRows - 1) > (std::numeric_limits<size_t>::max() - rowSize) / IncomingPitch) {
+            Logger::err("[Bridge] Surface upload row span overflows addressable memory; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
           const size_t byteOffset = bridge_util::calcImageByteOffset(static_cast<INT>(IncomingPitch), *pRect, format);
           const size_t rowSpan = size_t(numRows - 1) * IncomingPitch + rowSize;
           pHeapData = SharedHeap::getBuf(allocId, byteOffset, rowSpan);
