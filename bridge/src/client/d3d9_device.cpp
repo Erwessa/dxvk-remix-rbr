@@ -3689,8 +3689,11 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
   HRESULT res = S_OK;
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    // Clear all device state and release implicit/internal objects
-    releaseInternalObjects(false);
+    // ResetEx has the same device-state invalidation semantics as Reset.
+    // Release implicit/internal objects and drop every client-side state reference
+    // before the server invalidates its D3D9 resources.
+    releaseInternalObjects();
+    ResetState();
     // The server resets its state: forget what was sent (A3a)
     invalidateSentState();
 
@@ -3724,7 +3727,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
     // Rebuild implicit resources only after the server has completed ResetEx.
     const HRESULT implicitResult = initImplicitObjects(presParam);
     if (FAILED(implicitResult)) {
-      releaseInternalObjects(false);
+      releaseInternalObjects();
       return implicitResult;
     }
     // Keeping a track of previous present parameters, to detect and handle mode changes
