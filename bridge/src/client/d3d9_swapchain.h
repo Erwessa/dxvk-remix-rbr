@@ -71,13 +71,17 @@ public:
         c.send_data(D3DBACKBUFFER_TYPE_MONO);
         c.send_data(pLssBackBuffer->getId());
       }
-      if (GlobalOptions::getSendAllServerResponses()) {
+      if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
         const uint32_t timeoutMs = GlobalOptions::getAckTimeout();
         if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, timeoutMs, nullptr, true, currentUID)) {
-          Logger::err("Direct3DSwapChain9_LSS() failed with : no response from server.");
+          Logger::err("Direct3DSwapChain9_LSS() failed with: no response from server.");
+          removeChild(static_cast<uint32_t>(childIdx));
         } else {
-          HRESULT res = (HRESULT) DeviceBridge::get_data();
+          const HRESULT res = (HRESULT) DeviceBridge::get_data();
           DeviceBridge::pop_front();
+          if (FAILED(res)) {
+            removeChild(static_cast<uint32_t>(childIdx));
+          }
         }
       }
     }
