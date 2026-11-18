@@ -3363,26 +3363,26 @@ void ProcessDeviceCommandQueue() {
        */
       case D3D9VR_Create:
       {
-        OutputDebugStringA("[Bridge x64] D3D9VR_Create: dispatch entered\\n");
+        OutputDebugStringA("[Bridge x64] D3D9VR_Create: dispatch entered\n");
         GET_HND(vrHandle);
         PULL_U(deviceHandle);
         HRESULT hresult = E_FAIL;
         IDirect3DVR9* vrInterface = nullptr;
         const auto deviceIt = gpD3DDevices.find(deviceHandle);
         OutputDebugStringA(deviceIt != gpD3DDevices.end() && deviceIt->second
-          ? "[Bridge x64] D3D9VR_Create: device handle resolved\\n"
-          : "[Bridge x64] D3D9VR_Create: device handle missing\\n");
+          ? "[Bridge x64] D3D9VR_Create: device handle resolved\n"
+          : "[Bridge x64] D3D9VR_Create: device handle missing\n");
         using Direct3DCreateVRFn = HRESULT (WINAPI*)(IDirect3DDevice9*, IDirect3DVR9**);
         const auto createVR = ghModule
           ? reinterpret_cast<Direct3DCreateVRFn>(GetProcAddress(ghModule, "Direct3DCreateVR"))
           : nullptr;
         OutputDebugStringA(createVR
-          ? "[Bridge x64] D3D9VR_Create: Direct3DCreateVR export resolved\\n"
-          : "[Bridge x64] D3D9VR_Create: Direct3DCreateVR export missing\\n");
+          ? "[Bridge x64] D3D9VR_Create: Direct3DCreateVR export resolved\n"
+          : "[Bridge x64] D3D9VR_Create: Direct3DCreateVR export missing\n");
         if (deviceIt != gpD3DDevices.end() && deviceIt->second && createVR) {
-          OutputDebugStringA("[Bridge x64] D3D9VR_Create: calling runtime export\\n");
+          OutputDebugStringA("[Bridge x64] D3D9VR_Create: calling runtime export\n");
           hresult = createVR(deviceIt->second, &vrInterface);
-          OutputDebugStringA("[Bridge x64] D3D9VR_Create: runtime export returned\\n");
+          OutputDebugStringA("[Bridge x64] D3D9VR_Create: runtime export returned\n");
         }
         if (SUCCEEDED(hresult) && vrInterface) {
           const auto existing = gpD3DVRInterfaces.find(vrHandle);
@@ -3391,16 +3391,16 @@ void ProcessDeviceCommandQueue() {
             gpD3DVRInterfaces.erase(existing);
           }
           gpD3DVRInterfaces[vrHandle] = vrInterface;
-          OutputDebugStringA("[Bridge x64] D3D9VR_Create: interface registered\\n");
+          OutputDebugStringA("[Bridge x64] D3D9VR_Create: interface registered\n");
         } else if (SUCCEEDED(hresult)) {
           hresult = E_FAIL;
-          OutputDebugStringA("[Bridge x64] D3D9VR_Create: runtime returned success with null interface\\n");
+          OutputDebugStringA("[Bridge x64] D3D9VR_Create: runtime returned success with null interface\n");
         } else {
-          OutputDebugStringA("[Bridge x64] D3D9VR_Create: runtime returned failure\\n");
+          OutputDebugStringA("[Bridge x64] D3D9VR_Create: runtime returned failure\n");
         }
         ServerMessage response(Commands::Bridge_Response, currentUID);
         response.send_data(static_cast<uint32_t>(hresult));
-        OutputDebugStringA("[Bridge x64] D3D9VR_Create: response sent\\n");
+        OutputDebugStringA("[Bridge x64] D3D9VR_Create: response sent\n");
         break;
       }
       case D3D9VR_Destroy:
@@ -3434,9 +3434,9 @@ void ProcessDeviceCommandQueue() {
         if (vrInterface) {
           switch (static_cast<D3D9VRCommand>(methodValue)) {
           case D3D9VRCommand::InitializeOpenVRScene:
-            OutputDebugStringA("[Bridge x64] InitializeOpenVRScene: dispatch entered\\n");
+            OutputDebugStringA("[Bridge x64] InitializeOpenVRScene: dispatch entered\n");
             hresult = vrInterface->InitializeOpenVRScene();
-            OutputDebugStringA("[Bridge x64] InitializeOpenVRScene: runtime call returned\\n");
+            OutputDebugStringA("[Bridge x64] InitializeOpenVRScene: runtime call returned\n");
             break;
 
           case D3D9VRCommand::AcquireOpenVRFrame:
