@@ -96,7 +96,7 @@ namespace bridge_util {
 
     private:
       // Constants
-      static constexpr uint32_t kMax32BitHeapSize = 2 << 30; // 2GB
+      static constexpr uint32_t kMax32BitHeapSize = 2u << 30; // 2 GiB
 
       // Members
       const uint32_t m_chunkSize;
