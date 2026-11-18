@@ -25,20 +25,20 @@ public:
   }
 
   HRESULT createRemote() {
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: createRemote entered\\n");
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: createRemote entered\n");
     DeviceBridge::ResponseTransaction transaction;
     ClientMessage command(Commands::D3D9VR_Create, m_id);
     const auto uid = command.get_uid();
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command created\\n");
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command created\n");
     command.send_data(static_cast<uint32_t>(m_device->getId()));
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command sent; waiting for server\\n");
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command sent; waiting for server\n");
 
     WAIT_FOR_SERVER_RESPONSE("Direct3DCreateVR", E_FAIL, uid);
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: server response received\\n");
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: server response received\n");
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: HRESULT response read\\n");
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: HRESULT response read\n");
     DeviceBridge::pop_front();
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: completed\\n");
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: completed\n");
     return result;
   }
 
