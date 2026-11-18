@@ -189,8 +189,8 @@ HRESULT Direct3DSwapChain9_LSS::Present(CONST RECT* pSourceRect, CONST RECT* pDe
 
   extern HRESULT syncOnPresent();
   const auto syncResult = syncOnPresent();
-  if (syncResult == ERROR_SEM_TIMEOUT) {
-    return ERROR_SEM_TIMEOUT;
+  if (syncResult != S_OK) {
+    return syncResult;
   }
 
   // The frame rate limit waits after the server has caught up and before the game samples input for its next frame.
