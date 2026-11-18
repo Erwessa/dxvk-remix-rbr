@@ -3666,7 +3666,11 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HDR_VAL(_allocId);
         const auto allocId = (SharedHeap::AllocId) _allocId;
-        SharedHeap::deallocate(allocId);
+        if (!SharedHeap::deallocate(allocId)) {
+          Logger::err("[Bridge] Invalid SharedHeap deallocation; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
         break;
       }
       case Bridge_UnlinkResource:
