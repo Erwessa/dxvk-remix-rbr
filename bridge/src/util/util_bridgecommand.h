@@ -40,7 +40,7 @@
 #include "util_singleton.h"
 #include "../tracy/tracy.hpp"
 
-extern bool gbBridgeRunning;
+extern std::atomic<bool> gbBridgeRunning;
 
 #define WAIT_FOR_SERVER_RESPONSE(func, value, uidVal) \
   { \
