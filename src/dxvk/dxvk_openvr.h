@@ -177,7 +177,6 @@ namespace dxvk {
     HKEY                  m_vr_key     = nullptr;
     vr::IVRCompositor*    m_compositor = nullptr;
     vr::IVRSystem*        m_system = nullptr;
-    vr::IVRChaperone*     m_chaperone = nullptr;
     HMODULE               m_ovrApi     = nullptr;
 
     bool m_no_vr;
