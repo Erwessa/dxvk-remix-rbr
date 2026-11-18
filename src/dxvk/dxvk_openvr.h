@@ -156,7 +156,7 @@ namespace dxvk {
 
     // D3D9VR can publish the exact pose snapshot returned to the x86 game.
     // RTX consumes it once instead of calling WaitGetPoses a second time.
-    void registerExternalFrameProvider(const void* owner);
+    bool registerExternalFrameProvider(const void* owner);
     void publishExternalFrame(const void* owner, const OpenVrFrameState& frame);
     void invalidateExternalFrame(const void* owner);
     bool consumeExternalFrame(OpenVrFrameState& frame, bool& providerActive);
