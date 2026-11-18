@@ -3619,6 +3619,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetConvolutionMonoKernel(UINT width, 
   ZoneScoped;
   LogFunctionCall();
 
+  if ((width != 0 && rows == nullptr) || (height != 0 && columns == nullptr)) {
+    return D3DERR_INVALIDCALL;
+  }
+
   DeviceBridge::ResponseTransaction responseTransaction;
 
   UID currentUID = 0;
