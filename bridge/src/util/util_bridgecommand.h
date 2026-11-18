@@ -454,6 +454,7 @@ public:
     const Commands::D3D9Command m_command;
     const uint32_t m_handle;
     const Commands::Flags m_commandFlags;
+    bool m_batchStarted = false;
     int64_t m_perfStart = 0;  // [PerfBridge]: 0 when the counters are off or this is not a counted command
   };
 
