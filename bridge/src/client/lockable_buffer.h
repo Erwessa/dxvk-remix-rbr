@@ -139,6 +139,7 @@ protected:
       const auto nextBufId = (bDiscard || (m_bufferId == SharedHeap::kInvalidId)) ?
         m_bufferId = SharedHeap::allocate(m_desc.Size) : m_bufferId;
       if (nextBufId == SharedHeap::kInvalidId) {
+        m_bufferId = discardedBufferId;
         std::stringstream ss;
         ss << "[LockableBuffer][Lock] Failed to allocate on SharedHeap: {";
         ss << "offset=" << offset << ",";
