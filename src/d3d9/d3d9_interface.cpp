@@ -31,8 +31,8 @@ namespace dxvk {
 
   namespace {
     struct D3D9DeviceRegistration {
-      explicit D3D9DeviceRegistration(Rc<DxvkDevice> device)
-      : m_device(std::move(device)) { }
+      explicit D3D9DeviceRegistration(const Rc<DxvkDevice>& device)
+      : m_device(device) { }
 
       ~D3D9DeviceRegistration() {
         if (m_active && m_device->removeD3D9Device())
