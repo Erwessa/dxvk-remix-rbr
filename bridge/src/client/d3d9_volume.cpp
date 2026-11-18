@@ -60,6 +60,13 @@ ULONG Direct3DVolume9_LSS::Release() {
   return D3DBase::Release();
 }
 
+Direct3DVolume9_LSS::~Direct3DVolume9_LSS() {
+  while (!m_lockInfoQueue.empty()) {
+    delete[] static_cast<uint8_t*>(m_lockInfoQueue.front().lockedVolume.pBits);
+    m_lockInfoQueue.pop();
+  }
+}
+
 void Direct3DVolume9_LSS::onDestroy() {
   // The standalone volumes use normal destroy command, however child volumes
   // are completely owned and managed by their parent container, and so only need
