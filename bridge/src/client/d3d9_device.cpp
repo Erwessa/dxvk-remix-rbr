@@ -530,6 +530,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::Reset(D3DPRESENT_PARAMETERS* pPresent
       releaseInternalObjects();
       return implicitResult;
     }
+    // ResetState ran before the new implicit swapchain existed; now derive ZENABLE
+    // from the presentation parameters that were successfully installed.
+    m_state.renderStates[D3DRS_ZENABLE] = presParam.EnableAutoDepthStencil;
     // Keeping a track of previous present parameters, to detect and handle mode changes
     m_previousPresentParams = *pPresentationParameters;
   }
@@ -3736,6 +3739,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
       releaseInternalObjects();
       return implicitResult;
     }
+    // ResetState ran before the new implicit swapchain existed; now derive ZENABLE
+    // from the presentation parameters that were successfully installed.
+    m_state.renderStates[D3DRS_ZENABLE] = presParam.EnableAutoDepthStencil;
     // Keeping a track of previous present parameters, to detect and handle mode changes
     m_previousPresentParams = *pPresentationParameters;
   }
