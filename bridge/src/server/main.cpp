@@ -1651,9 +1651,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pHandle != NULL && pTexture == nullptr
           ? E_FAIL
           : pD3DDevice->SetTexture(IN Stage, IN pTexture);
-        if (SUCCEEDED(hresult)) {
-          assert(SUCCEEDED(hresult));
-        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1832,9 +1829,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pHandle != NULL && pVertexDecl == nullptr
           ? E_FAIL
           : pD3DDevice->SetVertexDeclaration(IN pVertexDecl);
-        if (SUCCEEDED(hresult)) {
-          assert(SUCCEEDED(hresult));
-        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1938,9 +1932,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pHandle != NULL && pStreamData == nullptr
           ? E_FAIL
           : pD3DDevice->SetStreamSource(IN StreamNumber, IN pStreamData, IN OffsetInBytes, IN Stride);
-        if (SUCCEEDED(hresult)) {
-          assert(SUCCEEDED(hresult));
-        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1969,9 +1960,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pHandle != NULL && pIndexData == nullptr
           ? E_FAIL
           : pD3DDevice->SetIndices(IN pIndexData);
-        if (SUCCEEDED(hresult)) {
-          assert(SUCCEEDED(hresult));
-        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
