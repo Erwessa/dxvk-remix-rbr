@@ -2817,7 +2817,12 @@ void ProcessDeviceCommandQueue() {
           data = DeviceBridge::Bridge::getReaderChannel().get_data_ptr() + DataOffset;
         } else if (Commands::IsDataInSharedHeap(rpcHeader.flags)) {
           PULL_U(allocId);
-          data = SharedHeap::getBuf(allocId) + OffsetToLock;
+          data = SharedHeap::getBuf(allocId, OffsetToLock, SizeToLock);
+          if (data == nullptr) {
+            Logger::err("[Bridge] Vertex buffer upload references an invalid SharedHeap range; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
         } else {
           const auto size = DeviceBridge::get_data(&data);
           assert(SizeToLock == size);
@@ -2909,7 +2914,12 @@ void ProcessDeviceCommandQueue() {
           data = DeviceBridge::Bridge::getReaderChannel().get_data_ptr() + DataOffset;
         } else if (Commands::IsDataInSharedHeap(rpcHeader.flags)) {
           PULL_U(allocId);
-          data = SharedHeap::getBuf(allocId) + OffsetToLock;
+          data = SharedHeap::getBuf(allocId, OffsetToLock, SizeToLock);
+          if (data == nullptr) {
+            Logger::err("[Bridge] Index buffer upload references an invalid SharedHeap range; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
         } else {
           const auto size = DeviceBridge::get_data(&data);
           assert(SizeToLock == size);
@@ -3038,7 +3048,8 @@ void ProcessDeviceCommandQueue() {
         if (rowSize == 0 || numRows == 0 || IncomingPitch == 0
             || IncomingPitch > static_cast<UINT>(std::numeric_limits<INT>::max())
             || (useSharedHeap
-              ? (pSurface != nullptr && (fullRowSize == 0 || IncomingPitch < fullRowSize))
+              ? (IncomingPitch < rowSize
+                || (pSurface != nullptr && (fullRowSize == 0 || IncomingPitch < fullRowSize)))
               : IncomingPitch != rowSize)) {
           Logger::err("[Bridge] IDirect3DSurface9_UnlockRect received an invalid row size or pitch; stopping the bridge.");
           gbBridgeRunning = false;
@@ -3049,9 +3060,13 @@ void ProcessDeviceCommandQueue() {
         const uint8_t* pHeapData = nullptr;
         if (useSharedHeap) {
           PULL_U(allocId);
-          if (pSurface != nullptr) {
-            const size_t byteOffset = bridge_util::calcImageByteOffset(static_cast<INT>(IncomingPitch), *pRect, format);
-            pHeapData = SharedHeap::getBuf(allocId) + byteOffset;
+          const size_t byteOffset = bridge_util::calcImageByteOffset(static_cast<INT>(IncomingPitch), *pRect, format);
+          const size_t rowSpan = size_t(numRows - 1) * IncomingPitch + rowSize;
+          pHeapData = SharedHeap::getBuf(allocId, byteOffset, rowSpan);
+          if (pHeapData == nullptr) {
+            Logger::err("[Bridge] Surface upload references an invalid SharedHeap range; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
           }
         }
 
@@ -3629,7 +3644,12 @@ void ProcessDeviceCommandQueue() {
         GET_HDR_VAL(_allocId);
         const auto allocId = (SharedHeap::AllocId) _allocId;
         PULL_U(chunkId);
-        SharedHeap::allocate(allocId, chunkId);
+        PULL_U(numChunks);
+        if (!SharedHeap::allocate(allocId, chunkId, numChunks)) {
+          Logger::err("[Bridge] Invalid SharedHeap allocation metadata; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
         break;
       }
       case Bridge_SharedHeap_Dealloc:
