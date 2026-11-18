@@ -112,7 +112,11 @@ void Direct3DDevice9Ex_LSS<EnableSync>::releaseInternalObjects(bool resetState) 
     D3DBase::AddRef();
   }
 
-  destroyImplicitObjects();
+  // A failed Reset leaves the device without implicit wrappers. A subsequent
+  // Reset or final Release must not destroy the same objects a second time.
+  if (implicitRefCnt != 0) {
+    destroyImplicitObjects();
+  }
 
   if (resetState) {
     for (auto& texture : m_state.textures) {
