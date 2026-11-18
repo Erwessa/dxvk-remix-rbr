@@ -119,14 +119,14 @@ using namespace remixapi::util;
               break; \
             } \
             const auto& name = name##It->second
-#define GET_RES_BY_HANDLE(name, map, handle) \
+#define GET_RES_BY_HANDLE(name, map, handle, type) \
             const auto name##It = (map).find(handle); \
             if ((handle) == NULL || name##It == (map).cend() || name##It->second == nullptr) { \
               Logger::err(format_string("[Bridge] Invalid or unknown object handle %u; stopping the bridge.", (unsigned) (handle))); \
               gbBridgeRunning = false; \
               break; \
             } \
-            const auto& name = name##It->second
+            const auto name = (type) name##It->second
 
 // NOTE: MSDN states HWNDs are safe to cross x86-->x64 boundary, and that a truncating cast should be used:
 // https://docs.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication?redirectedfrom=MSDN
@@ -1293,8 +1293,8 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(RECT, pSourceRect);
         PULL_HND(pDestHandle);
         PULL_OBJ(POINT, pDestPoint);
-        GET_RES_BY_HANDLE(pSourceSurface, gpD3DResources, pSourceHandle);
-        GET_RES_BY_HANDLE(pDestinationSurface, gpD3DResources, pDestHandle);
+        GET_RES_BY_HANDLE(pSourceSurface, gpD3DResources, pSourceHandle, IDirect3DSurface9*);
+        GET_RES_BY_HANDLE(pDestinationSurface, gpD3DResources, pDestHandle, IDirect3DSurface9*);
         if (pSourceSurface != nullptr && pDestinationSurface != nullptr) {
           hresult = pD3DDevice->UpdateSurface(IN pSourceSurface, IN pSourceRect, IN pDestinationSurface, IN pDestPoint);
           assert(SUCCEEDED(hresult));
@@ -1308,8 +1308,8 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_HND(pSourceTextureHandle);
         PULL_HND(pDestinationTextureHandle);
-        GET_RES_BY_HANDLE(pSourceTexture, gpD3DResources, pSourceTextureHandle);
-        GET_RES_BY_HANDLE(pDestinationTexture, gpD3DResources, pDestinationTextureHandle);
+        GET_RES_BY_HANDLE(pSourceTexture, gpD3DResources, pSourceTextureHandle, IDirect3DBaseTexture9*);
+        GET_RES_BY_HANDLE(pDestinationTexture, gpD3DResources, pDestinationTextureHandle, IDirect3DBaseTexture9*);
         if (pSourceTexture != nullptr && pDestinationTexture != nullptr) {
           hresult = pD3DDevice->UpdateTexture(IN pSourceTexture, IN pDestinationTexture);
           assert(SUCCEEDED(hresult));
@@ -1322,8 +1322,8 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_HND(pRenderTargetHandle);
         PULL_HND(pDestSurfaceHandle);
-        GET_RES_BY_HANDLE(pRenderTarget, gpD3DResources, pRenderTargetHandle);
-        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle);
+        GET_RES_BY_HANDLE(pRenderTarget, gpD3DResources, pRenderTargetHandle, IDirect3DSurface9*);
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle, IDirect3DSurface9*);
         auto hresult = pD3DDevice->GetRenderTargetData(IN pRenderTarget, IN pDestSurface);
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
         assert(SUCCEEDED(hresult));
@@ -1334,7 +1334,7 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL(uint32_t, iSwapChain);
         PULL_HND(pDestSurfaceHandle);
-        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle);
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle, IDirect3DSurface9*);
         IDirect3DSurface9* pBackbuffer = nullptr;
         auto hresult = pD3DDevice->GetFrontBufferData(IN iSwapChain, IN pDestSurface);
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
@@ -1349,8 +1349,8 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pDestHandle);
         PULL_OBJ(RECT, pDestRect);
         PULL(D3DTEXTUREFILTERTYPE, Filter);
-        GET_RES_BY_HANDLE(pSourceSurface, gpD3DResources, pSourceHandle);
-        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestHandle);
+        GET_RES_BY_HANDLE(pSourceSurface, gpD3DResources, pSourceHandle, IDirect3DSurface9*);
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestHandle, IDirect3DSurface9*);
         const auto hresult = pD3DDevice->StretchRect(IN pSourceSurface, IN pSourceRect, IN pDestSurface, IN pDestRect, IN Filter);
         assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
@@ -1362,7 +1362,7 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pHandle);
         PULL_OBJ(RECT, pRect);
         PULL_OBJ(D3DCOLOR, color);
-        GET_RES_BY_HANDLE(pSurface, gpD3DResources, pHandle);
+        GET_RES_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
         const auto hresult = pD3DDevice->ColorFill(IN pSurface, IN pRect, IN * color);
         assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
@@ -1777,8 +1777,8 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pVertexDeclHandle);
         PULL(DWORD, Flags);
 
-        GET_RES_BY_HANDLE(pVertexDecl, gpD3DVertexDeclarations, pVertexDeclHandle);
-        GET_RES_BY_HANDLE(pDestBuffer, gpD3DResources, pVertexBufferHandle);
+        GET_RES_BY_HANDLE(pVertexDecl, gpD3DVertexDeclarations, pVertexDeclHandle, IDirect3DVertexDeclaration9*);
+        GET_RES_BY_HANDLE(pDestBuffer, gpD3DResources, pVertexBufferHandle, IDirect3DVertexBuffer9*);
 
         const auto hresult = pD3DDevice->ProcessVertices(SrcStartIndex, DestIndex, VertexCount, pDestBuffer, pVertexDecl, Flags);
         assert(SUCCEEDED(hresult));
@@ -2057,10 +2057,10 @@ void ProcessDeviceCommandQueue() {
         PULL(D3DCOMPOSERECTSOP, Operation);
         PULL(int, Xoffset);
         PULL(int, Yoffset);
-        GET_RES_BY_HANDLE(srcSurface, gpD3DResources, pSrcSurface);
-        GET_RES_BY_HANDLE(destSurface, gpD3DResources, pDestSurface);
-        GET_RES_BY_HANDLE(srcVertexBuffer, gpD3DResources, pSrcRect);
-        GET_RES_BY_HANDLE(destVertexBuffer, gpD3DResources, pDestRect);
+        GET_RES_BY_HANDLE(srcSurface, gpD3DResources, pSrcSurface, IDirect3DSurface9*);
+        GET_RES_BY_HANDLE(destSurface, gpD3DResources, pDestSurface, IDirect3DSurface9*);
+        GET_RES_BY_HANDLE(srcVertexBuffer, gpD3DResources, pSrcRect, IDirect3DVertexBuffer9*);
+        GET_RES_BY_HANDLE(destVertexBuffer, gpD3DResources, pDestRect, IDirect3DVertexBuffer9*);
 
         const auto hresult = ((IDirect3DDevice9Ex*) pD3DDevice)->ComposeRects(IN srcSurface, IN destSurface, IN srcVertexBuffer, IN NumRects, IN destVertexBuffer, IN Operation, IN Xoffset, IN Yoffset);
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
@@ -2180,7 +2180,7 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pSwapChain, gpD3DSwapChains);
         PULL_HND(pDestSurfaceHandle);
-        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle);
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle, IDirect3DSurface9*);
         auto hresult = pSwapChain->GetFrontBufferData(pDestSurface);
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pDestSurfaceHandle] = pDestSurface;
