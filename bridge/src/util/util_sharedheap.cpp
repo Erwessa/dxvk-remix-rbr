@@ -174,6 +174,7 @@ bool SharedHeap::Instance::addNewHeapSegment() {
   if (bSuccess) {
     {
       ClientMessage c(Commands::Bridge_SharedHeap_AddSeg, segmentSize);
+      c.send_data(m_chunkSize);
     }
     Logger::debug(format_string(
       "[SharedHeap][addNewHeapSegment] Successfully allocated SharedHeap segment of size: %s",
@@ -189,7 +190,11 @@ bool SharedHeap::Instance::addNewHeapSegment() {
 }
 #endif
 #ifdef REMIX_BRIDGE_SERVER
-bool SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize) {
+bool SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize, const uint32_t chunkSize) {
+  if (chunkSize != m_chunkSize) {
+    Logger::err(format_string("[SharedHeap][addNewHeapSegment] Client/server chunk size mismatch (%u != %u).", chunkSize, m_chunkSize));
+    return false;
+  }
   const size_t totalHeapSize = getTotalHeapSize();
   if (m_chunkSize == 0 || segmentSize == 0 || segmentSize % m_chunkSize != 0
       || totalHeapSize > kMax32BitHeapSize
