@@ -197,8 +197,6 @@ protected:
   UINT m_curTexPalette;
   BOOL m_bSoftwareVtxProcessing;
   D3DCLIPSTATUS9 m_clipStatus;
-  float m_NPatchMode;
-  DWORD m_FVF;
   INT m_gpuThreadPriority;
   UINT m_maxFrameLatency;
 
@@ -236,6 +234,9 @@ protected:
     bool viewport;
     // Scissor Rect
     bool scissorRect;
+    bool currentTexturePalette;
+    bool nPatchMode;
+    bool fvf;
     std::array<bool, caps::MaxClipPlanes> clipPlanes;
     // Pixel Shader Constants
     struct VertexConstants {
@@ -280,6 +281,9 @@ protected:
     std::array<SamplerStateArray, kNumStageSamplers> samplerStates;
     // Scissor Rect
     RECT scissorRect;
+    UINT currentTexturePalette = 65535;
+    float nPatchMode = 0.0f;
+    DWORD fvf = 0;
     // Vertex Decl
     D3DAutoPtr vertexDecl;
     // Vertex Shader
