@@ -148,7 +148,7 @@ std::chrono::steady_clock::time_point gTimeStart;
 
 // Shared memory and IPC channels
 Guid gUniqueIdentifier;
-NamedSemaphore* gpPresent = nullptr;
+std::unique_ptr<NamedSemaphore> gpPresent;
 std::unique_ptr<MessageChannelServer> gpClientMessageChannel;
 // D3D Library handle
 typedef IDirect3D9* (WINAPI* D3DC9)(UINT);
@@ -5132,8 +5132,12 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   }
 
   // Same counts as the client (d3d9_lss.cpp). Normally the client created the semaphore first and these are ignored.
-  gpPresent = new NamedSemaphore("Present", GlobalOptions::getPresentSemaphoreMaxFrames(),
-                                 std::max<size_t>(GlobalOptions::getPresentSemaphoreMaxFrames(), 1));
+  gpPresent = std::make_unique<NamedSemaphore>("Present", GlobalOptions::getPresentSemaphoreMaxFrames(),
+                                               std::max<size_t>(GlobalOptions::getPresentSemaphoreMaxFrames(), 1));
+  if (GlobalOptions::getPresentSemaphoreEnabled() && !gpPresent->isValid()) {
+    Logger::err("Unable to create the Present semaphore required for frame synchronization.");
+    return 1;
+  }
 
   // Initialize our shared client command queue as a Reader.
   // (1) Wait for connection for client.
