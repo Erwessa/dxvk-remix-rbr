@@ -125,7 +125,7 @@ std::mutex gShadowMapMutex;
 std::mutex serverStartMutex;
 SceneState gSceneState = WaitBeginScene;
 std::chrono::steady_clock::time_point gTimeStart;
-bool gbBridgeRunning = true;
+std::atomic<bool> gbBridgeRunning { true };
 std::string gRemixFolder = "";
 std::mutex gSwapChainMapMutex;
 SwapChainMap gSwapChainMap;
