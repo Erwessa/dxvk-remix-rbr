@@ -125,6 +125,9 @@ HRESULT Direct3DSurface9_LSS::GetDesc(D3DSURFACE_DESC* pDesc) {
 
 HRESULT Direct3DSurface9_LSS::LockRect(D3DLOCKED_RECT* pLockedRect, CONST RECT* pRect, DWORD Flags) {
   LogFunctionCall();
+  if (pLockedRect == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   // Store locked rect pointer locally so we can copy the data on unlock
   {
     BRIDGE_PARENT_DEVICE_LOCKGUARD();
