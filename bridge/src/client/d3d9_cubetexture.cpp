@@ -195,6 +195,9 @@ HRESULT Direct3DCubeTexture9_LSS::UnlockRect(D3DCUBEMAP_FACES FaceType, UINT Lev
 
 HRESULT Direct3DCubeTexture9_LSS::AddDirtyRect(D3DCUBEMAP_FACES FaceType, CONST RECT* pDirtyRect) {
   LogFunctionCall();
+  if (FaceType >= caps::MaxCubeFaces || pDirtyRect == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
 
   DeviceBridge::ResponseTransaction responseTransaction;
 
