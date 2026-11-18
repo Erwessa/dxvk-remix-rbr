@@ -2845,7 +2845,13 @@ void ProcessDeviceCommandQueue() {
         // Now lock the buffer and copy the data into it
         void* pbData = nullptr;
         auto hresult = pVertexBuffer->Lock(IN OffsetToLock, IN SizeToLock, IN & pbData, IN Flags);
-        if (SUCCEEDED(hresult) && pbData != nullptr) {
+        if (SUCCEEDED(hresult)) {
+          if (pbData == nullptr) {
+            pVertexBuffer->Unlock();
+            Logger::err("[Bridge] Vertex buffer Lock succeeded without returning a data pointer; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
           if (SizeToLock != 0) {
             memcpy(pbData, data, SizeToLock);
           }
@@ -2953,7 +2959,13 @@ void ProcessDeviceCommandQueue() {
         // Now lock the buffer and copy the data into it
         void* pbData = nullptr;
         auto hresult = pIndexBuffer->Lock(IN OffsetToLock, IN SizeToLock, IN & pbData, IN Flags);
-        if (SUCCEEDED(hresult) && pbData != nullptr) {
+        if (SUCCEEDED(hresult)) {
+          if (pbData == nullptr) {
+            pIndexBuffer->Unlock();
+            Logger::err("[Bridge] Index buffer Lock succeeded without returning a data pointer; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
           if (SizeToLock != 0) {
             memcpy(pbData, data, SizeToLock);
           }
