@@ -100,7 +100,8 @@ namespace dxvk {
 // NV-DXVK start: external API
     , m_withExternalSwapchain { WithExternalSwapchain } {
 // NV-DXVK end
-    m_dxvkDevice->addD3D9Device();
+    // The D3D9 frontend registration is reserved by CreateDeviceEx before
+    // this constructor runs, so the shared device cannot retire mid-construction.
 
     // If we can SWVP, then we use an extended constant set
     // as SWVP has many more slots available than HWVP.
