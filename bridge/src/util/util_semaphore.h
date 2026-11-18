@@ -28,6 +28,7 @@
 
 #include <windows.h>
 #include <sstream>
+#include <atomic>
 
 #define FIVE_SECONDS 5'000
 #define HALF_SECOND 500
@@ -41,7 +42,7 @@ namespace bridge_util {
   class NamedSemaphore {
     std::string baseName;
     const size_t count;
-    size_t avail;
+    std::atomic<size_t> avail;
     HANDLE ghSemaphore = nullptr;
 
   public:
@@ -57,7 +58,7 @@ namespace bridge_util {
       SetLastError(ERROR_SUCCESS);
       ghSemaphore = CreateSemaphore(
         nullptr,                    // default access
-        static_cast<LONG>(avail),   // initial count
+        static_cast<LONG>(avail.load()), // initial count
         static_cast<LONG>(count),   // maximum count
         uniqueName.c_str());        // named semaphore
 
@@ -89,7 +90,7 @@ namespace bridge_util {
     void release(LONG batchSize = 1);
 
     size_t available() const {
-      return avail;
+      return avail.load();
     }
   };
 
