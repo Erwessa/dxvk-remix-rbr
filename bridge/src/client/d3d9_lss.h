@@ -129,10 +129,28 @@ class Direct3DStateBlock9_LSS: public D3DBase<IDirect3DStateBlock9> {
   void onDestroy() override;
 protected:
   BaseDirect3DDevice9Ex_LSS* const m_pDevice = nullptr;
+private:
+  // A recording wrapper must not keep its device alive. Attach an internal
+  // object reference only after the server has created the state block.
+  D3DAutoPtr m_deviceRef;
+  bool m_serverCreated = false;
 public:
   Direct3DStateBlock9_LSS(BaseDirect3DDevice9Ex_LSS* const pDevice)
-    : D3DBase((IDirect3DStateBlock9*) nullptr, pDevice)
+    : D3DBase((IDirect3DStateBlock9*) nullptr, nullptr)
     , m_pDevice(pDevice) {
+  }
+
+  void markServerCreated() {
+    m_deviceRef.reset(m_pDevice);
+    m_serverCreated = true;
+  }
+
+  void markServerObjectMayExist() {
+    m_serverCreated = true;
+  }
+
+  bool isServerCreated() const {
+    return m_serverCreated;
   }
 
   friend BaseDirect3DDevice9Ex_LSS;
