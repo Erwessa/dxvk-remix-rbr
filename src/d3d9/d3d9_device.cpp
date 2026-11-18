@@ -176,9 +176,9 @@ namespace dxvk {
 
     m_dxvkDevice->waitForIdle(); // Sync Device
     // NV-DXVK start: clean exit
-    // Every D3D9 device on the shared DXVK device uses the same common objects.
+    // Every frontend on the shared DXVK device uses the same common objects.
     // An overlay's short-lived probe device must not destroy them under the game's device.
-    if (m_dxvkDevice->removeD3D9Device()) {
+    if (m_dxvkDevice->removeFrontendDevice()) {
       m_dxvkDevice->getCommon()->onDestroy();
     }
     // NV-DXVK end
