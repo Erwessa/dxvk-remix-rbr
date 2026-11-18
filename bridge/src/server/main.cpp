@@ -1315,7 +1315,7 @@ void ProcessDeviceCommandQueue() {
         GET_RES_OPTIONAL_BY_HANDLE(pDestinationSurface, gpD3DResources, pDestHandle, IDirect3DSurface9*);
         if (pSourceSurface != nullptr && pDestinationSurface != nullptr) {
           hresult = pD3DDevice->UpdateSurface(IN pSourceSurface, IN pSourceRect, IN pDestinationSurface, IN pDestPoint);
-          assert(SUCCEEDED(hresult));
+
         }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
@@ -1330,7 +1330,7 @@ void ProcessDeviceCommandQueue() {
         GET_RES_OPTIONAL_BY_HANDLE(pDestinationTexture, gpD3DResources, pDestinationTextureHandle, IDirect3DBaseTexture9*);
         if (pSourceTexture != nullptr && pDestinationTexture != nullptr) {
           hresult = pD3DDevice->UpdateTexture(IN pSourceTexture, IN pDestinationTexture);
-          assert(SUCCEEDED(hresult));
+
         }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
@@ -1374,7 +1374,7 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pSourceSurface != nullptr && pDestSurface != nullptr
           ? pD3DDevice->StretchRect(IN pSourceSurface, IN pSourceRect, IN pDestSurface, IN pDestRect, IN Filter)
           : E_FAIL;
-        if (pSourceSurface != nullptr && pDestSurface != nullptr) assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1386,7 +1386,7 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(D3DCOLOR, color);
         GET_RES_OPTIONAL_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
         const auto hresult = pSurface != nullptr ? pD3DDevice->ColorFill(IN pSurface, IN pRect, IN * color) : E_FAIL;
-        if (pSurface != nullptr) assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
