@@ -154,6 +154,13 @@ namespace dxvk {
     // compositor may access the Vulkan queue outside Explicit Timing mode.
     bool acquireFrame(OpenVrFrameState& frame);
 
+    // D3D9VR can publish the exact pose snapshot returned to the x86 game.
+    // RTX consumes it once instead of calling WaitGetPoses a second time.
+    void registerExternalFrameProvider(const void* owner);
+    void publishExternalFrame(const void* owner, const OpenVrFrameState& frame);
+    void invalidateExternalFrame(const void* owner);
+    bool consumeExternalFrame(OpenVrFrameState& frame, bool& providerActive);
+
     // Submits a completed left/right Vulkan image pair. The caller must hold
     // DxvkDevice's submission queue gate for the duration of this call.
     bool submitFrame(
@@ -185,6 +192,11 @@ namespace dxvk {
     bool m_sceneSessionActive = false;
     uint32_t m_sceneSessionAdapterId = UINT32_MAX;
     std::unordered_set<const void*> m_sceneSessionOwners;
+    const void* m_externalFrameProvider = nullptr;
+    OpenVrFrameState m_externalFrame = {};
+    bool m_externalFramePending = false;
+    OpenVrMatrix4 m_lastValidTrackingFromHead = {};
+    bool m_hasLastValidTrackingFromHead = false;
     uint64_t m_frameIndex = 0;
     uint64_t m_waitGetPosesFailures = 0;
     bool m_initializedInsExt = false;
