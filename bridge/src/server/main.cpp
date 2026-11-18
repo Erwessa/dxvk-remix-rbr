@@ -2582,7 +2582,6 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DVolumeTexture9_AddDirtyBox:
       {
         GET_HND(pHandle);
-        PULL_U(Level);
         PULL_OBJ(D3DBOX, pBox);
         GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pHandle, IDirect3DVolumeTexture9*);
         const auto hresult = pVolumeTexture != nullptr ? pVolumeTexture->AddDirtyBox(IN pBox) : E_FAIL;
