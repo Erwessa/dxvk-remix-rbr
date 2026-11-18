@@ -4156,10 +4156,7 @@ void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects() {
     m_state.depthStencil.reset(nullptr);
   }
 
-  const size_t nBackBuf = GET_PRES_PARAM().BackBufferCount;
-  for (size_t iBackBuf = 0; iBackBuf < nBackBuf; ++iBackBuf) {
-    m_pSwapchain->Release();
-  }
+  m_pSwapchain->releaseBackBufferReferences();
   // Release implicit SwapChain, must happen last so PresParam still exist prior
   const auto scRefCnt = m_pSwapchain->Release();
   assert(scRefCnt == 0 && "Implicit Swapchain has not been released!");
