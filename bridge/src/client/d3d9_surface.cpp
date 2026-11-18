@@ -238,6 +238,11 @@ bool Direct3DSurface9_LSS::lock(D3DLOCKED_RECT& lockedRect, const RECT* pRect, c
       return false;
     }
     lockedRect.pBits = getBufPtr(lockedRect.Pitch, rect);
+    if (lockedRect.pBits == nullptr) {
+      SharedHeap::deallocate(m_bufferId);
+      m_bufferId = SharedHeap::kInvalidId;
+      return false;
+    }
     m_lockInfoQueue.push({ lockedRect, rect, flags, m_bufferId, discardBufId });
   } else {
     if (!m_shadow) {
@@ -278,8 +283,8 @@ RECT Direct3DSurface9_LSS::resolveLockInfoRect(const RECT* const pRect, const D3
 
 void* Direct3DSurface9_LSS::getBufPtr(const int pitch, const RECT& rect) {
   const size_t byteOffset = bridge_util::calcImageByteOffset(pitch, rect, m_desc.Format);
-  void* const ptr = SharedHeap::getBuf(m_bufferId) + byteOffset;
-  return ptr;
+  BYTE* const base = SharedHeap::getBuf(m_bufferId);
+  return base != nullptr ? base + byteOffset : nullptr;
 }
 
 void Direct3DSurface9_LSS::sendDataToServer(const LockInfo& lockInfo) const {
