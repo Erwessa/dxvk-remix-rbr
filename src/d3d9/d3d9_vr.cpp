@@ -569,7 +569,16 @@ public:
       return beginResult;
     }
 
-    const bool submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Auto);
+    bool submitted = false;
+    try {
+      submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Auto);
+    } catch (...) {
+      // Do not let an exception from the runtime or its wrapper strand the
+      // external submission lock and the D3D9 device lock across this COM call.
+      const HRESULT endResult = EndVRSubmit();
+      return FAILED(endResult) ? endResult : E_FAIL;
+    }
+
     const HRESULT endResult = EndVRSubmit();
     if (FAILED(endResult))
       return endResult;
