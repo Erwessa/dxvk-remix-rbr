@@ -23,6 +23,9 @@
 
 #include "client_options.h"
 #include "d3d9_lss.h"
+#include "d3d9_swapchain.h"
+
+#include <algorithm>
 #include "window.h"
 
 #include "util_devicecommand.h"
@@ -130,6 +133,55 @@ BaseDirect3DDevice9Ex_LSS::BaseDirect3DDevice9Ex_LSS(const bool bExtended,
   }
   Logger::debug("...server-side D3D9 device successfully created...");
   Logger::debug("...Device successfully created!");
+}
+
+void BaseDirect3DDevice9Ex_LSS::registerSwapChain(Direct3DSwapChain9_LSS* swapChain, bool implicitSwapChain) {
+  if (swapChain == nullptr) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
+  const auto it = std::find(m_swapChainRegistry.begin(), m_swapChainRegistry.end(), swapChain);
+  if (it != m_swapChainRegistry.end()) {
+    return;
+  }
+  if (implicitSwapChain) {
+    m_swapChainRegistry.insert(m_swapChainRegistry.begin(), swapChain);
+  } else {
+    m_swapChainRegistry.push_back(swapChain);
+  }
+}
+
+void BaseDirect3DDevice9Ex_LSS::unregisterSwapChain(Direct3DSwapChain9_LSS* swapChain) {
+  std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
+  const auto it = std::find(m_swapChainRegistry.begin(), m_swapChainRegistry.end(), swapChain);
+  if (it != m_swapChainRegistry.end()) {
+    m_swapChainRegistry.erase(it);
+  }
+}
+
+Direct3DSwapChain9_LSS* BaseDirect3DDevice9Ex_LSS::getSwapChainAtIndex(UINT index) const {
+  std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
+  if (index >= m_swapChainRegistry.size()) {
+    return nullptr;
+  }
+  auto* swapChain = m_swapChainRegistry[index];
+  if (swapChain != nullptr) {
+    swapChain->AddRef();
+  }
+  return swapChain;
+}
+
+UINT BaseDirect3DDevice9Ex_LSS::getSwapChainIndex(const Direct3DSwapChain9_LSS* swapChain) const {
+  std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
+  const auto it = std::find(m_swapChainRegistry.begin(), m_swapChainRegistry.end(), swapChain);
+  return it == m_swapChainRegistry.end()
+    ? static_cast<UINT>(-1)
+    : static_cast<UINT>(std::distance(m_swapChainRegistry.begin(), it));
+}
+
+UINT BaseDirect3DDevice9Ex_LSS::getSwapChainCount() const {
+  std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
+  return static_cast<UINT>(m_swapChainRegistry.size());
 }
 
 void BaseDirect3DDevice9Ex_LSS::InitRamp() {
