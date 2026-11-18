@@ -1350,7 +1350,6 @@ void ProcessDeviceCommandQueue() {
           ? pD3DDevice->GetRenderTargetData(IN pRenderTarget, IN pDestSurface)
           : E_FAIL;
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
-        assert(SUCCEEDED(hresult));
         break;
       }
       case IDirect3DDevice9Ex_GetFrontBufferData:
@@ -1364,7 +1363,6 @@ void ProcessDeviceCommandQueue() {
           ? pD3DDevice->GetFrontBufferData(IN iSwapChain, IN pDestSurface)
           : E_FAIL;
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
-        assert(SUCCEEDED(hresult));
         break;
       }
       case IDirect3DDevice9Ex_StretchRect:
@@ -2215,7 +2213,6 @@ void ProcessDeviceCommandQueue() {
           gpD3DResources[pDestSurfaceHandle] = pDestSurface;
         }
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
-        assert(SUCCEEDED(hresult));
         break;
       }
       case IDirect3DSwapChain9_GetBackBuffer:
