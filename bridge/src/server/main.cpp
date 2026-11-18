@@ -202,6 +202,7 @@ std::unordered_map<uint32_t, void*> gMapRemixApi;
 // Global state
 std::atomic<bool> gbBridgeRunning { true };
 std::atomic<bool> gClientProcessExited { false };
+std::atomic<bool> gServerCleanupComplete { false };
 HANDLE hWait;
 
 namespace {
@@ -4981,16 +4982,15 @@ void CALLBACK OnClientExited(void* context, BOOLEAN isTimeout) {
   gClientProcessExited.store(true);
   gbBridgeRunning = false;
 
-  // Give the server some time to shut down, but then force quit so it doesn't hang forever
+  // Give the main thread time to finish server-side cleanup, but force quit if it hangs.
   uint32_t numRetries = 0;
-  uint32_t maxRetries = ServerOptions::getShutdownRetries();
-  uint32_t timeout = ServerOptions::getShutdownTimeout();
-  while (ghModule && numRetries++ < maxRetries) {
+  const uint32_t maxRetries = ServerOptions::getShutdownRetries();
+  const uint32_t timeout = ServerOptions::getShutdownTimeout();
+  while (!gServerCleanupComplete.load() && numRetries++ < maxRetries) {
     Sleep(timeout);
   }
-  // We rely on the d3d9 module having been unloaded successfully for this to work
-  if (ghModule && numRetries >= maxRetries) {
-    // Terminate is stronger than ExitProcess in case some thread doesn't cleanly exit
+  if (!gServerCleanupComplete.load()) {
+    // Terminate is stronger than ExitProcess in case some thread doesn't cleanly exit.
     TerminateProcess(GetCurrentProcess(), 1);
   }
 }
@@ -5218,6 +5218,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     // to being unable to acquire certain locks during unloading.
     //FreeLibrary(ghModule);
   }
+
+  // The queue workers, leaked-object diagnostics and VR interface cleanup are complete.
+  // Let the exit callback return before waiting for it to unregister.
+  gServerCleanupComplete.store(true);
 
   // Clean up client exit callback handler
   if (hWait) {
