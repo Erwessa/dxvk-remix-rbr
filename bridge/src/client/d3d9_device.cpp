@@ -2857,7 +2857,15 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetVertexDeclaration(IDirect3DVertexD
   UID currentUID = 0;
   {
     {
-      m_state.vertexDecl = MakeD3DAutoPtr(pLssVtxDecl);
+      if (m_stateRecording) {
+        m_stateRecording->m_captureState.vertexDecl = MakeD3DAutoPtr(pLssVtxDecl);
+        m_stateRecording->m_dirtyFlags.vertexDecl = true;
+        m_stateRecording->m_captureState.fvf = 0;
+        m_stateRecording->m_dirtyFlags.fvf = true;
+      } else {
+        m_state.vertexDecl = MakeD3DAutoPtr(pLssVtxDecl);
+        m_state.fvf = 0;
+      }
     }
     if (!mustSend(Commands::IDirect3DDevice9Ex_SetVertexDeclaration,
                   [&](SentState& s) { return s.vertexDeclaration((uint32_t) id); })) {
@@ -2903,8 +2911,11 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetFVF(DWORD FVF) {
       if (m_stateRecording) {
         m_stateRecording->m_captureState.fvf = FVF;
         m_stateRecording->m_dirtyFlags.fvf = true;
+        m_stateRecording->m_captureState.vertexDecl = nullptr;
+        m_stateRecording->m_dirtyFlags.vertexDecl = true;
       } else {
         m_state.fvf = FVF;
+        m_state.vertexDecl = nullptr;
       }
     }
     if (!mustSend(Commands::IDirect3DDevice9Ex_SetFVF, [&](SentState& s) { return s.fvf(FVF); })) {
