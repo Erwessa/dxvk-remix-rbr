@@ -60,12 +60,42 @@ SharedHeap::Instance::Instance()
 }
 
 BYTE* SharedHeap::Instance::getBuf(const AllocId id) {
-  assert(m_cache.count(id) != 0);
-  const auto firstChunk = m_cache[id];
-  const auto segId = chunkIdToSegId(firstChunk);
-  BYTE* const pBuf = m_segments[segId].getBuf(firstChunk);
-  return pBuf;
+  const auto allocation = m_cache.find(id);
+  if (allocation == m_cache.end()) {
+    Logger::err(format_string("[SharedHeap] Unknown allocation id %u.", id));
+    return nullptr;
+  }
+  const auto segId = chunkIdToSegId(allocation->second);
+  if (segId >= m_segments.size()) {
+    Logger::err(format_string("[SharedHeap] Allocation id %u references an invalid heap segment.", id));
+    return nullptr;
+  }
+  return m_segments[segId].getBuf(allocation->second);
 }
+
+#ifdef REMIX_BRIDGE_SERVER
+BYTE* SharedHeap::Instance::getBuf(const AllocId id, const size_t offset, const size_t size) {
+  const auto allocation = m_cache.find(id);
+  const auto allocationSize = m_allocationChunkCounts.find(id);
+  if (allocation == m_cache.end() || allocationSize == m_allocationChunkCounts.end()) {
+    Logger::err(format_string("[SharedHeap] Unknown or incomplete allocation id %u.", id));
+    return nullptr;
+  }
+  if (m_chunkSize == 0
+      || allocationSize->second > std::numeric_limits<size_t>::max() / m_chunkSize) {
+    Logger::err(format_string("[SharedHeap] Invalid allocation extent for id %u.", id));
+    return nullptr;
+  }
+  const size_t totalSize = size_t(allocationSize->second) * m_chunkSize;
+  if (offset > totalSize || size > totalSize - offset) {
+    Logger::err(format_string("[SharedHeap] Out-of-range access for allocation id %u (offset %zu, size %zu, allocation %zu).",
+                              id, offset, size, totalSize));
+    return nullptr;
+  }
+  BYTE* const base = getBuf(id);
+  return base != nullptr ? base + offset : nullptr;
+}
+#endif
 
 size_t SharedHeap::Instance::getTotalHeapSize() const {
   size_t size = 0;
@@ -200,6 +230,7 @@ SharedHeap::AllocId SharedHeap::Instance::allocate(const size_t size) {
   {
     ClientMessage c(Commands::Bridge_SharedHeap_Alloc, id);
     c.send_data(alloc.firstChunk);
+    c.send_data(numChunks);
   }
 
   assert(getChunkState(alloc.firstChunk) == ChunkState::Unallocated);
@@ -218,15 +249,36 @@ void SharedHeap::Instance::deallocate(const AllocId id) {
 #endif
 
 #ifdef REMIX_BRIDGE_SERVER
-void SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk) {
-  m_cache[id] = firstChunk;
+void SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk, const uint32_t numChunks) {
+  const auto segId = chunkIdToSegId(firstChunk);
+  if (m_cache.count(id) != 0 || numChunks == 0 || segId >= m_segments.size()) {
+    Logger::err(format_string("[SharedHeap] Rejecting invalid allocation metadata (id %u, first chunk %u, chunks %u).",
+                              id, firstChunk, numChunks));
+    return;
+  }
+  const auto& segment = m_segments[segId];
+  const size_t segmentEnd = size_t(segment.getBaseChunkId()) + segment.getNumChunks();
+  if (firstChunk < segment.getBaseChunkId()
+      || size_t(firstChunk) >= segmentEnd
+      || size_t(numChunks) > segmentEnd - firstChunk) {
+    Logger::err(format_string("[SharedHeap] Allocation %u crosses or exceeds its heap segment.", id));
+    return;
+  }
+  m_cache.emplace(id, firstChunk);
+  m_allocationChunkCounts.emplace(id, numChunks);
 }
 void SharedHeap::Instance::deallocate(const AllocId id) {
-  assert(m_cache.count(id) != 0);
-  const auto firstChunk = m_cache[id];
+  const auto allocation = m_cache.find(id);
+  const auto allocationSize = m_allocationChunkCounts.find(id);
+  if (allocation == m_cache.end() || allocationSize == m_allocationChunkCounts.end()) {
+    Logger::err(format_string("[SharedHeap] Rejecting deallocation of unknown allocation id %u.", id));
+    return;
+  }
+  const auto firstChunk = allocation->second;
   assert(getChunkState(firstChunk) == ChunkState::Allocated);
   setChunkState(firstChunk, ChunkState::Deallocated);
-  m_cache.erase(id);
+  m_cache.erase(allocation);
+  m_allocationChunkCounts.erase(allocationSize);
 }
 #endif
 
