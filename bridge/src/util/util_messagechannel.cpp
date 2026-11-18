@@ -173,6 +173,13 @@ bool MessageChannelServer::init(HWND clientWindow,
   m_worker = ThreadType([this] { workerJob(); });
   m_workerThreadId = ::GetThreadId((HANDLE) m_worker.native_handle());
 
+  // Do not return until the worker has created its message queue. The
+  // destructor relies on PostThreadMessage(WM_QUIT) to stop the worker.
+  {
+    std::unique_lock<std::mutex> lock(m_workerQueueReadyMutex);
+    m_workerQueueReadyCv.wait(lock, [this] { return m_workerQueueReady; });
+  }
+
   // It would be better to do handshake here, however because init is
   // usually called from SwapChain which is created at CreateDevice,
   // there's no guarantee that in bridge environment the client's window
@@ -201,6 +208,16 @@ bool MessageChannelServer::handshake() {
 }
 
 void MessageChannelServer::workerJob() {
+  // PeekMessage creates the thread message queue before init() returns,
+  // making a later PostThreadMessage(WM_QUIT) reliable.
+  MSG msg;
+  ::PeekMessage(&msg, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
+  {
+    std::lock_guard<std::mutex> lock(m_workerQueueReadyMutex);
+    m_workerQueueReady = true;
+  }
+  m_workerQueueReadyCv.notify_one();
+
   if (!handshake()) {
     return;
   }
@@ -210,8 +227,8 @@ void MessageChannelServer::workerJob() {
 
   const HWND kCurrentThreadId = (HWND) (-1);
 
-  MSG msg;
-  while (GetMessage(&msg, kCurrentThreadId, 0, 0)) {
+  BOOL messageResult = 0;
+  while ((messageResult = GetMessage(&msg, kCurrentThreadId, 0, 0)) > 0) {
     TranslateMessage(&msg);
 
     if (onMessage(msg.message, msg.wParam, msg.lParam)) {
