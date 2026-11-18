@@ -56,12 +56,14 @@ ULONG Direct3DStateBlock9_LSS::Release() {
 }
 
 void Direct3DStateBlock9_LSS::onDestroy() {
-  ClientMessage { Commands::IDirect3DStateBlock9_Destroy, getId() };
+  if (m_serverCreated) {
+    ClientMessage { Commands::IDirect3DStateBlock9_Destroy, getId() };
+  }
 }
 
 HRESULT Direct3DStateBlock9_LSS::GetDevice(IDirect3DDevice9** ppDevice) {
   LogFunctionCall();
-  if (ppDevice == nullptr) {
+  if (ppDevice == nullptr || !m_serverCreated) {
     return D3DERR_INVALIDCALL;
   }
   m_pDevice->AddRef();
@@ -196,7 +198,7 @@ void Direct3DStateBlock9_LSS::LocalCapture() {
 
 HRESULT Direct3DStateBlock9_LSS::Capture() {
   LogFunctionCall();
-  if (m_pDevice->m_stateRecording) {
+  if (!m_serverCreated || m_pDevice->m_stateRecording) {
     return D3DERR_INVALIDCALL;
   }
   LocalCapture();
@@ -208,6 +210,9 @@ HRESULT Direct3DStateBlock9_LSS::Capture() {
 
 HRESULT Direct3DStateBlock9_LSS::Apply() {
   LogFunctionCall();
+  if (!m_serverCreated) {
+    return D3DERR_INVALIDCALL;
+  }
   // Same lock order as the setters: the client bridge mutex, then the channel (inside ClientMessage).
   bridge_util::ResponseTransaction transaction;
   StateTransfer(m_dirtyFlags, m_captureState, m_pDevice->m_state);
