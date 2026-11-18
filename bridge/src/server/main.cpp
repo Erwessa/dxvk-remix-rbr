@@ -2138,18 +2138,23 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DStateBlock9_Capture:
       {
         GET_HND(pHandle);
-        const auto& pSB = gpD3DStateBlocks[pHandle];
-        const auto hresult = pSB->Capture();
-        assert(SUCCEEDED(hresult));
+        const auto it = gpD3DStateBlocks.find(pHandle);
+        const HRESULT hresult = it != gpD3DStateBlocks.end() && it->second != nullptr
+          ? it->second->Capture()
+          : D3DERR_INVALIDCALL;
+        ServerMessage c(Commands::Bridge_Response, currentUID);
+        c.send_data(hresult);
         break;
       }
       case IDirect3DStateBlock9_Apply:
       {
         GET_HND(pHandle);
-        const auto& pSB = gpD3DStateBlocks[pHandle];
-        assert(pSB != nullptr);
-        const auto hresult = pSB->Apply();
-        assert(SUCCEEDED(hresult));
+        const auto it = gpD3DStateBlocks.find(pHandle);
+        const HRESULT hresult = it != gpD3DStateBlocks.end() && it->second != nullptr
+          ? it->second->Apply()
+          : D3DERR_INVALIDCALL;
+        ServerMessage c(Commands::Bridge_Response, currentUID);
+        c.send_data(hresult);
         break;
       }
 
