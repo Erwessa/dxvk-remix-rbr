@@ -144,7 +144,7 @@ public:
       c.send_data(D3DBACKBUFFER_TYPE_MONO);
       c.send_data(pLssBackBuffer->getId());
     }
-    WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetBackBuffer()", D3DERR_INVALIDCALL, childIdx, &pLssBackBuffer);
+    WAIT_FOR_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetBackBuffer()", D3DERR_INVALIDCALL, currentUID, childIdx, &pLssBackBuffer);
   }
 
   static D3DPRESENT_PARAMETERS sanitizePresentationParameters(const D3DPRESENT_PARAMETERS& presParam, const D3DDEVICE_CREATION_PARAMETERS& createParams) {
