@@ -270,7 +270,7 @@ HRESULT Direct3DSwapChain9_LSS::GetBackBuffer(UINT iBackBuffer, D3DBACKBUFFER_TY
     c.send_data(pLssSurface->getId());
   }
   
-  WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetBackBuffer()", D3DERR_INVALIDCALL, currentUID, iBackBuffer, ppBackBuffer);
+  WAIT_FOR_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetBackBuffer()", D3DERR_INVALIDCALL, currentUID, iBackBuffer, ppBackBuffer);
 }
 
 HRESULT Direct3DSwapChain9_LSS::GetRasterStatus(D3DRASTER_STATUS* pRasterStatus) {
