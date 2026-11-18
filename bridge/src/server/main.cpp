@@ -4919,6 +4919,10 @@ bool InitializeD3D() {
   // create the D3D instance used for the lifetime of this process.
   if (ghModule != nullptr) {
     auto Direct3DCreate9 = (D3DC9) GetProcAddress(ghModule, "Direct3DCreate9");
+    if (Direct3DCreate9 == nullptr) {
+      Logger::err(format_string("Unable to resolve Direct3DCreate9: %ld\\n", GetLastError()));
+      return false;
+    }
     if (nullptr == (gpD3D = Direct3DCreate9(D3D_SDK_VERSION))) {
       Logger::err(format_string("D3D9 interface object creation failed: %ld\n", GetLastError()));
       return false;
