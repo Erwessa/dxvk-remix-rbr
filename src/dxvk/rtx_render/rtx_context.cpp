@@ -3450,6 +3450,8 @@ namespace dxvk {
       m_device->lockSubmission();
       DEFER(unlockSubmission, m_device->unlockSubmission(););
       submitted = VrInstance::s_instance.submitFrame(textures, vr::ColorSpace_Linear);
+      if (submitted)
+        VrInstance::s_instance.markRtxFrameSubmitted(m_vrFrame.get().frameIndex);
     }
 
     // OpenVR Submit is ordered on the same graphics queue. Record the return transitions
