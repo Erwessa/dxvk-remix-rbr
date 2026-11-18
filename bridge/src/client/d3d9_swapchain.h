@@ -34,7 +34,8 @@ class Direct3DSwapChain9_LSS: public Direct3DContainer9_LSS<D3DBase<IDirect3DSwa
   DWORD m_behaviorFlag;
 public:
   Direct3DSwapChain9_LSS(BaseDirect3DDevice9Ex_LSS* const pDevice,
-                         const D3DPRESENT_PARAMETERS& presParam)
+                         const D3DPRESENT_PARAMETERS& presParam,
+                         bool linkImplicitSwapchain = true)
     : Direct3DContainer9_LSS(nullptr, pDevice)
     , m_presParam(sanitizePresentationParameters(presParam, pDevice->getCreateParams())) {
     m_window = m_presParam.hDeviceWindow;
@@ -44,47 +45,57 @@ public:
     m_behaviorFlag = pDevice->getCreateParams().BehaviorFlags;
 
     m_children.resize(m_presParam.BackBufferCount);
-    {
+    if (linkImplicitSwapchain) {
       ClientMessage c(Commands::IDirect3DDevice9Ex_LinkSwapchain, pDevice->getId());
       c.send_data(getId());
+      const HRESULT result = initializeBackBuffers();
+      if (FAILED(result)) {
+        Logger::err(format_string("Implicit swapchain BackBuffer initialization failed: 0x%08x", result));
+      }
     }
-    for (size_t childIdx = 0; childIdx < m_children.size(); ++childIdx) {
-      const D3DSURFACE_DESC backBufferDesc {
-        m_presParam.BackBufferFormat,
-        D3DRTYPE_SURFACE,
-        D3DUSAGE_RENDERTARGET,
-        D3DPOOL_DEFAULT,
-        m_presParam.MultiSampleType,
-        m_presParam.MultiSampleQuality,
-        m_presParam.BackBufferWidth,
-        m_presParam.BackBufferHeight
-      };
-      auto* const pLssBackBuffer = trackWrapper(new Direct3DSurface9_LSS(pDevice, this, backBufferDesc, true));
+  }
 
-      setChild(childIdx, pLssBackBuffer);
-      DeviceBridge::ResponseTransaction responseTransaction;
-      UID currentUID = 0;
-      {
-        ClientMessage c(Commands::IDirect3DSwapChain9_GetBackBuffer, getId());
-        currentUID = c.get_uid();
-        c.send_data(childIdx);
-        c.send_data(D3DBACKBUFFER_TYPE_MONO);
-        c.send_data(pLssBackBuffer->getId());
-      }
-      if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
-        const uint32_t timeoutMs = GlobalOptions::getAckTimeout();
-        if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, timeoutMs, nullptr, true, currentUID)) {
-          Logger::err("Direct3DSwapChain9_LSS() failed with: no response from server.");
-          removeChild(static_cast<uint32_t>(childIdx));
-        } else {
-          const HRESULT res = (HRESULT) DeviceBridge::get_data();
-          DeviceBridge::pop_front();
-          if (FAILED(res)) {
-            removeChild(static_cast<uint32_t>(childIdx));
-          }
-        }
+  HRESULT initializeBackBuffers() {
+    for (uint32_t childIdx = 0; childIdx < m_children.size(); ++childIdx) {
+      const HRESULT result = initializeBackBuffer(childIdx);
+      if (FAILED(result)) {
+        return result;
       }
     }
+    return D3D_OK;
+  }
+
+  HRESULT initializeBackBuffer(uint32_t childIdx) {
+    if (childIdx >= m_children.size()) {
+      return D3DERR_INVALIDCALL;
+    }
+    if (getChild(childIdx) != nullptr) {
+      return D3D_OK;
+    }
+
+    const D3DSURFACE_DESC backBufferDesc {
+      m_presParam.BackBufferFormat,
+      D3DRTYPE_SURFACE,
+      D3DUSAGE_RENDERTARGET,
+      D3DPOOL_DEFAULT,
+      m_presParam.MultiSampleType,
+      m_presParam.MultiSampleQuality,
+      m_presParam.BackBufferWidth,
+      m_presParam.BackBufferHeight
+    };
+    auto* pLssBackBuffer = trackWrapper(new Direct3DSurface9_LSS(m_pDevice, this, backBufferDesc, true));
+    setChild(childIdx, pLssBackBuffer);
+
+    DeviceBridge::ResponseTransaction responseTransaction;
+    UID currentUID = 0;
+    {
+      ClientMessage c(Commands::IDirect3DSwapChain9_GetBackBuffer, getId());
+      currentUID = c.get_uid();
+      c.send_data(childIdx);
+      c.send_data(D3DBACKBUFFER_TYPE_MONO);
+      c.send_data(pLssBackBuffer->getId());
+    }
+    WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetBackBuffer()", D3DERR_INVALIDCALL, childIdx, &pLssBackBuffer);
   }
 
   static D3DPRESENT_PARAMETERS sanitizePresentationParameters(const D3DPRESENT_PARAMETERS& presParam, const D3DDEVICE_CREATION_PARAMETERS& createParams) {
