@@ -201,6 +201,7 @@ std::unordered_map<uint32_t, void*> gMapRemixApi;
 
 // Global state
 std::atomic<bool> gbBridgeRunning { true };
+std::atomic<bool> gClientProcessExited { false };
 HANDLE hWait;
 
 namespace {
@@ -4977,6 +4978,7 @@ bool InitializeD3D() {
 void CALLBACK OnClientExited(void* context, BOOLEAN isTimeout) {
   Logger::err("The client process has unexpectedly exited, shutting down server as well!");
   logRuntimeSessionEnd("the game process ended without closing the bridge (a normal quit or a game crash)");
+  gClientProcessExited.store(true);
   gbBridgeRunning = false;
 
   // Give the server some time to shut down, but then force quit so it doesn't hang forever
@@ -5180,17 +5182,19 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   bSignalDone.store(true);
   moduleCmdProcessingThread.join();
 
-  // Both IPC command consumers have stopped, and the client process has exited.
-  // Snapshot queue history here rather than in OnClientExited(): the queue payload
-  // slots are non-atomic and the SPSC queue does not support concurrent observers.
-  Logger::info("Most recent Device Queue commands sent from Client");
-  DeviceBridge::Command::print_reader_data_sent();
-  Logger::info("Most recent Device Queue commands received by Server");
-  DeviceBridge::Command::print_reader_data_received();
-  Logger::info("Most recent Module Queue commands sent from Client");
-  ModuleBridge::Command::print_reader_data_sent();
-  Logger::info("Most recent Module Queue commands received by Server");
-  ModuleBridge::Command::print_reader_data_received();
+  // The client-exit callback marks the producer as stopped. Both server-side
+  // consumers have also stopped above, so the SPSC queue history can be inspected
+  // without racing either endpoint.
+  if (gClientProcessExited.load()) {
+    Logger::info("Most recent Device Queue commands sent from Client");
+    DeviceBridge::Command::print_reader_data_sent();
+    Logger::info("Most recent Device Queue commands received by Server");
+    DeviceBridge::Command::print_reader_data_received();
+    Logger::info("Most recent Module Queue commands sent from Client");
+    ModuleBridge::Command::print_reader_data_sent();
+    Logger::info("Most recent Module Queue commands received by Server");
+    ModuleBridge::Command::print_reader_data_received();
+  }
 
   if (!dumpLeakedObjects()) {
     bridge_util::Logger::debug("No leaked objects dicovered at Direct3D module eviction.");
