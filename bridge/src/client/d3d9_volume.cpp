@@ -24,6 +24,9 @@
 
 #include "util_bridge_assert.h"
 
+#include <limits>
+#include <new>
+
 /*
  * Direct3DVolume9_LSS Interface Implementation
  */
@@ -148,9 +151,28 @@ bool Direct3DVolume9_LSS::lock(D3DLOCKED_BOX& lockedVolume, const D3DBOX* const 
   // The pitches are in bytes, rows of blocks for compressed formats, with no padding between rows and slices.
   const size_t rowSize = bridge_util::calcRowSize((uint32_t) width, m_desc.Format);
   const size_t numRows = bridge_util::calcStride((uint32_t) height, m_desc.Format);
-  void* const pData = new uint8_t[rowSize * numRows * depth];
+  const size_t maxPitch = size_t(std::numeric_limits<INT>::max());
+
+  // D3DLOCKED_BOX exposes signed INT pitches, so both pitches must fit before
+  // allocating or publishing the lock to the caller.
+  if (rowSize == 0 || numRows == 0 || depth == 0
+      || rowSize > maxPitch || numRows > maxPitch / rowSize) {
+    return false;
+  }
+
+  const size_t sliceSize = rowSize * numRows;
+  if (depth > std::numeric_limits<size_t>::max() / sliceSize) {
+    return false;
+  }
+
+  const size_t allocationSize = sliceSize * depth;
+  uint8_t* const pData = new (std::nothrow) uint8_t[allocationSize];
+  if (pData == nullptr) {
+    return false;
+  }
+
   lockedVolume.RowPitch = (INT) rowSize;
-  lockedVolume.SlicePitch = (INT) (rowSize * numRows);
+  lockedVolume.SlicePitch = (INT) sliceSize;
   lockedVolume.pBits = pData;
   m_lockInfoQueue.push({ lockedVolume, box, flags });
   return true;
