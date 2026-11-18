@@ -133,12 +133,15 @@ HRESULT Direct3DCubeTexture9_LSS::GetCubeMapSurface(D3DCUBEMAP_FACES FaceType, U
     setChild(surfaceIndex, pLssCubeMapSurface);
   }
 
+  DeviceBridge::ResponseTransaction responseTransaction;
+  UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DCubeTexture9_GetCubeMapSurface, getId());
+    currentUID = c.get_uid();
     c.send_many(FaceType, Level);
     c.send_data(pLssCubeMapSurface->getId());
   }
-  return S_OK;
+  WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetCubeMapSurface()", D3DERR_INVALIDCALL, currentUID, surfaceIndex, ppCubeMapSurface);
 }
 
 HRESULT Direct3DCubeTexture9_LSS::LockRect(D3DCUBEMAP_FACES FaceType, UINT Level, D3DLOCKED_RECT* pLockedRect, CONST RECT* pRect, DWORD Flags) {
