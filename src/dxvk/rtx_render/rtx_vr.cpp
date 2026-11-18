@@ -59,7 +59,10 @@ namespace dxvk {
   void RtxVrFrame::acquire(DxvkDevice& device) {
     m_valid = false;
 
-    if (!VrInstance::s_instance.isSceneSessionActive()) {
+    // A D3D9 plugin may own the shared OpenVR scene session independently.
+    // Do not activate RTX stereo rendering or submit a second eye pair unless
+    // the RTX VR option itself was explicitly enabled.
+    if (!RtxVr::enable() || !VrInstance::s_instance.isSceneSessionActive()) {
       return;
     }
 
