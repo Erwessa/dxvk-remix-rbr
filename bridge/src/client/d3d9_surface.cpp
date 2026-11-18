@@ -44,6 +44,12 @@ Direct3DSurface9_LSS::Direct3DSurface9_LSS(BaseDirect3DDevice9Ex_LSS* const pDev
 
 Direct3DSurface9_LSS::~Direct3DSurface9_LSS() {
   if (m_bUseSharedHeap) {
+    while (!m_lockInfoQueue.empty()) {
+      const auto discardBufId = m_lockInfoQueue.front().discardBufId;
+      if (discardBufId != SharedHeap::kInvalidId)
+        SharedHeap::deallocate(discardBufId);
+      m_lockInfoQueue.pop();
+    }
     if (m_bufferId != SharedHeap::kInvalidId) {
       SharedHeap::deallocate(m_bufferId);
     }
