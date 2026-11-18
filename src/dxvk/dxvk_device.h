@@ -664,28 +664,22 @@ namespace dxvk {
       return &m_objects;
     }
 
-    // Atomically registers a D3D9 device unless the shared device has retired.
-    // This closes the race between acquiring a cached VkDevice and its last frontend
-    // destroying the common objects.
-    bool tryAddD3D9Device() {
-      std::lock_guard<sync::Spinlock> lock(m_d3d9DeviceLock);
+    // Atomically registers a D3D9 or D3D11 frontend unless the shared device has retired.
+    bool tryAddFrontendDevice() {
+      std::lock_guard<sync::Spinlock> lock(m_frontendDeviceLock);
       if (m_retired.load())
         return false;
-      ++m_d3d9DeviceCount;
+      ++m_frontendDeviceCount;
       return true;
     }
 
-    // Unregisters a D3D9 device.
-    // Returns true when it was the last one. The caller then destroys the common objects,
-    // and the device is retired so that no new frontend reuses it.
-    bool removeD3D9Device() {
-      std::lock_guard<sync::Spinlock> lock(m_d3d9DeviceLock);
-      if (m_d3d9DeviceCount > 0) {
-        --m_d3d9DeviceCount;
-      }
-      if (m_d3d9DeviceCount > 0) {
+    // Unregisters a frontend. Returns true when the last frontend retires the device.
+    bool removeFrontendDevice() {
+      std::lock_guard<sync::Spinlock> lock(m_frontendDeviceLock);
+      if (m_frontendDeviceCount > 0)
+        --m_frontendDeviceCount;
+      if (m_frontendDeviceCount > 0)
         return false;
-      }
       m_retired = true;
       return true;
     }
@@ -726,8 +720,8 @@ namespace dxvk {
     DxvkDevicePerfHints         m_perfHints;
     DxvkObjects                 m_objects;
 
-    sync::Spinlock              m_d3d9DeviceLock;
-    uint32_t                    m_d3d9DeviceCount = 0;
+    sync::Spinlock              m_frontendDeviceLock;
+    uint32_t                    m_frontendDeviceCount = 0;
     std::atomic<bool>           m_retired = { false };
     bool                        m_openVrSessionOwned = false;
 
@@ -759,6 +753,39 @@ namespace dxvk {
             uint32_t                family,
             uint32_t                index) const;
     
+  };
+
+  // Owns a previously reserved frontend slot. Declaring this member before
+  // frontend child objects makes it unregister only after those children have
+  // flushed and released their command contexts.
+  class DxvkDeviceFrontendRegistration {
+  public:
+    explicit DxvkDeviceFrontendRegistration(const Rc<DxvkDevice>& device)
+    : m_device(device) { }
+
+    DxvkDeviceFrontendRegistration(DxvkDeviceFrontendRegistration&& other) noexcept
+    : m_device(other.m_device), m_active(other.m_active) {
+      other.m_active = false;
+    }
+
+    DxvkDeviceFrontendRegistration(const DxvkDeviceFrontendRegistration&) = delete;
+    DxvkDeviceFrontendRegistration& operator=(const DxvkDeviceFrontendRegistration&) = delete;
+    DxvkDeviceFrontendRegistration& operator=(DxvkDeviceFrontendRegistration&&) = delete;
+
+    ~DxvkDeviceFrontendRegistration() {
+      if (m_active && m_device->removeFrontendDevice()) {
+        m_device->waitForIdle();
+        m_device->getCommon()->onDestroy();
+      }
+    }
+
+    void transfer() {
+      m_active = false;
+    }
+
+  private:
+    Rc<DxvkDevice> m_device;
+    bool m_active = true;
   };
 
   // NV-DXVK start: Remix native device access
