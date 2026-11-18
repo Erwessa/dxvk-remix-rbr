@@ -543,6 +543,11 @@ public:
     if (!left || !right || !m_openVrSceneSession)
       return D3DERR_INVALIDCALL;
 
+    // RTX injection runs inside the original D3D9 Present. If it already
+    // submitted this exact OpenVR snapshot, do not submit the D3D9 eye pair too.
+    if (VrInstance::s_instance.wasRtxFrameSubmittedForLatestExternalFrame())
+      return D3D_OK;
+
     const HRESULT leftTransfer = TransferSurfaceForVR(left);
     if (FAILED(leftTransfer))
       return leftTransfer;
