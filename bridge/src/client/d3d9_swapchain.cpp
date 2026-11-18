@@ -68,6 +68,7 @@ HRESULT Direct3DSwapChain9_LSS::changeDisplayMode(const D3DPRESENT_PARAMETERS& p
 }
 
 Direct3DSwapChain9_LSS::~Direct3DSwapChain9_LSS() {
+  m_pDevice->unregisterSwapChain(this);
   if (m_monitor) {
     RestoreMonitorDisplayMode();
     m_monitor = nullptr;
@@ -289,8 +290,13 @@ HRESULT Direct3DSwapChain9_LSS::GetRasterStatus(D3DRASTER_STATUS* pRasterStatus)
 
   D3DDISPLAYMODEEX mode;
   mode.Size = sizeof(mode);
-  if (m_pDevice->GetDisplayModeEx(0, &mode, nullptr) != S_OK)
+  D3DDISPLAYROTATION rotation;
+  const UINT swapChainIndex = m_pDevice->getSwapChainIndex(this);
+  if (swapChainIndex == static_cast<UINT>(-1)
+      || FAILED(m_pDevice->GetDisplayModeEx(swapChainIndex, &mode, &rotation)))
     return D3DERR_INVALIDCALL;
+  if (mode.RefreshRate == 0)
+    return D3DERR_NOTAVAILABLE;
 
   uint32_t scanLineCount = mode.Height + vBlankLineCount;
 
@@ -313,7 +319,10 @@ HRESULT Direct3DSwapChain9_LSS::GetDisplayMode(D3DDISPLAYMODE* pMode) {
   if (pMode == nullptr) {
     return D3DERR_INVALIDCALL;
   }
-  return m_pDevice->GetDisplayMode(0, pMode);
+  const UINT swapChainIndex = m_pDevice->getSwapChainIndex(this);
+  return swapChainIndex == static_cast<UINT>(-1)
+    ? D3DERR_INVALIDCALL
+    : m_pDevice->GetDisplayMode(swapChainIndex, pMode);
 }
 
 HRESULT Direct3DSwapChain9_LSS::GetDevice(IDirect3DDevice9** ppDevice) {
