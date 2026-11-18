@@ -764,6 +764,8 @@ namespace dxvk {
             IDXGIAdapter*       pAdapter,
       const Rc<DxvkInstance>&   pDxvkInstance,
       const Rc<DxvkAdapter>&    pDxvkAdapter,
+      const Rc<DxvkDevice>&     pDxvkDevice,
+            DxvkDeviceFrontendRegistration registration,
             D3D_FEATURE_LEVEL   FeatureLevel,
             UINT                FeatureFlags);
     
@@ -839,6 +841,7 @@ namespace dxvk {
     Rc<DxvkInstance>    m_dxvkInstance;
     Rc<DxvkAdapter>     m_dxvkAdapter;
     Rc<DxvkDevice>      m_dxvkDevice;
+    DxvkDeviceFrontendRegistration m_deviceRegistration;
 
     D3D11Device         m_d3d11Device;
     D3D11DeviceExt      m_d3d11DeviceExt;
@@ -849,8 +852,6 @@ namespace dxvk {
     WineDXGISwapChainFactory m_wineFactory;
     
     uint32_t m_frameLatency = DefaultFrameLatency;
-
-    Rc<DxvkDevice> CreateDevice(D3D_FEATURE_LEVEL FeatureLevel);
 
   };
   
