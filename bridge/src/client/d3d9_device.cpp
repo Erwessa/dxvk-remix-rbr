@@ -486,6 +486,9 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::Reset(D3DPRESENT_PARAMETERS* pPresentationParameters) {
   ZoneScoped;
   LogFunctionCall();
+  if (pPresentationParameters == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   HRESULT res = S_OK;
   {
     BRIDGE_DEVICE_LOCKGUARD();
@@ -3686,6 +3689,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
   ZoneScoped;
   assert(m_ex);
   LogFunctionCall();
+  if (pPresentationParameters == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   HRESULT res = S_OK;
   {
     BRIDGE_DEVICE_LOCKGUARD();
