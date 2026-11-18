@@ -249,12 +249,12 @@ void SharedHeap::Instance::deallocate(const AllocId id) {
 #endif
 
 #ifdef REMIX_BRIDGE_SERVER
-void SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk, const uint32_t numChunks) {
+bool SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk, const uint32_t numChunks) {
   const auto segId = chunkIdToSegId(firstChunk);
   if (m_cache.count(id) != 0 || numChunks == 0 || segId >= m_segments.size()) {
     Logger::err(format_string("[SharedHeap] Rejecting invalid allocation metadata (id %u, first chunk %u, chunks %u).",
                               id, firstChunk, numChunks));
-    return;
+    return false;
   }
   const auto& segment = m_segments[segId];
   const size_t segmentEnd = size_t(segment.getBaseChunkId()) + segment.getNumChunks();
@@ -262,10 +262,11 @@ void SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk, 
       || size_t(firstChunk) >= segmentEnd
       || size_t(numChunks) > segmentEnd - firstChunk) {
     Logger::err(format_string("[SharedHeap] Allocation %u crosses or exceeds its heap segment.", id));
-    return;
+    return false;
   }
   m_cache.emplace(id, firstChunk);
   m_allocationChunkCounts.emplace(id, numChunks);
+  return true;
 }
 void SharedHeap::Instance::deallocate(const AllocId id) {
   const auto allocation = m_cache.find(id);
