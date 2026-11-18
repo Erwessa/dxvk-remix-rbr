@@ -484,6 +484,7 @@ public:
       return D3DERR_NOTAVAILABLE;
 
     m_openVrSceneSession = true;
+    VrInstance::s_instance.registerExternalFrameProvider(this);
     return D3D_OK;
   }
 
@@ -504,8 +505,14 @@ public:
     DEFER(unlockSubmission, device->unlockSubmission(););
     OpenVrFrameState snapshot = {};
     const bool acquired = VrInstance::s_instance.acquireFrame(snapshot);
-    if (!acquired)
+    if (!acquired) {
+      VrInstance::s_instance.invalidateExternalFrame(this);
       return D3DERR_NOTAVAILABLE;
+    }
+
+    // Cache the same compositor snapshot returned to x86. RTX will consume
+    // this exact frame instead of issuing another WaitGetPoses call.
+    VrInstance::s_instance.publishExternalFrame(this, snapshot);
 
     const auto& pose = snapshot.renderPoses[vr::k_unTrackedDeviceIndex_Hmd];
     frame->Version = D3D9_OPENVR_FRAME_STATE_VERSION;
