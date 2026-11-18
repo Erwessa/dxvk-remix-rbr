@@ -5061,16 +5061,23 @@ static inline bool initFileSys() {
   auto parentPid = bridge_util::getParentPid();
   DWORD accessRights = PROCESS_QUERY_INFORMATION | PROCESS_VM_READ;
   HANDLE processHandle = OpenProcess(accessRights, FALSE, parentPid);
-  {
-    auto executable32PathVec = createPathVec();
-    if(GetModuleFileNameEx(processHandle, NULL, executable32PathVec.data(), executable32PathVec.size()) == 0) {
-      Logger::err("Failed to find executable path!");
-      return false;
-    }
-    const fspath executable32Path(executable32PathVec.data());
-    const auto exe32Dir = executable32Path.parent_path();
-    dxvk::util::RtxFileSys::init(exe32Dir.string());
+  if (processHandle == nullptr) {
+    Logger::err(format_string("Failed to open parent process %lu: %lu", parentPid, GetLastError()));
+    return false;
   }
+
+  auto executable32PathVec = createPathVec();
+  if (GetModuleFileNameEx(processHandle, NULL, executable32PathVec.data(), executable32PathVec.size()) == 0) {
+    const DWORD error = GetLastError();
+    CloseHandle(processHandle);
+    Logger::err(format_string("Failed to find executable path: %lu", error));
+    return false;
+  }
+
+  const fspath executable32Path(executable32PathVec.data());
+  const auto exe32Dir = executable32Path.parent_path();
+  CloseHandle(processHandle);
+  dxvk::util::RtxFileSys::init(exe32Dir.string());
   return true;
 }
 
