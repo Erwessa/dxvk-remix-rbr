@@ -60,6 +60,7 @@
 #include <stdio.h>
 #include <string>
 #include <mutex>
+#include <memory>
 #include <vector>
 
 using namespace bridge_util;
@@ -119,7 +120,7 @@ FunctionEntryExitLogger::~FunctionEntryExitLogger() {
 static bool gIsAttached = false;
 Guid gUniqueIdentifier;
 Process* gpServer = nullptr;
-NamedSemaphore* gpPresent = nullptr;
+std::unique_ptr<NamedSemaphore> gpPresent;
 ShadowMap gShadowMap;
 std::mutex gShadowMapMutex;
 std::mutex serverStartMutex;
@@ -342,7 +343,32 @@ void InitServer() {
   BridgeState::setServerState(BridgeState::ProcessState::Running);
   
   if (GlobalOptions::getUseSharedHeap()) {
-    SharedHeap::init();
+    try {
+      SharedHeap::init();
+    } catch (const std::exception& err) {
+      Logger::err(format_string("[Bridge] Failed to initialize SharedHeap: %s", err.what()));
+      BridgeState::setClientState(BridgeState::ProcessState::DoneProcessing);
+      BridgeState::setServerState(BridgeState::ProcessState::DoneProcessing);
+      gbBridgeRunning = false;
+
+      if (gpServer != nullptr) {
+        gpServer->UnregisterExitCallback();
+        {
+          ClientMessage { Commands::Bridge_Terminate };
+        }
+        const auto result = DeviceBridge::waitForCommandAndDiscard(
+          Commands::Bridge_Ack, GlobalOptions::getCommandTimeout());
+        if (RESULT_SUCCESS(result)) {
+          Logger::info("Server notified about SharedHeap initialization failure and terminated cleanly.");
+        } else {
+          Logger::err("Timed out waiting for server shutdown after SharedHeap initialization failure.");
+        }
+        delete gpServer;
+        gpServer = nullptr;
+      }
+      gpPresent.reset();
+      return;
+    }
   }
 }
 
@@ -521,8 +547,13 @@ bool RemixAttach(HMODULE hModule) {
     // The client creates this semaphore before it launches the server, so these counts are the ones that apply (the
     // server's are ignored when it opens the existing semaphore). Initial count = presentSemaphoreMaxFrames: the
     // client may run that many frames ahead of the server. 0 = lock-step (each Present waits for the server's).
-    gpPresent = new NamedSemaphore("Present", GlobalOptions::getPresentSemaphoreMaxFrames(),
-                                   std::max<size_t>(GlobalOptions::getPresentSemaphoreMaxFrames(), 1));
+    gpPresent = std::make_unique<NamedSemaphore>("Present", GlobalOptions::getPresentSemaphoreMaxFrames(),
+                                                 std::max<size_t>(GlobalOptions::getPresentSemaphoreMaxFrames(), 1));
+    if (GlobalOptions::getPresentSemaphoreEnabled() && !gpPresent->isValid()) {
+      Logger::err("Unable to create the Present semaphore required for frame synchronization.");
+      gpPresent.reset();
+      return false;
+    }
 
     BridgeState::setClientState(BridgeState::ProcessState::Init);
 
@@ -577,7 +608,7 @@ void RemixDetach() {
     PrintRecentCommandHistory();
 
     // Clean up resources
-    delete gpPresent;
+    gpPresent.reset();
 
     Logger::info("Shutdown cleanup successful, exiting now!");
     BridgeState::setClientState(BridgeState::ProcessState::Exited);
