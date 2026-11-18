@@ -539,7 +539,7 @@ static void readVolumeRows(const D3DLOCKED_BOX* pLockedBox, const uint32_t uid,
     return;
   }
   if (pLockedBox != nullptr
-      && (pLockedBox->RowPitch <= 0 || pLockedBox->SlicePitch <= 0
+      && (pLockedBox->pBits == nullptr || pLockedBox->RowPitch <= 0 || pLockedBox->SlicePitch <= 0
           || static_cast<uint32_t>(pLockedBox->RowPitch) < rowSize
           || numRows > static_cast<uint32_t>(pLockedBox->SlicePitch / pLockedBox->RowPitch))) {
     Logger::err(format_string("[Bridge] UnlockBox uid=%u: native row/slice pitch cannot contain the upload; stopping the bridge.", uid));
@@ -3028,7 +3028,7 @@ void ProcessDeviceCommandQueue() {
           hresult = pSurface->LockRect(OUT & lockedRect, IN pRect, IN Flags);
         }
         bool locked = SUCCEEDED(hresult);
-        if (locked && (lockedRect.Pitch <= 0 || static_cast<size_t>(lockedRect.Pitch) < rowSize)) {
+        if (locked && (lockedRect.pBits == nullptr || lockedRect.Pitch <= 0 || static_cast<size_t>(lockedRect.Pitch) < rowSize)) {
           Logger::err("[Bridge] IDirect3DSurface9_UnlockRect native surface pitch is smaller than the upload row.");
           pSurface->UnlockRect();
           locked = false;
