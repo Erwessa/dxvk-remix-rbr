@@ -71,7 +71,14 @@ namespace dxvk {
     {
       device.lockSubmission();
       DEFER(unlockSubmission, device.unlockSubmission(););
-      m_valid = VrInstance::s_instance.acquireFrame(*m_pFrame);
+
+      bool externalProviderActive = false;
+      m_valid = VrInstance::s_instance.consumeExternalFrame(*m_pFrame, externalProviderActive);
+      if (!m_valid && !externalProviderActive) {
+        // Preserve standalone RTX VR operation when no D3D9 game plugin
+        // supplies the frame snapshot.
+        m_valid = VrInstance::s_instance.acquireFrame(*m_pFrame);
+      }
     }
 
     if (!m_valid) {
