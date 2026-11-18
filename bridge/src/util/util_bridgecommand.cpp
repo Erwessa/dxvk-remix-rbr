@@ -90,7 +90,7 @@ DECL_BRIDGE_FUNC(void, perfOnFrame) {
   }
 }
 
-DECL_BRIDGE_FUNC(void, syncDataQueue, size_t expectedMemUsage, bool posResetOnLastIndex) {
+DECL_BRIDGE_FUNC(bool, syncDataQueue, size_t expectedMemUsage, bool posResetOnLastIndex) {
   // The flag is read before the position. The reader resets its position before it clears the flag, so a clear flag
   // is never paired with a position from the reader's previous lap.
   const bool serverLapBehind = *static_cast<volatile bool*>(s_pWriterChannel->serverResetPosRequired);
@@ -103,7 +103,7 @@ DECL_BRIDGE_FUNC(void, syncDataQueue, size_t expectedMemUsage, bool posResetOnLa
   // The current batch has run past the end of the queue and continues at its start.
   const bool batchWrapped = s_curBatchStartPos >= 0 && currClientDataPos < (size_t) s_curBatchStartPos;
 
-  auto handleOverwriteCondition = [&]() {
+  auto handleOverwriteCondition = [&]() -> bool {
     // Below variable is set to let the server know that a particular position
     // in the queue not yet accessed by it is going to be used
     const int64_t serverTargetPos = (int64_t) s_curBatchStartPos - 1;
@@ -139,11 +139,14 @@ DECL_BRIDGE_FUNC(void, syncDataQueue, size_t expectedMemUsage, bool posResetOnLa
       }
       s_pWriterChannel->dataSemaphore->wait(kOverwritePollMs);
     }
-    if (!reached) {
-      Logger::err("Max retries reached waiting on the server to process enough data to prevent a overwrite!");
-    }
     *s_pWriterChannel->clientDataExpectedPos = -1;
+    if (!reached) {
+      Logger::err("[Bridge] Timed out waiting for the server to release data queue space; disabling the bridge rather than overwriting unread data.");
+      gbBridgeRunning = false;
+      return false;
+    }
     Logger::debug("DataQueue overwrite condition resolved");
+    return true;
   };
 
   // A write that runs past the end of the queue continues at its start.
@@ -182,7 +185,9 @@ DECL_BRIDGE_FUNC(void, syncDataQueue, size_t expectedMemUsage, bool posResetOnLa
 
   if (wraps && serverLapBehind) {
     // Double Overflow Condition Detected, mitigate by stalling and waiting for a response
-    handleOverwriteCondition();
+    if (!handleOverwriteCondition()) {
+      return false;
+    }
   }
 
   /*
@@ -195,7 +200,9 @@ DECL_BRIDGE_FUNC(void, syncDataQueue, size_t expectedMemUsage, bool posResetOnLa
       ((s_curBatchStartPos < serverCount)
        || (s_curBatchStartPos > serverCount && expectedClientDataPos < s_curBatchStartPos)
        || ((s_curBatchStartPos <= serverCount) && clientLapAhead))) {
-    handleOverwriteCondition();
+    if (!handleOverwriteCondition()) {
+      return false;
+    }
   }
 
   // The flag tells the server that it has to complete a loop to reach the client's position.
@@ -203,6 +210,7 @@ DECL_BRIDGE_FUNC(void, syncDataQueue, size_t expectedMemUsage, bool posResetOnLa
   if (wraps || endsAtQueueEnd) {
     *s_pWriterChannel->serverResetPosRequired = true;
   }
+  return true;
 }
 
 DECL_BRIDGE_FUNC(Header, pop_front) {
@@ -549,7 +557,12 @@ DECL_BRIDGE_FUNC(void, openStatePacketLocked, uint32_t handle) {
   s_packetRecords = 0;
   s_cmdCounter++;
   // The packet's UID, as for every command
-  syncDataQueue(1, false);
+  if (!syncDataQueue(1, false)) {
+    s_packetOpen = false;
+    s_curBatchStartPos = -1;
+    s_pWriterChannel->data->end_batch();
+    return;
+  }
   const auto result = s_pWriterChannel->data->push((UINT) s_cmdUID);
   if (RESULT_FAILURE(result)) {
     Logger::err("DataQueue send_data: Failed to send data!");
@@ -638,7 +651,7 @@ DECL_COMMAND_FUNC(,Command,const Commands::D3D9Command command,
   if (gbBridgeRunning) {
     // Send command id as part of data queue for everycommand from client to server
 #ifdef REMIX_BRIDGE_CLIENT
-      syncDataQueue(1, false);
+      if (syncDataQueue(1, false)) {
       const auto result = s_pWriterChannel->data->push((UINT)s_cmdUID);
 #if defined(_DEBUG) || defined(DEBUGOPT)
       if (GlobalOptions::getLogAllCommands()) {
@@ -648,6 +661,7 @@ DECL_COMMAND_FUNC(,Command,const Commands::D3D9Command command,
       if (RESULT_FAILURE(result)) {
         // For now just log when things go wrong, but could use some robustness improvements
         Logger::err("DataQueue send_data: Failed to send data!");
+      }
       }
 #endif
   }
@@ -706,7 +720,9 @@ DECL_STATE_MESSAGE_FUNC(,StateMessage,const Commands::D3D9Command command, uintp
     openStatePacketLocked(handle);
   }
   // Record header: the setter's command id. Its arguments follow through the DataWriter methods.
-  syncDataQueue(1, false);
+  if (!syncDataQueue(1, false)) {
+    return;
+  }
   const auto result = s_pWriterChannel->data->push((uint32_t) command);
   if (RESULT_FAILURE(result)) {
     Logger::err("DataQueue send_data: Failed to send data!");
