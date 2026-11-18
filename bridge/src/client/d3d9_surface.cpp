@@ -285,9 +285,16 @@ RECT Direct3DSurface9_LSS::resolveLockInfoRect(const RECT* const pRect, const D3
 }
 
 void* Direct3DSurface9_LSS::getBufPtr(const int pitch, const RECT& rect) {
+  const auto [width, height] = getRectDimensions(rect);
+  const size_t rowSize = bridge_util::calcRowSize(static_cast<uint32_t>(width), m_desc.Format);
+  const size_t numRows = bridge_util::calcStride(static_cast<uint32_t>(height), m_desc.Format);
+  if (pitch <= 0 || rowSize == 0 || numRows == 0
+      || numRows - 1 > (std::numeric_limits<size_t>::max() - rowSize) / static_cast<size_t>(pitch)) {
+    return nullptr;
+  }
   const size_t byteOffset = bridge_util::calcImageByteOffset(pitch, rect, m_desc.Format);
-  BYTE* const base = SharedHeap::getBuf(m_bufferId);
-  return base != nullptr ? base + byteOffset : nullptr;
+  const size_t rowSpan = (numRows - 1) * static_cast<size_t>(pitch) + rowSize;
+  return SharedHeap::getBuf(m_bufferId, byteOffset, rowSpan);
 }
 
 void Direct3DSurface9_LSS::sendDataToServer(const LockInfo& lockInfo) const {
