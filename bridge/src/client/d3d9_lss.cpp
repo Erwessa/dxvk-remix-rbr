@@ -347,10 +347,8 @@ void InitServer() {
       SharedHeap::init();
     } catch (const std::exception& err) {
       Logger::err(format_string("[Bridge] Failed to initialize SharedHeap: %s", err.what()));
+      // Keep the command channel enabled until the server has acknowledged termination.
       BridgeState::setClientState(BridgeState::ProcessState::DoneProcessing);
-      BridgeState::setServerState(BridgeState::ProcessState::DoneProcessing);
-      gbBridgeRunning = false;
-
       if (gpServer != nullptr) {
         gpServer->UnregisterExitCallback();
         {
@@ -363,8 +361,13 @@ void InitServer() {
         } else {
           Logger::err("Timed out waiting for server shutdown after SharedHeap initialization failure.");
         }
+        BridgeState::setServerState(BridgeState::ProcessState::DoneProcessing);
+        gbBridgeRunning = false;
         delete gpServer;
         gpServer = nullptr;
+      } else {
+        BridgeState::setServerState(BridgeState::ProcessState::DoneProcessing);
+        gbBridgeRunning = false;
       }
       gpPresent.reset();
       return;
