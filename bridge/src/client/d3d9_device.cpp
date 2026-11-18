@@ -363,7 +363,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetCursorProperties(UINT XHotSpot, UI
   }
 
   const auto pLssSurface = bridge_cast<Direct3DSurface9_LSS*>(pCursorBitmap);
-  if (pLssSurface == nullptr) {
+  if (pLssSurface == nullptr || !ownsResource(pLssSurface)) {
     return D3DERR_INVALIDCALL;
   }
   if (pLssSurface) {
@@ -936,7 +936,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::UpdateSurface(IDirect3DSurface9* pSou
 
   const auto pLssSrcSurface = bridge_cast<Direct3DSurface9_LSS*>(pSourceSurface);
   const auto pLssDestSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestinationSurface);
-  if (pLssSrcSurface == nullptr || pLssDestSurface == nullptr) {
+  if (pLssSrcSurface == nullptr || pLssDestSurface == nullptr
+      || !ownsResource(pLssSrcSurface) || !ownsResource(pLssDestSurface)) {
     return D3DERR_INVALIDCALL;
   }
   DeviceBridge::ResponseTransaction responseTransaction;
@@ -962,7 +963,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::UpdateTextureImpl(IDirect3DBaseTextur
 
   auto pLssSourceTexture = bridge_cast<T*>(pSourceTexture);
   auto pLssDestinationTexture = bridge_cast<T*>(pDestinationTexture);
-  if (pLssSourceTexture == nullptr || pLssDestinationTexture == nullptr) {
+  if (pLssSourceTexture == nullptr || pLssDestinationTexture == nullptr
+      || !ownsResource(pLssSourceTexture) || !ownsResource(pLssDestinationTexture)) {
     return D3DERR_INVALIDCALL;
   }
   DeviceBridge::ResponseTransaction responseTransaction;
@@ -1012,7 +1014,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRenderTargetData(IDirect3DSurface9
   }
   const auto pLssSourceSurface = bridge_cast<Direct3DSurface9_LSS*>(pRenderTarget);
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
-  if (pLssSourceSurface == nullptr || pLssDestinationSurface == nullptr) {
+  if (pLssSourceSurface == nullptr || pLssDestinationSurface == nullptr
+      || !ownsResource(pLssSourceSurface) || !ownsResource(pLssDestinationSurface)) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1047,7 +1050,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetFrontBufferData(UINT iSwapChain, I
   requestedSwapChain->Release();
 
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
-  if (pLssDestinationSurface == nullptr) {
+  if (pLssDestinationSurface == nullptr || !ownsResource(pLssDestinationSurface)) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1080,7 +1083,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::StretchRect(IDirect3DSurface9* pSourc
 
   const auto pLssSrcSurface = bridge_cast<Direct3DSurface9_LSS*>(pSourceSurface);
   const auto pLssDstSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
-  if (pLssSrcSurface == nullptr || pLssDstSurface == nullptr) {
+  if (pLssSrcSurface == nullptr || pLssDstSurface == nullptr
+      || !ownsResource(pLssSrcSurface) || !ownsResource(pLssDstSurface)) {
     return D3DERR_INVALIDCALL;
   }
   DeviceBridge::ResponseTransaction responseTransaction;
@@ -1107,7 +1111,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ColorFill(IDirect3DSurface9* pSurface
   }
 
   const auto pLssSurface = bridge_cast<Direct3DSurface9_LSS*>(pSurface);
-  if (pLssSurface == nullptr) {
+  if (pLssSurface == nullptr || !ownsResource(pLssSurface)) {
     return D3DERR_INVALIDCALL;
   }
   DeviceBridge::ResponseTransaction responseTransaction;
@@ -1167,7 +1171,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetRenderTarget(DWORD RenderTargetInd
     return D3DERR_INVALIDCALL;
   }
   auto* const pLssRenderTarget = bridge_cast<Direct3DSurface9_LSS*>(pRenderTarget);
-  if (pRenderTarget != nullptr && pLssRenderTarget == nullptr) {
+  if (pRenderTarget != nullptr && (pLssRenderTarget == nullptr || !ownsResource(pLssRenderTarget))) {
     return D3DERR_INVALIDCALL;
   }
   DeviceBridge::ResponseTransaction responseTransaction;
@@ -1232,7 +1236,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetDepthStencilSurface(IDirect3DSurfa
   ZoneScoped;
   LogFunctionCall();
   auto* const pLssDepthStencil = bridge_cast<Direct3DSurface9_LSS*>(pNewZStencil);
-  if (pNewZStencil != nullptr && pLssDepthStencil == nullptr) {
+  if (pNewZStencil != nullptr && (pLssDepthStencil == nullptr || !ownsResource(pLssDepthStencil))) {
     return D3DERR_INVALIDCALL;
   }
   DeviceBridge::ResponseTransaction responseTransaction;
@@ -2706,7 +2710,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ProcessVertices(UINT SrcStartIndex, U
 
   auto* const pLssVtxDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(pVertexDecl);
   auto* const pLssDestBuffer = bridge_cast<Direct3DVertexBuffer9_LSS*>(pDestBuffer);
-  if (pLssVtxDecl == nullptr || pLssDestBuffer == nullptr) {
+  if (pLssVtxDecl == nullptr || pLssDestBuffer == nullptr
+      || !ownsResource(pLssVtxDecl) || !ownsResource(pLssDestBuffer)) {
     return D3DERR_INVALIDCALL;
   }
   const UID vtxDeclId = (UID) pLssVtxDecl->getId();
@@ -2764,7 +2769,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetVertexDeclaration(IDirect3DVertexD
   LogFunctionCall();
 
   auto* const pLssVtxDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(pDecl);
-  if (pDecl != nullptr && pLssVtxDecl == nullptr) {
+  if (pDecl != nullptr && (pLssVtxDecl == nullptr || !ownsResource(pLssVtxDecl))) {
     return D3DERR_INVALIDCALL;
   }
   const UID id = (pLssVtxDecl) ? (UID) pLssVtxDecl->getId() : 0;
@@ -2888,7 +2893,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetVertexShader(IDirect3DVertexShader
 
   // NULL is an allowed value for pShader
   auto* const pLssVertexShader = bridge_cast<Direct3DVertexShader9_LSS*>(pShader);
-  if (pShader != nullptr && pLssVertexShader == nullptr) {
+  if (pShader != nullptr && (pLssVertexShader == nullptr || !ownsResource(pLssVertexShader))) {
     return D3DERR_INVALIDCALL;
   }
   const auto id = (pLssVertexShader) ? (uint32_t) pLssVertexShader->getId() : 0;
@@ -3127,7 +3132,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetStreamSource(UINT StreamNumber, ID
     return D3DERR_INVALIDCALL;
   }
   auto* const pLssStreamData = bridge_cast<Direct3DVertexBuffer9_LSS*>(pStreamData);
-  if (pStreamData != nullptr && pLssStreamData == nullptr) {
+  if (pStreamData != nullptr && (pLssStreamData == nullptr || !ownsResource(pLssStreamData))) {
     return D3DERR_INVALIDCALL;
   }
   const UID id = (pStreamData) ? (UID) pLssStreamData->getId() : 0;
@@ -3237,7 +3242,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetIndices(IDirect3DIndexBuffer9* pIn
   ZoneScoped;
   LogFunctionCall();
   auto* const pLssIndexData = bridge_cast<Direct3DIndexBuffer9_LSS*>(pIndexData);
-  if (pIndexData != nullptr && pLssIndexData == nullptr) {
+  if (pIndexData != nullptr && (pLssIndexData == nullptr || !ownsResource(pLssIndexData))) {
     return D3DERR_INVALIDCALL;
   }
   const UID id = (pLssIndexData) ? (UID) pLssIndexData->getId() : 0;
@@ -3329,7 +3334,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetPixelShader(IDirect3DPixelShader9*
   ZoneScoped;
   LogFunctionCall();
   Direct3DPixelShader9_LSS* pLssPixelShader = bridge_cast<Direct3DPixelShader9_LSS*>(pShader);
-  if (pShader != nullptr && pLssPixelShader == nullptr) {
+  if (pShader != nullptr && (pLssPixelShader == nullptr || !ownsResource(pLssPixelShader))) {
     return D3DERR_INVALIDCALL;
   }
   const auto id = (pLssPixelShader) ? (uint32_t) pLssPixelShader->getId() : 0;
@@ -3592,8 +3597,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ComposeRects(IDirect3DSurface9* pSrc,
     auto* const pLssSrcRect = bridge_cast<Direct3DVertexBuffer9_LSS*>(pSrcRectDescs);
     auto* const pLssDestRect = bridge_cast<Direct3DVertexBuffer9_LSS*>(pDstRectDescs);
     if (pLssSourceSurface == nullptr || pLssDestinationSurface == nullptr
-        || (pSrcRectDescs != nullptr && pLssSrcRect == nullptr)
-        || (pDstRectDescs != nullptr && pLssDestRect == nullptr)) {
+        || !ownsResource(pLssSourceSurface) || !ownsResource(pLssDestinationSurface)
+        || (pSrcRectDescs != nullptr && (pLssSrcRect == nullptr || !ownsResource(pLssSrcRect)))
+        || (pDstRectDescs != nullptr && (pLssDestRect == nullptr || !ownsResource(pLssDestRect)))) {
       return D3DERR_INVALIDCALL;
     }
     const UID idSrcRect = pLssSrcRect ? (UID) pLssSrcRect->getId() : 0;
