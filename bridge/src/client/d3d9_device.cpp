@@ -3542,10 +3542,26 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetGPUThreadPriority(INT Priority) {
 template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::WaitForVBlank(UINT iSwapChain) {
   ZoneScoped;
-  LogMissingFunctionCall();
+  LogFunctionCall();
 
-  // This API always returns D3D_OK
-  return D3D_OK;
+  auto* const swapChain = getSwapChainAtIndex(iSwapChain);
+  if (swapChain == nullptr) {
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
+  }
+  swapChain->Release();
+
+  DeviceBridge::ResponseTransaction responseTransaction;
+  UID currentUID = 0;
+  {
+    ClientMessage c(Commands::IDirect3DDevice9Ex_WaitForVBlank, getId());
+    currentUID = c.get_uid();
+    c.send_data(iSwapChain);
+  }
+  WAIT_FOR_SERVER_RESPONSE("WaitForVBlank()", D3DERR_INVALIDCALL, currentUID);
+
+  const HRESULT result = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  return result;
 }
 
 template<bool EnableSync>
