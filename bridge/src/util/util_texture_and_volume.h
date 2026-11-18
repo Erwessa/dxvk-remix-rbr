@@ -236,8 +236,12 @@ namespace bridge_util {
   // Num pixels OR num compressed pixels
   static inline uint32_t calcStride(const uint32_t numPixels, const D3DFORMAT format) {
     const uint32_t effectivePixelsPerUnit = getBlockSize(format);
-    // If effectivePixelsPerUnit == 4, numPixels is compressed
-    return ((numPixels + effectivePixelsPerUnit - 1) / effectivePixelsPerUnit);
+    // If effectivePixelsPerUnit == 4, numPixels is compressed.
+    // Use quotient/remainder instead of numPixels + unit - 1 so UINT_MAX
+    // dimensions cannot overflow before the division.
+    return effectivePixelsPerUnit != 0
+      ? (numPixels / effectivePixelsPerUnit) + (numPixels % effectivePixelsPerUnit != 0)
+      : 0;
   }
 
   static inline uint32_t calcRowSize(const uint32_t width, const D3DFORMAT format) {
