@@ -1628,7 +1628,11 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetLight(DWORD Index, D3DLIGHT9* pLig
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pLight = m_state.lights[Index];
+    const auto light = m_state.lights.find(Index);
+    if (light == m_state.lights.end()) {
+      return D3DERR_INVALIDCALL;
+    }
+    *pLight = light->second;
   }
   return S_OK;
 }
@@ -2662,16 +2666,36 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::DrawPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, CONST void* pVertexStreamZeroData, UINT VertexStreamZeroStride) {
   ZoneScoped;
   LogFunctionCall();
+
+  if (VertexStreamZeroStride == 0 || PrimitiveCount > m_caps.MaxPrimitiveCount) {
+    return D3DERR_INVALIDCALL;
+  }
+
+  uint64_t numIndices = 0;
+  switch (PrimitiveType) {
+  case D3DPT_POINTLIST:     numIndices = PrimitiveCount; break;
+  case D3DPT_LINELIST:      numIndices = uint64_t(PrimitiveCount) * 2; break;
+  case D3DPT_LINESTRIP:     numIndices = uint64_t(PrimitiveCount) + 1; break;
+  case D3DPT_TRIANGLELIST:  numIndices = uint64_t(PrimitiveCount) * 3; break;
+  case D3DPT_TRIANGLESTRIP:
+  case D3DPT_TRIANGLEFAN:   numIndices = uint64_t(PrimitiveCount) + 2; break;
+  default:                  return D3DERR_INVALIDCALL;
+  }
+
+  if (numIndices > UINT_MAX / VertexStreamZeroStride) {
+    return D3DERR_INVALIDCALL;
+  }
+  const uint32_t vertexDataSize = static_cast<uint32_t>(numIndices * VertexStreamZeroStride);
+  if (vertexDataSize != 0 && pVertexStreamZeroData == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
+
   const SetterLock setterLock;
   UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DDevice9Ex_DrawPrimitiveUP, getId());
     currentUID = c.get_uid();
     c.send_many(PrimitiveType, PrimitiveCount);
-
-    uint32_t numIndices = GetIndexCount(PrimitiveType, PrimitiveCount);
-    uint32_t vertexDataSize = numIndices * VertexStreamZeroStride;
-
     c.send_data(vertexDataSize, (void*) pVertexStreamZeroData);
     c.send_data(VertexStreamZeroStride);
   }
@@ -2684,18 +2708,41 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::DrawIndexedPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT MinIndex, UINT NumVertices, UINT PrimitiveCount, CONST void* pIndexData, D3DFORMAT IndexDataFormat, CONST void* pVertexStreamZeroData, UINT VertexStreamZeroStride) {
   ZoneScoped;
   LogFunctionCall();
+
+  if (VertexStreamZeroStride == 0 || PrimitiveCount > m_caps.MaxPrimitiveCount
+      || (IndexDataFormat != D3DFMT_INDEX16 && IndexDataFormat != D3DFMT_INDEX32)) {
+    return D3DERR_INVALIDCALL;
+  }
+
+  uint64_t numIndices = 0;
+  switch (PrimitiveType) {
+  case D3DPT_POINTLIST:     numIndices = PrimitiveCount; break;
+  case D3DPT_LINELIST:      numIndices = uint64_t(PrimitiveCount) * 2; break;
+  case D3DPT_LINESTRIP:     numIndices = uint64_t(PrimitiveCount) + 1; break;
+  case D3DPT_TRIANGLELIST:  numIndices = uint64_t(PrimitiveCount) * 3; break;
+  case D3DPT_TRIANGLESTRIP:
+  case D3DPT_TRIANGLEFAN:   numIndices = uint64_t(PrimitiveCount) + 2; break;
+  default:                  return D3DERR_INVALIDCALL;
+  }
+
+  const uint32_t indexStride = IndexDataFormat == D3DFMT_INDEX16 ? 2u : 4u;
+  if (numIndices > UINT_MAX / indexStride
+      || uint64_t(NumVertices) > UINT_MAX / VertexStreamZeroStride) {
+    return D3DERR_INVALIDCALL;
+  }
+  const uint32_t indexDataSize = static_cast<uint32_t>(numIndices * indexStride);
+  const uint32_t vertexDataSize = static_cast<uint32_t>(uint64_t(NumVertices) * VertexStreamZeroStride);
+  if ((indexDataSize != 0 && pIndexData == nullptr)
+      || (vertexDataSize != 0 && pVertexStreamZeroData == nullptr)) {
+    return D3DERR_INVALIDCALL;
+  }
+
   const SetterLock setterLock;
   UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DDevice9Ex_DrawIndexedPrimitiveUP, getId());
     currentUID = c.get_uid();
     c.send_many(PrimitiveType, MinIndex, NumVertices, PrimitiveCount, IndexDataFormat, VertexStreamZeroStride);
-
-    uint32_t numIndices = GetIndexCount(PrimitiveType, PrimitiveCount);
-    uint32_t indexStride = IndexDataFormat == D3DFMT_INDEX16 ? 2 : 4;
-    uint32_t indexDataSize = numIndices * indexStride;
-    uint32_t vertexDataSize = NumVertices * VertexStreamZeroStride;
-
     c.send_data(indexDataSize, (void*) pIndexData);
     c.send_data(vertexDataSize, (void*) pVertexStreamZeroData);
   }
