@@ -145,8 +145,17 @@ void BaseDirect3DDevice9Ex_LSS::registerSwapChain(Direct3DSwapChain9_LSS* swapCh
     return;
   }
   if (implicitSwapChain) {
-    m_swapChainRegistry.insert(m_swapChainRegistry.begin(), swapChain);
+    if (m_swapChainRegistry.empty()) {
+      m_swapChainRegistry.push_back(swapChain);
+    } else {
+      // Keep slot zero reserved even while Reset has temporarily released the
+      // client wrapper but the server's implicit chain still exists.
+      m_swapChainRegistry[0] = swapChain;
+    }
   } else {
+    if (m_swapChainRegistry.empty()) {
+      m_swapChainRegistry.push_back(nullptr);
+    }
     m_swapChainRegistry.push_back(swapChain);
   }
 }
