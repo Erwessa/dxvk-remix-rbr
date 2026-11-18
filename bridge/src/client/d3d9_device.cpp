@@ -100,9 +100,11 @@ void Direct3DDevice9Ex_LSS<EnableSync>::cancelStateBlockRecording() {
 }
 
 template<bool EnableSync>
-void Direct3DDevice9Ex_LSS<EnableSync>::releaseInternalObjects(bool resetState) {
-  // Reset and ResetEx invalidate any in-progress recording on both processes.
-  cancelStateBlockRecording();
+void Direct3DDevice9Ex_LSS<EnableSync>::releaseInternalObjects(bool resetState, bool preserveExplicitState, bool cancelRecording) {
+  // Classic Reset cancels an in-progress state block; ResetEx preserves device state.
+  if (cancelRecording) {
+    cancelStateBlockRecording();
+  }
 
   // Take references first so that the device won't be
   // destroyed unintentionally and to prevent releaseInternalObjects()
@@ -115,7 +117,7 @@ void Direct3DDevice9Ex_LSS<EnableSync>::releaseInternalObjects(bool resetState) 
   // A failed Reset leaves the device without implicit wrappers. A subsequent
   // Reset or final Release must not destroy the same objects a second time.
   if (implicitRefCnt != 0) {
-    destroyImplicitObjects();
+    destroyImplicitObjects(preserveExplicitState);
   }
 
   if (resetState) {
@@ -3871,11 +3873,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
   HRESULT res = S_OK;
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    // ResetEx has the same device-state invalidation semantics as Reset.
-    // Release implicit/internal objects and drop every client-side state reference
-    // before the server invalidates its D3D9 resources.
-    releaseInternalObjects();
-    ResetState();
+    // ResetEx preserves explicit surfaces, textures, and device state. Only
+    // replace implicit swapchain-backed surfaces; keep other bindings and any
+    // in-progress state-block recording intact.
+    releaseInternalObjects(false, true, false);
     // The server resets its state: forget what was sent (A3a)
     invalidateSentState();
 
@@ -3909,12 +3910,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
     // Rebuild implicit resources only after the server has completed ResetEx.
     const HRESULT implicitResult = initImplicitObjects(presParam);
     if (FAILED(implicitResult)) {
-      releaseInternalObjects();
+      releaseInternalObjects(false, true, false);
       return implicitResult;
     }
-    // ResetState ran before the new implicit swapchain existed; now derive ZENABLE
-    // from the presentation parameters that were successfully installed.
-    m_state.renderStates[D3DRS_ZENABLE] = presParam.EnableAutoDepthStencil;
     // Keeping a track of previous present parameters, to detect and handle mode changes
     m_previousPresentParams = *pPresentationParameters;
   }
@@ -4403,24 +4401,34 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitDepthStencil() {
 }
 
 template<bool EnableSync>
-void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects() {
+void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects(bool preserveExplicitState) {
   // Release implicit RenderTarget
   if (m_pImplicitRenderTarget != nullptr) {
+    if (!preserveExplicitState || *m_state.renderTargets[0] == m_pImplicitRenderTarget) {
+      m_state.renderTargets[0].reset(nullptr);
+    }
     const auto rtRefCnt = m_pImplicitRenderTarget->Release();
     assert(rtRefCnt == 0 && "Implicit RenderTarget has not been released!");
     m_pImplicitRenderTarget = nullptr;
     --m_implicitRefCnt;
   }
-  m_state.renderTargets[0].reset(nullptr);
+  if (!preserveExplicitState) {
+    m_state.renderTargets[0].reset(nullptr);
+  }
 
   // Release implicit DepthStencil only when one was successfully linked.
   if (m_pImplicitDepthStencil != nullptr) {
+    if (!preserveExplicitState || *m_state.depthStencil == m_pImplicitDepthStencil) {
+      m_state.depthStencil.reset(nullptr);
+    }
     const auto dsRefCnt = m_pImplicitDepthStencil->Release();
     assert(dsRefCnt == 0 && "Implicit DepthStencil has not been released!");
     m_pImplicitDepthStencil = nullptr;
     --m_implicitRefCnt;
   }
-  m_state.depthStencil.reset(nullptr);
+  if (!preserveExplicitState) {
+    m_state.depthStencil.reset(nullptr);
+  }
 
   // Release implicit SwapChain, must happen last so PresParam still exist prior
   if (m_pSwapchain != nullptr) {
