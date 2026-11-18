@@ -166,7 +166,7 @@ void Direct3DStateBlock9_LSS::StateTransfer(const BaseDirect3DDevice9Ex_LSS::Sta
     if (flags.vertexConstants.bConsts[i]) {
       size_t dwordIndex = i / 32;
       size_t dwordOffset = i % 32;
-      uint32_t bitMask = 1 << dwordOffset;
+      uint32_t bitMask = uint32_t{1} << dwordOffset;
       dst.vertexConstants.bConsts[dwordIndex]
         = (src.vertexConstants.bConsts[dwordIndex] & bitMask) ? dst.vertexConstants.bConsts[dwordIndex] | bitMask : dst.vertexConstants.bConsts[dwordIndex] & ~bitMask;
     }
@@ -185,7 +185,7 @@ void Direct3DStateBlock9_LSS::StateTransfer(const BaseDirect3DDevice9Ex_LSS::Sta
     if (flags.pixelConstants.bConsts[i]) {
       size_t dwordIndex = i / 32;
       size_t dwordOffset = i % 32;
-      uint32_t bitMask = 1 << dwordOffset;
+      uint32_t bitMask = uint32_t{1} << dwordOffset;
       dst.pixelConstants.bConsts[dwordIndex]
         = (src.pixelConstants.bConsts[dwordIndex] & bitMask) ? dst.pixelConstants.bConsts[dwordIndex] | bitMask : dst.pixelConstants.bConsts[dwordIndex] & ~bitMask;
     }
