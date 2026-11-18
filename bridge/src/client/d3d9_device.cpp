@@ -435,12 +435,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
     }
   }
 
-  const HRESULT backBufferResult = pLssSwapChain->initializeBackBuffers();
-  if (FAILED(backBufferResult)) {
-    *ppSwapChain = nullptr;
-    pLssSwapChain->Release();
-    return backBufferResult;
-  }
+  // BackBuffer wrappers are created lazily by GetBackBuffer(). The server
+  // swapchain is now registered, so those requests resolve against this chain.
   return D3D_OK;
 }
 
