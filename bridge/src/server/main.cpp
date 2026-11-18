@@ -200,7 +200,7 @@ std::unordered_map<uint32_t, IDirect3DVR9*> gpD3DVRInterfaces;
 std::unordered_map<uint32_t, void*> gMapRemixApi;
 
 // Global state
-bool gbBridgeRunning = true;
+std::atomic<bool> gbBridgeRunning { true };
 HANDLE hWait;
 
 namespace {
