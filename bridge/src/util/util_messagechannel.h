@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <functional>
 #include <mutex>
+#include <condition_variable>
 
 // The code is shared between Remix Bridge and Remix Renderer
 #if defined(REMIX_BRIDGE_CLIENT) || defined(REMIX_BRIDGE_SERVER)
@@ -124,6 +125,10 @@ namespace UTIL_NS {
 
     ThreadType m_worker;
     uint32_t m_workerThreadId = 0;
+
+    std::mutex m_workerQueueReadyMutex;
+    std::condition_variable m_workerQueueReadyCv;
+    bool m_workerQueueReady = false;
 
     bool m_isDestroying = false;
   };
