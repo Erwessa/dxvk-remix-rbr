@@ -52,20 +52,25 @@ static HRESULT copyServerSurfaceRawData(Direct3DSurface9_LSS* const pLssSurface,
 
     // The rows arrive in blobs of whole rows.
     const size_t rowSize = bridge_util::calcRowSize(width, format);
-    const size_t totalSize = bridge_util::calcStride(height, format) * rowSize;
-    data.resize(totalSize);
-    size_t received = 0;
-    while (received < totalSize) {
-      void* pChunk = nullptr;
-      const size_t chunkSize = DeviceBridge::get_data_view(&pChunk);
-      if (pChunk == nullptr || chunkSize == 0 || chunkSize > totalSize - received || chunkSize % rowSize != 0) {
-        Logger::err(format_string("getServerSurfaceBufferData(): a blob of %zu bytes does not hold whole rows of %zu bytes "
-                                  "for the %zu of %zu bytes still expected.", chunkSize, rowSize, totalSize - received, totalSize));
-        res = D3DERR_INVALIDCALL;
-        break;
+    const size_t totalSize = bridge_util::calcTotalSizeOfRect(width, height, format);
+    if (rowSize == 0 || totalSize == 0) {
+      Logger::err("getServerSurfaceBufferData(): server returned unsupported or overflowing surface dimensions.");
+      res = D3DERR_INVALIDCALL;
+    } else {
+      data.resize(totalSize);
+      size_t received = 0;
+      while (received < totalSize) {
+        void* pChunk = nullptr;
+        const size_t chunkSize = DeviceBridge::get_data_view(&pChunk);
+        if (pChunk == nullptr || chunkSize == 0 || chunkSize > totalSize - received || chunkSize % rowSize != 0) {
+          Logger::err(format_string("getServerSurfaceBufferData(): a blob of %zu bytes does not hold whole rows of %zu bytes "
+                                    "for the %zu of %zu bytes still expected.", chunkSize, rowSize, totalSize - received, totalSize));
+          res = D3DERR_INVALIDCALL;
+          break;
+        }
+        memcpy(data.data() + received, pChunk, chunkSize);
+        received += chunkSize;
       }
-      memcpy(data.data() + received, pChunk, chunkSize);
-      received += chunkSize;
     }
   }
 
