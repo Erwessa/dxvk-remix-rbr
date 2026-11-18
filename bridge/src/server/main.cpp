@@ -130,6 +130,9 @@ using namespace remixapi::util;
 
 // NOTE: MSDN states HWNDs are safe to cross x86-->x64 boundary, and that a truncating cast should be used:
 // https://docs.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication?redirectedfrom=MSDN
+#define GET_RES_OPTIONAL_BY_HANDLE(name, map, handle, type) \
+            const auto name##It = (map).find(handle); \
+            const auto name = (name##It == (map).cend() ? nullptr : (type) name##It->second)
 #define SAFE_ADDREF_RES(map) \
             const auto pResourceIt = (map).find(pHandle); \
             if (pResourceIt != (map).cend() && pResourceIt->second != nullptr) { \
@@ -2243,9 +2246,10 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL(DWORD, PriorityNew);
-        const auto& pResource = gpD3DResources[pHandle];
-        assert(pResource != nullptr);
-        pResource->SetPriority(PriorityNew);
+        GET_RES_OPTIONAL_BY_HANDLE(pResource, gpD3DResources, pHandle, IDirect3DResource9*);
+        if (pResource != nullptr) {
+          pResource->SetPriority(PriorityNew);
+        }
         break;
       }
       case IDirect3DResource9_GetPriority:
@@ -2253,9 +2257,10 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DResource9_PreLoad:
       {
         GET_HND(pHandle);
-        const auto& pResource = gpD3DResources[pHandle];
-        assert(pResource != nullptr);
-        pResource->PreLoad();
+        GET_RES_OPTIONAL_BY_HANDLE(pResource, gpD3DResources, pHandle, IDirect3DResource9*);
+        if (pResource != nullptr) {
+          pResource->PreLoad();
+        }
         break;
       }
       case IDirect3DResource9_GetType:
@@ -2356,11 +2361,10 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL(DWORD, LODNew);
-        const auto& pResource = gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pResource, gpD3DResources, pHandle, IDirect3DBaseTexture9*);
         if (pResource != nullptr) {
-          ((IDirect3DBaseTexture9*) pResource)->SetLOD(LODNew);
+          pResource->SetLOD(LODNew);
         }
-        assert(pResource != nullptr);
         break;
       }
       case IDirect3DBaseTexture9_GetLOD:
@@ -2372,12 +2376,11 @@ void ProcessDeviceCommandQueue() {
         HRESULT hresult = D3DERR_INVALIDCALL;
         GET_HND(pHandle);
         PULL(D3DTEXTUREFILTERTYPE, FilterType);
-        const auto& pResource = gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pResource, gpD3DResources, pHandle, IDirect3DBaseTexture9*);
         if (pResource != nullptr) {
-          hresult = ((IDirect3DBaseTexture9*) pResource)->SetAutoGenFilterType(FilterType);
-          SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
+          hresult = pResource->SetAutoGenFilterType(FilterType);
         }
-        assert(pResource != nullptr);
+        SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DBaseTexture9_GetAutoGenFilterType:
@@ -2385,11 +2388,10 @@ void ProcessDeviceCommandQueue() {
       case IDirect3DBaseTexture9_GenerateMipSubLevels:
       {
         GET_HND(pHandle);
-        const auto& pResource = gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pResource, gpD3DResources, pHandle, IDirect3DBaseTexture9*);
         if (pResource != nullptr) {
-          ((IDirect3DBaseTexture9*) pResource)->GenerateMipSubLevels();
+          pResource->GenerateMipSubLevels();
         }
-        assert(pResource != nullptr);
         break;
       }
 
@@ -2434,9 +2436,11 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_D(orig_cnt);
-        const auto& pTexture = (IDirect3DTexture9*) gpD3DResources[pHandle];
-        const auto cnt = pTexture->GetLevelCount();
-        assert(orig_cnt == cnt);
+        GET_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pHandle, IDirect3DTexture9*);
+        if (pTexture != nullptr) {
+          const auto cnt = pTexture->GetLevelCount();
+          assert(orig_cnt == cnt);
+        }
         break;
       }
       case IDirect3DTexture9_SetAutoGenFilterType:
@@ -2450,10 +2454,12 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pHandle);
         PULL_OBJ(D3DSURFACE_DESC, orig_desc);
         PULL_U(Level);
-        const auto& pTexture = (IDirect3DTexture9*) gpD3DResources[pHandle];
-        D3DSURFACE_DESC pDesc;
-        const auto hresult = pTexture->GetLevelDesc(Level, &pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pHandle, IDirect3DTexture9*);
+        if (pTexture != nullptr) {
+          D3DSURFACE_DESC pDesc;
+          const auto hresult = pTexture->GetLevelDesc(Level, &pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
       case IDirect3DTexture9_GetSurfaceLevel:
@@ -2461,9 +2467,12 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pTextureHandle);
         PULL_U(Level);
         PULL_HND(pSurfaceHandle);
-        const auto& pTexture = (IDirect3DTexture9*) gpD3DResources[pTextureHandle];
-        LPDIRECT3DSURFACE9 pSurfaceLevel;
-        const auto hresult = pTexture->GetSurfaceLevel(IN Level, OUT & pSurfaceLevel);
+        GET_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pTextureHandle, IDirect3DTexture9*);
+        LPDIRECT3DSURFACE9 pSurfaceLevel = nullptr;
+        HRESULT hresult = E_FAIL;
+        if (pTexture != nullptr) {
+          hresult = pTexture->GetSurfaceLevel(IN Level, OUT & pSurfaceLevel);
+        }
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pSurfaceLevel;
         }
@@ -2484,10 +2493,12 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_OBJ(RECT, pDirtyRect);
-        const auto& pTexture = (IDirect3DTexture9*) gpD3DResources[pHandle];
-        const auto hresult = pTexture->AddDirtyRect(IN pDirtyRect);
+        GET_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pHandle, IDirect3DTexture9*);
+        const auto hresult = pTexture != nullptr ? pTexture->AddDirtyRect(IN pDirtyRect) : E_FAIL;
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
-        assert(SUCCEEDED(hresult));
+        if (pTexture != nullptr) {
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
 
