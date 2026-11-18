@@ -133,6 +133,9 @@ using namespace remixapi::util;
 #define GET_RES_OPTIONAL_BY_HANDLE(name, map, handle, type) \
             const auto name##It = (map).find(handle); \
             const auto name = (name##It == (map).cend() ? nullptr : (type) name##It->second)
+#define FIND_RES_OPTIONAL_BY_HANDLE(name, map, handle, type) \
+            const auto name##It = (map).find(handle); \
+            name = (name##It == (map).cend() ? nullptr : (type) name##It->second)
 #define SAFE_ADDREF_RES(map) \
             const auto pResourceIt = (map).find(pHandle); \
             if (pResourceIt != (map).cend() && pResourceIt->second != nullptr) { \
@@ -978,7 +981,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DSurface9* pCursorBitmap = nullptr;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pCursorBitmap, gpD3DResources, pHandle, IDirect3DSurface9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pCursorBitmap, gpD3DResources, pHandle, IDirect3DSurface9*);
         }
         const auto hresult = pHandle != NULL && pCursorBitmap == nullptr
           ? E_FAIL
@@ -1412,7 +1415,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DSurface9* pRenderTarget = nullptr;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pRenderTarget, gpD3DResources, pHandle, IDirect3DSurface9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pRenderTarget, gpD3DResources, pHandle, IDirect3DSurface9*);
         }
         if (pHandle == NULL || pRenderTarget != nullptr) {
           hresult = pD3DDevice->SetRenderTarget(IN RenderTargetIndex, IN pRenderTarget);
@@ -1442,7 +1445,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DSurface9* pDepthStencil = nullptr;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pDepthStencil, gpD3DResources, pHandle, IDirect3DSurface9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pDepthStencil, gpD3DResources, pHandle, IDirect3DSurface9*);
         }
         if (pHandle == NULL || pDepthStencil != nullptr) {
           hresult = pD3DDevice->SetDepthStencilSurface(IN pDepthStencil);
@@ -1646,7 +1649,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DBaseTexture9* pTexture = nullptr;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pHandle, IDirect3DBaseTexture9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pHandle, IDirect3DBaseTexture9*);
         }
         const auto hresult = pHandle != NULL && pTexture == nullptr
           ? E_FAIL
@@ -1824,7 +1827,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DVertexDeclaration9* pVertexDecl = nullptr;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pVertexDecl, gpD3DVertexDeclarations, pHandle, IDirect3DVertexDeclaration9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pVertexDecl, gpD3DVertexDeclarations, pHandle, IDirect3DVertexDeclaration9*);
         }
         const auto hresult = pHandle != NULL && pVertexDecl == nullptr
           ? E_FAIL
@@ -1927,7 +1930,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(Stride);
         IDirect3DVertexBuffer9* pStreamData = nullptr;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pStreamData, gpD3DResources, pHandle, IDirect3DVertexBuffer9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pStreamData, gpD3DResources, pHandle, IDirect3DVertexBuffer9*);
         }
         const auto hresult = pHandle != NULL && pStreamData == nullptr
           ? E_FAIL
@@ -1955,7 +1958,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DIndexBuffer9* pIndexData = NULL;
         if (pHandle != NULL) {
-          GET_RES_OPTIONAL_BY_HANDLE(pIndexData, gpD3DResources, pHandle, IDirect3DIndexBuffer9*);
+          FIND_RES_OPTIONAL_BY_HANDLE(pIndexData, gpD3DResources, pHandle, IDirect3DIndexBuffer9*);
         }
         const auto hresult = pHandle != NULL && pIndexData == nullptr
           ? E_FAIL
