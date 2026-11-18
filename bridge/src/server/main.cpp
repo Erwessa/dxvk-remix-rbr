@@ -2543,9 +2543,11 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_D(orig_cnt);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pHandle];
-        const auto cnt = pVolumeTexture->GetLevelCount();
-        assert(orig_cnt == cnt);
+        GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pHandle, IDirect3DVolumeTexture9*);
+        if (pVolumeTexture != nullptr) {
+          const auto cnt = pVolumeTexture->GetLevelCount();
+          assert(orig_cnt == cnt);
+        }
         break;
       }
       case IDirect3DVolumeTexture9_SetAutoGenFilterType:
@@ -2559,10 +2561,12 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pHandle);
         PULL_OBJ(D3DVOLUME_DESC, orig_desc);
         PULL_U(Level);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pHandle];
-        D3DVOLUME_DESC pDesc;
-        const auto hresult = pVolumeTexture->GetLevelDesc(Level, &pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pHandle, IDirect3DVolumeTexture9*);
+        if (pVolumeTexture != nullptr) {
+          D3DVOLUME_DESC pDesc;
+          const auto hresult = pVolumeTexture->GetLevelDesc(Level, &pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
       case IDirect3DVolumeTexture9_GetVolumeLevel:
@@ -2570,9 +2574,12 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pVolumeTextureHandle);
         PULL_U(Level);
         PULL_HND(pVolumeLevelHandle);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pVolumeTextureHandle];
-        LPDIRECT3DVOLUME9 pVolumeLevel;
-        const auto hresult = pVolumeTexture->GetVolumeLevel(IN Level, OUT & pVolumeLevel);
+        GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pVolumeTextureHandle, IDirect3DVolumeTexture9*);
+        LPDIRECT3DVOLUME9 pVolumeLevel = nullptr;
+        HRESULT hresult = E_FAIL;
+        if (pVolumeTexture != nullptr) {
+          hresult = pVolumeTexture->GetVolumeLevel(IN Level, OUT & pVolumeLevel);
+        }
         if (SUCCEEDED(hresult)) {
           gpD3DVolumes[pVolumeLevelHandle] = pVolumeLevel;
         }
@@ -2590,7 +2597,7 @@ void ProcessDeviceCommandQueue() {
         PULL_U(Level);
         PULL_OBJ(D3DBOX, pBox);
         PULL_D(Flags);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pHandle];
+        GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pHandle, IDirect3DVolumeTexture9*);
         // Now lock the box so we can copy the data into it
         D3DLOCKED_BOX lockedVolume = {};
         HRESULT hresult = E_FAIL;
@@ -2610,10 +2617,12 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pHandle);
         PULL_U(Level);
         PULL_OBJ(D3DBOX, pBox);
-        const auto& pVolumeTexture = (IDirect3DVolumeTexture9*) gpD3DResources[pHandle];
-        const auto hresult = pVolumeTexture->AddDirtyBox(IN pBox);
+        GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pHandle, IDirect3DVolumeTexture9*);
+        const auto hresult = pVolumeTexture != nullptr ? pVolumeTexture->AddDirtyBox(IN pBox) : E_FAIL;
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
-        assert(SUCCEEDED(hresult));
+        if (pVolumeTexture != nullptr) {
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
 
@@ -2658,9 +2667,11 @@ void ProcessDeviceCommandQueue() {
       {
         GET_HND(pHandle);
         PULL_D(orig_cnt);
-        const auto& pCubeTexture = (IDirect3DCubeTexture9*) gpD3DResources[pHandle];
-        const auto cnt = pCubeTexture->GetLevelCount();
-        assert(orig_cnt == cnt);
+        GET_RES_OPTIONAL_BY_HANDLE(pCubeTexture, gpD3DResources, pHandle, IDirect3DCubeTexture9*);
+        if (pCubeTexture != nullptr) {
+          const auto cnt = pCubeTexture->GetLevelCount();
+          assert(orig_cnt == cnt);
+        }
         break;
       }
       case IDirect3DCubeTexture9_SetAutoGenFilterType:
@@ -2674,10 +2685,12 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(D3DSURFACE_DESC, orig_desc);
         PULL_U(Level);
         GET_HND(pHandle);
-        const auto& pCubeTexture = (IDirect3DCubeTexture9*) gpD3DResources[pHandle];
-        D3DSURFACE_DESC pDesc;
-        const auto hresult = pCubeTexture->GetLevelDesc(Level, &pDesc);
-        assert(SUCCEEDED(hresult));
+        GET_RES_OPTIONAL_BY_HANDLE(pCubeTexture, gpD3DResources, pHandle, IDirect3DCubeTexture9*);
+        if (pCubeTexture != nullptr) {
+          D3DSURFACE_DESC pDesc;
+          const auto hresult = pCubeTexture->GetLevelDesc(Level, &pDesc);
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
       case IDirect3DCubeTexture9_GetCubeMapSurface:
@@ -2686,9 +2699,12 @@ void ProcessDeviceCommandQueue() {
         PULL_U(Level);
         GET_HND(pCubeTextureHandle);
         PULL_HND(pCubeMapSurfaceHandle);
-        const auto& pCubeTexture = (IDirect3DCubeTexture9*) gpD3DResources[pCubeTextureHandle];
-        LPDIRECT3DSURFACE9 pCubeMapSurface;
-        const auto hresult = pCubeTexture->GetCubeMapSurface(IN FaceType, IN Level, OUT & pCubeMapSurface);
+        GET_RES_OPTIONAL_BY_HANDLE(pCubeTexture, gpD3DResources, pCubeTextureHandle, IDirect3DCubeTexture9*);
+        LPDIRECT3DSURFACE9 pCubeMapSurface = nullptr;
+        HRESULT hresult = E_FAIL;
+        if (pCubeTexture != nullptr) {
+          hresult = pCubeTexture->GetCubeMapSurface(IN FaceType, IN Level, OUT & pCubeMapSurface);
+        }
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pCubeMapSurfaceHandle] = pCubeMapSurface;
         }
@@ -2710,10 +2726,12 @@ void ProcessDeviceCommandQueue() {
         GET_HND(pCubeTextureHandle);
         PULL(D3DCUBEMAP_FACES, FaceType);
         PULL_OBJ(RECT, pDirtyRect);
-        const auto& pCubeTexture = (IDirect3DCubeTexture9*) gpD3DResources[pCubeTextureHandle];
-        const auto hresult = pCubeTexture->AddDirtyRect(IN FaceType, IN pDirtyRect);
+        GET_RES_OPTIONAL_BY_HANDLE(pCubeTexture, gpD3DResources, pCubeTextureHandle, IDirect3DCubeTexture9*);
+        const auto hresult = pCubeTexture != nullptr ? pCubeTexture->AddDirtyRect(IN FaceType, IN pDirtyRect) : E_FAIL;
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
-        assert(SUCCEEDED(hresult));
+        if (pCubeTexture != nullptr) {
+          assert(SUCCEEDED(hresult));
+        }
         break;
       }
 
