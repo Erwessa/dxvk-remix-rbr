@@ -767,6 +767,8 @@ namespace dxvk {
       m_externalFrameProvider = nullptr;
       m_externalFramePending = false;
       m_externalFrame = {};
+      m_latestExternalFrameIndex = 0;
+      m_rtxSubmittedFrameIndex = 0;
     }
 
     // RTX and D3D9VR may share one DxvkDevice and one OpenVR Scene session.
@@ -816,6 +818,8 @@ namespace dxvk {
     m_externalFrameProvider = nullptr;
     m_externalFramePending = false;
     m_externalFrame = {};
+    m_latestExternalFrameIndex = 0;
+    m_rtxSubmittedFrameIndex = 0;
     m_hasLastValidTrackingFromHead = false;
     m_lastValidTrackingFromHead = {};
     m_initializedOpenVr = false;
