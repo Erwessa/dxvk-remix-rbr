@@ -4920,7 +4920,7 @@ bool InitializeD3D() {
   if (ghModule != nullptr) {
     auto Direct3DCreate9 = (D3DC9) GetProcAddress(ghModule, "Direct3DCreate9");
     if (Direct3DCreate9 == nullptr) {
-      Logger::err(format_string("Unable to resolve Direct3DCreate9: %ld\\n", GetLastError()));
+      Logger::err(format_string("Unable to resolve Direct3DCreate9: %ld\n", GetLastError()));
       return false;
     }
     if (nullptr == (gpD3D = Direct3DCreate9(D3D_SDK_VERSION))) {
