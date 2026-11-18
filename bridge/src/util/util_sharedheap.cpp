@@ -161,25 +161,31 @@ bool SharedHeap::Instance::addNewHeapSegment() {
 }
 #endif
 #ifdef REMIX_BRIDGE_SERVER
-void SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize) {
-  bool bSuccess = false;
+bool SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize) {
+  const size_t totalHeapSize = getTotalHeapSize();
+  if (m_chunkSize == 0 || segmentSize == 0 || segmentSize % m_chunkSize != 0
+      || totalHeapSize > kMax32BitHeapSize
+      || segmentSize > kMax32BitHeapSize - totalHeapSize
+      || size_t(m_nChunks) + segmentSize / m_chunkSize > std::numeric_limits<uint32_t>::max()) {
+    Logger::err(format_string("[SharedHeap][addNewHeapSegment] Rejecting invalid segment size %u.", segmentSize));
+    return false;
+  }
   try {
     const std::string shMemName =
       std::string("SharedHeap_data_") + std::to_string(m_segments.size());
     m_segments.emplace_back(shMemName, segmentSize, m_chunkSize, m_nChunks);
-    bSuccess = true;
   }
   catch (const char* const errMsg) {
     Logger::err(format_string(
       "[SharedHeap][addNewHeapSegment] Failed to create SharedHeap segment of size: %s",
       bridge_util::toByteUnitString(segmentSize).c_str()));
+    return false;
   }
-  if (bSuccess) {
-    const auto newSegId = m_segments.size() - 1;
-    const auto& newSeg = m_segments[newSegId];
-    m_mapChunkToSeg[newSeg.getBaseChunkId()] = newSegId;
-    m_nChunks += newSeg.getNumChunks();
-  }
+  const auto newSegId = m_segments.size() - 1;
+  const auto& newSeg = m_segments[newSegId];
+  m_mapChunkToSeg[newSeg.getBaseChunkId()] = newSegId;
+  m_nChunks += static_cast<uint32_t>(newSeg.getNumChunks());
+  return true;
 }
 #endif
 
