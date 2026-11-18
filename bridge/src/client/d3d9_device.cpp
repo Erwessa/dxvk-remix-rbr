@@ -2701,10 +2701,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ProcessVertices(UINT SrcStartIndex, U
   }
 
   auto* const pLssVtxDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(pVertexDecl);
-  const UID vtxDeclId = (pLssVtxDecl) ? (UID) pLssVtxDecl->getId() : 0;
-
   auto* const pLssDestBuffer = bridge_cast<Direct3DVertexBuffer9_LSS*>(pDestBuffer);
-  const UID destBufferId = (pLssDestBuffer) ? (UID) pLssDestBuffer->getId() : 0;
+  if (pLssVtxDecl == nullptr || pLssDestBuffer == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
+  const UID vtxDeclId = (UID) pLssVtxDecl->getId();
+  const UID destBufferId = (UID) pLssDestBuffer->getId();
 
   // Send command to server and wait for response
   DeviceBridge::ResponseTransaction responseTransaction;
