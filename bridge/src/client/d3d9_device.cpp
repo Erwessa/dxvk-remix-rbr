@@ -1874,6 +1874,10 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetPixelCaptureFlags(BaseDirec
   for (auto& stage : flags.textureStageStates) {
     std::fill(std::begin(stage), std::end(stage), true);
   }
+  // Pixel-state blocks include the textures bound to pixel samplers.
+  for (uint32_t i = 0; i < caps::MaxTexturesPS; i++) {
+    flags.textures[i] = true;
+  }
 }
 
 template<bool EnableSync>
@@ -1936,6 +1940,11 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetVertexCaptureFlags(BaseDire
   for (const auto& enable : m_state.bLightEnables) {
     flags.bLightEnables[enable.first] = true;
   }
+  // Vertex-state blocks include the displacement-map texture and vertex textures.
+  for (uint32_t i = caps::MaxTexturesPS; i < kNumStageSamplers; i++) {
+    flags.textures[i] = true;
+  }
+
   // The displacement-map sampler is a single vertex-pipeline sampler at
   // D3DDMAPSAMPLER, mapped immediately after the pixel samplers.
   flags.samplerStates[caps::MaxTexturesPS][D3DSAMP_DMAPOFFSET] = true;
