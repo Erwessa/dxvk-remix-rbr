@@ -2596,13 +2596,47 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(D3DBOX, pBox);
         PULL_D(Flags);
         GET_RES_OPTIONAL_BY_HANDLE(pVolumeTexture, gpD3DResources, pHandle, IDirect3DVolumeTexture9*);
+        if (pBox == nullptr || pBox->Left >= pBox->Right || pBox->Top >= pBox->Bottom
+            || pBox->Front >= pBox->Back) {
+          Logger::err("[Bridge] IDirect3DVolumeTexture9_UnlockBox received an invalid box; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
+        const uint32_t width = pBox->Right - pBox->Left;
+        const uint32_t height = pBox->Bottom - pBox->Top;
+        const uint32_t boxDepth = pBox->Back - pBox->Front;
+        uint32_t expectedRowSize = 0;
+        uint32_t expectedNumRows = 0;
+        if (pVolumeTexture != nullptr) {
+          if (Level >= pVolumeTexture->GetLevelCount()) {
+            Logger::err("[Bridge] IDirect3DVolumeTexture9_UnlockBox has an invalid mip level; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
+          D3DVOLUME_DESC volumeDesc = {};
+          const HRESULT descResult = pVolumeTexture->GetLevelDesc(Level, OUT &volumeDesc);
+          if (FAILED(descResult) || pBox->Right > volumeDesc.Width
+              || pBox->Bottom > volumeDesc.Height || pBox->Back > volumeDesc.Depth) {
+            Logger::err("[Bridge] IDirect3DVolumeTexture9_UnlockBox box exceeds the mip level; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
+          expectedRowSize = bridge_util::calcRowSize(width, volumeDesc.Format);
+          expectedNumRows = bridge_util::calcStride(height, volumeDesc.Format);
+          if (expectedRowSize == 0 || expectedNumRows == 0) {
+            Logger::err("[Bridge] IDirect3DVolumeTexture9_UnlockBox has unsupported mip dimensions; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
+        }
         // Now lock the box so we can copy the data into it
         D3DLOCKED_BOX lockedVolume = {};
         HRESULT hresult = E_FAIL;
         if (pVolumeTexture != nullptr) {
           hresult = pVolumeTexture->LockBox(IN Level, IN & lockedVolume, IN pBox, IN Flags);
         }
-        readVolumeRows(SUCCEEDED(hresult) ? &lockedVolume : nullptr, currentUID);
+        readVolumeRows(SUCCEEDED(hresult) ? &lockedVolume : nullptr, currentUID,
+                       expectedRowSize, expectedNumRows, boxDepth);
         if (SUCCEEDED(hresult)) {
           hresult = pVolumeTexture->UnlockBox(Level);
         }
