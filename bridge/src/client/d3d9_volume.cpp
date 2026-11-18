@@ -69,6 +69,9 @@ void Direct3DVolume9_LSS::onDestroy() {
 
 HRESULT Direct3DVolume9_LSS::GetDevice(IDirect3DDevice9** ppDevice) {
   LogFunctionCall();
+  if (ppDevice == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   m_pDevice->AddRef();
   (*ppDevice) = m_pDevice;
   return S_OK;
@@ -91,21 +94,35 @@ HRESULT Direct3DVolume9_LSS::FreePrivateData(REFGUID refguid) {
 
 HRESULT Direct3DVolume9_LSS::GetContainer(REFIID riid, void** ppContainer) {
   LogFunctionCall();
+  if (ppContainer == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   return getParent()->QueryInterface(riid, ppContainer);
 }
 
 HRESULT Direct3DVolume9_LSS::GetDesc(D3DVOLUME_DESC* pDesc) {
   LogFunctionCall();
+  if (pDesc == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   *pDesc = m_desc;
   return S_OK;
 }
 
 HRESULT Direct3DVolume9_LSS::LockBox(D3DLOCKED_BOX* pLockedVolume, CONST D3DBOX* pBox, DWORD Flags) {
   LogFunctionCall();
-  // Store locked rect pointer locally so we can copy the data on unlock
+  if (pLockedVolume == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
+  const D3DBOX box = resolveLockInfoBox(pBox, m_desc);
+  if (box.Left >= box.Right || box.Top >= box.Bottom || box.Front >= box.Back
+      || box.Right > m_desc.Width || box.Bottom > m_desc.Height || box.Back > m_desc.Depth) {
+    return D3DERR_INVALIDCALL;
+  }
+  // Store locked box pointer locally so we can copy the data on unlock
   {
     BRIDGE_PARENT_DEVICE_LOCKGUARD();
-    if (!lock(*pLockedVolume, pBox, Flags)) {
+    if (!lock(*pLockedVolume, &box, Flags)) {
       std::stringstream ss;
       ss << "[Direct3DVolume9_LSS][LockBox] Failed!";
       Logger::err(ss.str());
