@@ -33,7 +33,9 @@ namespace bridge_util {
     m_name = gUniqueIdentifier.toString(name.c_str());
     m_size = size;
 
-    // Create a named file mapping object
+    // Create a named file mapping object. Clear stale last-error state so
+    // ERROR_ALREADY_EXISTS reliably identifies an existing mapping.
+    SetLastError(ERROR_SUCCESS);
     m_hMapObject = CreateFileMapping(
       INVALID_HANDLE_VALUE, // use paging file
       NULL,                 // default security attributes
