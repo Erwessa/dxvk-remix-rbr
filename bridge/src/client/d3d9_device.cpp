@@ -363,6 +363,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetCursorProperties(UINT XHotSpot, UI
   }
 
   const auto pLssSurface = bridge_cast<Direct3DSurface9_LSS*>(pCursorBitmap);
+  if (pLssSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   if (pLssSurface) {
     DeviceBridge::ResponseTransaction responseTransaction;
     UID currentUID = 0;
@@ -1160,7 +1163,13 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetRenderTarget(DWORD RenderTargetIndex, IDirect3DSurface9* pRenderTarget) {
   ZoneScoped;
   LogFunctionCall();
+  if (RenderTargetIndex >= D3D_MAX_SIMULTANEOUS_RENDERTARGETS) {
+    return D3DERR_INVALIDCALL;
+  }
   auto* const pLssRenderTarget = bridge_cast<Direct3DSurface9_LSS*>(pRenderTarget);
+  if (pRenderTarget != nullptr && pLssRenderTarget == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   DeviceBridge::ResponseTransaction responseTransaction;
   UID currentUID = 0;
   {
@@ -1193,7 +1202,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRenderTarget(DWORD RenderTargetInd
   ZoneScoped;
   LogFunctionCall();
 
-  if (ppRenderTarget == nullptr) {
+  if (ppRenderTarget == nullptr || RenderTargetIndex >= D3D_MAX_SIMULTANEOUS_RENDERTARGETS) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1221,14 +1230,17 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRenderTarget(DWORD RenderTargetInd
 template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetDepthStencilSurface(IDirect3DSurface9* pNewZStencil) {
   ZoneScoped;
-  LogFunctionCall();  
+  LogFunctionCall();
+  auto* const pLssDepthStencil = bridge_cast<Direct3DSurface9_LSS*>(pNewZStencil);
+  if (pNewZStencil != nullptr && pLssDepthStencil == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   DeviceBridge::ResponseTransaction responseTransaction;
   UID currentUID = 0;
   {
     UID id = 0;
     {
       BRIDGE_DEVICE_LOCKGUARD();
-      auto* const pLssDepthStencil = bridge_cast<Direct3DSurface9_LSS*>(pNewZStencil);
       if (pLssDepthStencil) {
         m_state.depthStencil = MakeD3DAutoPtr(pLssDepthStencil);
         id = pLssDepthStencil->getId();
@@ -2183,6 +2195,16 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetTexture(DWORD Stage, IDirect3DBase
   if (isInvalidSamplerStage(Stage)) {
     return D3DERR_INVALIDCALL;
   }
+  if (pTexture != nullptr) {
+    const auto type = pTexture->GetType();
+    const bool isBridgeTexture =
+      (type == D3DRTYPE_TEXTURE && bridge_cast<Direct3DTexture9_LSS*>(pTexture) != nullptr)
+      || (type == D3DRTYPE_CUBETEXTURE && bridge_cast<Direct3DCubeTexture9_LSS*>(pTexture) != nullptr)
+      || (type == D3DRTYPE_VOLUMETEXTURE && bridge_cast<Direct3DVolumeTexture9_LSS*>(pTexture) != nullptr);
+    if (!isBridgeTexture) {
+      return D3DERR_INVALIDCALL;
+    }
+  }
 
   IDirect3DBaseTexture9* pD3DObject = nullptr;
   D3DAutoPtr objectRef;
@@ -2736,6 +2758,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetVertexDeclaration(IDirect3DVertexD
   LogFunctionCall();
 
   auto* const pLssVtxDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(pDecl);
+  if (pDecl != nullptr && pLssVtxDecl == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const UID id = (pLssVtxDecl) ? (UID) pLssVtxDecl->getId() : 0;
   const SetterLock setterLock;
   UID currentUID = 0;
@@ -2857,6 +2882,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetVertexShader(IDirect3DVertexShader
 
   // NULL is an allowed value for pShader
   auto* const pLssVertexShader = bridge_cast<Direct3DVertexShader9_LSS*>(pShader);
+  if (pShader != nullptr && pLssVertexShader == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const auto id = (pLssVertexShader) ? (uint32_t) pLssVertexShader->getId() : 0;
   const SetterLock setterLock;
   UID currentUID = 0;
@@ -3089,7 +3117,13 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetStreamSource(UINT StreamNumber, IDirect3DVertexBuffer9* pStreamData, UINT OffsetInBytes, UINT Stride) {
   ZoneScoped;
   LogFunctionCall();
+  if (StreamNumber >= D3D_MAX_STREAMS) {
+    return D3DERR_INVALIDCALL;
+  }
   auto* const pLssStreamData = bridge_cast<Direct3DVertexBuffer9_LSS*>(pStreamData);
+  if (pStreamData != nullptr && pLssStreamData == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const UID id = (pStreamData) ? (UID) pLssStreamData->getId() : 0;
   const SetterLock setterLock;
   UID currentUID = 0;
@@ -3193,6 +3227,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetIndices(IDirect3DIndexBuffer9* pIn
   ZoneScoped;
   LogFunctionCall();
   auto* const pLssIndexData = bridge_cast<Direct3DIndexBuffer9_LSS*>(pIndexData);
+  if (pIndexData != nullptr && pLssIndexData == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const UID id = (pLssIndexData) ? (UID) pLssIndexData->getId() : 0;
   const SetterLock setterLock;
   UID currentUID = 0;
@@ -3282,6 +3319,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetPixelShader(IDirect3DPixelShader9*
   ZoneScoped;
   LogFunctionCall();
   Direct3DPixelShader9_LSS* pLssPixelShader = bridge_cast<Direct3DPixelShader9_LSS*>(pShader);
+  if (pShader != nullptr && pLssPixelShader == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const auto id = (pLssPixelShader) ? (uint32_t) pLssPixelShader->getId() : 0;
   const SetterLock setterLock;
   {
