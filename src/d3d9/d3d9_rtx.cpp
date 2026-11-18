@@ -377,6 +377,22 @@ namespace dxvk {
     }
   }
 
+  void D3D9Rtx::setGameCamera(const Matrix4& worldToView, const Matrix4& viewToProjection, bool valid) {
+    m_gameCameraValid = valid;
+    if (valid) {
+      m_gameCameraWorldToView = worldToView;
+      m_gameCameraViewToProjection = viewToProjection;
+    }
+  }
+
+  void D3D9Rtx::applyGameCamera(DrawCallTransforms& transforms) const {
+    if (!m_gameCameraValid)
+      return;
+    transforms.worldToView = m_gameCameraWorldToView;
+    transforms.viewToProjection = m_gameCameraViewToProjection;
+    transforms.objectToView = transforms.worldToView * transforms.objectToWorld;
+  }
+
   bool D3D9Rtx::processRenderState() {
     DrawCallTransforms& transformData = m_activeDrawCallState.transformData;
 
@@ -387,6 +403,7 @@ namespace dxvk {
     transformData.worldToView = d3d9State().transforms[GetTransformIndex(D3DTS_VIEW)];
     transformData.viewToProjection = d3d9State().transforms[GetTransformIndex(D3DTS_PROJECTION)];
     transformData.objectToView = transformData.worldToView * transformData.objectToWorld;
+    applyGameCamera(transformData);
 
     // Some games pass invalid matrices which D3D9 apparently doesnt care about.
     // since we'll be doing inversions and other matrix operations, we need to 
@@ -1814,6 +1831,7 @@ namespace dxvk {
     transforms.worldToView = d3d9State().transforms[GetTransformIndex(D3DTS_VIEW)];
     transforms.viewToProjection = d3d9State().transforms[GetTransformIndex(D3DTS_PROJECTION)];
     transforms.objectToView = transforms.worldToView * transforms.objectToWorld;
+    applyGameCamera(transforms);
     transforms.sanitize();
     CameraInputs camera = frontendCameraInputs(transforms);
     // A world matrix the CS thread rebuilds from the reference camera depends on more than the pre-key holds, so such a
@@ -2044,6 +2062,7 @@ namespace dxvk {
 
     m_stagedBones.clear();
     ++m_d3d9FrameIndex;
+    m_gameCameraValid = false;
     m_frontendApp.endFrame();
 
     sampleThreadCpuForPerfLog();

@@ -314,6 +314,15 @@ public:
     return result;
   }
 
+  HRESULT STDMETHODCALLTYPE SetGameCamera(const D3D9_GAME_CAMERA* camera) override {
+    if (!camera || camera->Version != D3D9_GAME_CAMERA_VERSION ||
+        (camera->Flags & ~D3D9_GAME_CAMERA_VALID) != 0)
+      return D3DERR_INVALIDCALL;
+    return invoke(D3D9VRCommand::SetGameCamera, [&](ClientMessage& c) {
+      c.send_data(sizeof(*camera), camera);
+    });
+  }
+
   HRESULT STDMETHODCALLTYPE InitializeOpenVRScene() override {
     OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: entering proxy method\n");
     DeviceBridge::ResponseTransaction transaction;

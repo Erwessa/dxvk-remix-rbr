@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <windows.h>
+#include <cstring>
 
 #include "version.h"
 #include "module_processing.h"
@@ -3498,6 +3499,18 @@ void ProcessDeviceCommandQueue() {
             // Win32 NT handle; close the Bridge-side duplicate after import.
             if (sharedHandle && sharedHandle != INVALID_HANDLE_VALUE)
               CloseHandle(sharedHandle);
+            break;
+          }
+
+          case D3D9VRCommand::SetGameCamera:
+          {
+            D3D9_GAME_CAMERA camera = {};
+            uint8_t* cameraData = nullptr;
+            PULL_DATA(sizeof(camera), cameraData);
+            if (cameraData) {
+              std::memcpy(&camera, cameraData, sizeof(camera));
+              hresult = vrInterface->SetGameCamera(&camera);
+            }
             break;
           }
 

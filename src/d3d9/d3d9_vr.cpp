@@ -5,6 +5,7 @@
 #include "d3d9_surface.h"
 #include "d3d9_device.h"
 #include "d3d9_shader.h"
+#include "d3d9_util.h"
 #include "../dxvk/dxvk_openvr.h"
 #include "../util/util_defer.h"
 
@@ -594,6 +595,22 @@ public:
     if (!m_openVrSceneSession)
       return D3DERR_NOTAVAILABLE;
     return VrInstance::s_instance.resetView() ? D3D_OK : D3DERR_NOTAVAILABLE;
+  }
+
+  HRESULT STDMETHODCALLTYPE SetGameCamera(const D3D9_GAME_CAMERA* camera) {
+    if (!camera || camera->Version != D3D9_GAME_CAMERA_VERSION ||
+        (camera->Flags & ~D3D9_GAME_CAMERA_VALID) != 0)
+      return D3DERR_INVALIDCALL;
+
+    D3D9DeviceLock lock = m_device->LockDevice();
+    if ((camera->Flags & D3D9_GAME_CAMERA_VALID) != 0) {
+      m_device->m_rtx.setGameCamera(
+        ConvertMatrix(&camera->WorldToView),
+        ConvertMatrix(&camera->ViewToProjection), true);
+    } else {
+      m_device->m_rtx.setGameCamera(Matrix4(), Matrix4(), false);
+    }
+    return D3D_OK;
   }
 
   HRESULT STDMETHODCALLTYPE GetOpenVRFrameTiming(D3D9_OPENVR_FRAME_TIMING* timing) {

@@ -167,6 +167,10 @@ namespace dxvk {
       */
     void EndFrame(const Rc<DxvkImage>& targetImage, bool callInjectRtx = true);
 
+    // Raw RBR camera captured before OpenRBRVR applies eye-specific transforms.
+    void setGameCamera(const Matrix4& worldToView, const Matrix4& viewToProjection, bool valid);
+    void applyGameCamera(DrawCallTransforms& transforms) const;
+
     /**
       * \brief: Records whether the game window is inactive or minimized, where a game may keep drawing without presenting.
       * Safe to call from any thread. Under the bridge the window procedure runs on the message-channel thread,
@@ -239,6 +243,10 @@ namespace dxvk {
 
     RtxStagingDataAlloc m_rtStagingData;
     D3D9DeviceEx* m_parent;
+
+    Matrix4 m_gameCameraWorldToView;
+    Matrix4 m_gameCameraViewToProjection;
+    bool m_gameCameraValid = false;
 
     std::optional<D3DPRESENT_PARAMETERS> m_activePresentParams;
 
