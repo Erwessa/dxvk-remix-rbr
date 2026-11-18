@@ -1024,6 +1024,11 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pD3DDevice->GetSwapChain(iSwapChain, &pSwapChain);
         assert(SUCCEEDED(hresult));
         assert(pSwapChain != nullptr);
+        if (SUCCEEDED(hresult) && pSwapChain != nullptr) {
+          // This is a read-only validation request; do not leak the COM reference
+          // acquired by GetSwapChain().
+          pSwapChain->Release();
+        }
         break;
       }
       case IDirect3DDevice9Ex_GetNumberOfSwapChains:
