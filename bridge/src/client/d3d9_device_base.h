@@ -301,6 +301,8 @@ protected:
   // What the server's device state is known to hold (d3d9_sent_state.h).
   mutable std::mutex m_swapChainRegistryMutex;
   std::vector<Direct3DSwapChain9_LSS*> m_swapChainRegistry;
+  std::unordered_map<Direct3DSwapChain9_LSS*, D3DGAMMARAMP> m_swapChainGammaRamps;
+  D3DGAMMARAMP m_defaultGammaRamp = {};
 
   SentState m_sentState;
   bool m_dropRedundantState = false;  // bridge.conf client.dropRedundantState, read at device creation
