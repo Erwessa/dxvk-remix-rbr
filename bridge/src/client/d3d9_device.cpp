@@ -1634,7 +1634,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetLight(DWORD Index, D3DLIGHT9* pLig
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    const auto& lights = (m_stateRecording && m_stateRecording->m_dirtyFlags.lights.contains(Index))
+    const auto& lights = (m_stateRecording && m_stateRecording->m_dirtyFlags.lights.find(Index) != m_stateRecording->m_dirtyFlags.lights.end())
       ? m_stateRecording->m_captureState.lights : m_state.lights;
     const auto light = lights.find(Index);
     if (light == lights.end()) {
@@ -1684,7 +1684,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetLightEnable(DWORD Index, BOOL* pEn
     BRIDGE_DEVICE_LOCKGUARD();
     // This is the true value for light-enables found through experimentation
     constexpr BOOL LightEnableTrue = 128;
-    const auto& enables = (m_stateRecording && m_stateRecording->m_dirtyFlags.bLightEnables.contains(Index))
+    const auto& enables = (m_stateRecording && m_stateRecording->m_dirtyFlags.bLightEnables.find(Index) != m_stateRecording->m_dirtyFlags.bLightEnables.end())
       ? m_stateRecording->m_captureState.bLightEnables : m_state.bLightEnables;
     const auto enable = enables.find(Index);
     *pEnable = enable != enables.end() && enable->second ? LightEnableTrue : 0;
