@@ -712,7 +712,6 @@ namespace dxvk {
 
     m_compositor = nullptr;
     m_system = nullptr;
-    m_chaperone = nullptr;
     m_sceneSessionActive = false;
     m_sceneSessionAdapterId = UINT32_MAX;
     m_sceneSessionOwners.clear();
