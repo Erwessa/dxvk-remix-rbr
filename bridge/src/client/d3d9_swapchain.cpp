@@ -68,7 +68,6 @@ HRESULT Direct3DSwapChain9_LSS::changeDisplayMode(const D3DPRESENT_PARAMETERS& p
 }
 
 Direct3DSwapChain9_LSS::~Direct3DSwapChain9_LSS() {
-  m_pDevice->unregisterSwapChain(this);
   if (m_monitor) {
     RestoreMonitorDisplayMode();
     m_monitor = nullptr;
@@ -154,6 +153,9 @@ ULONG Direct3DSwapChain9_LSS::Release() {
 }
 
 void Direct3DSwapChain9_LSS::onDestroy() {
+  BRIDGE_PARENT_DEVICE_LOCKGUARD();
+  // Keep the local index map in sync with the server-side Destroy command.
+  m_pDevice->unregisterSwapChain(this);
   ClientMessage c(Commands::IDirect3DSwapChain9_Destroy, getId());
 }
 
