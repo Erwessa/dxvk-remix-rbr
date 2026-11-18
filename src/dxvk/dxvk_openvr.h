@@ -150,7 +150,8 @@ namespace dxvk {
 
     // Acquires poses and both eyes' optical parameters as one synchronized
     // frame snapshot. WaitGetPoses is serialized by m_mutex with submission;
-    // it does not require the Vulkan submission queue gate.
+    // callers must also hold DxvkDevice's submission queue gate because the
+    // compositor may access the Vulkan queue outside Explicit Timing mode.
     bool acquireFrame(OpenVrFrameState& frame);
 
     // Submits a completed left/right Vulkan image pair. The caller must hold
