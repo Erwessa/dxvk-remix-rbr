@@ -933,6 +933,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::UpdateSurface(IDirect3DSurface9* pSou
 
   const auto pLssSrcSurface = bridge_cast<Direct3DSurface9_LSS*>(pSourceSurface);
   const auto pLssDestSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestinationSurface);
+  if (pLssSrcSurface == nullptr || pLssDestSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   DeviceBridge::ResponseTransaction responseTransaction;
   UID currentUID = 0;
   {
@@ -956,8 +959,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::UpdateTextureImpl(IDirect3DBaseTextur
 
   auto pLssSourceTexture = bridge_cast<T*>(pSourceTexture);
   auto pLssDestinationTexture = bridge_cast<T*>(pDestinationTexture);
-  assert(pLssSourceTexture && "UpdateTexture: unable to cast source texture!");
-  assert(pLssDestinationTexture && "UpdateTexture: unable to cast destination texture!");
+  if (pLssSourceTexture == nullptr || pLssDestinationTexture == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   DeviceBridge::ResponseTransaction responseTransaction;
   UID currentUID = 0;
   {
@@ -974,7 +978,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::UpdateTexture(IDirect3DBaseTexture9* 
   ZoneScoped;
   LogFunctionCall();
 
-  assert(pSourceTexture->GetType() == pDestinationTexture->GetType() && "UpdateTexture: texture type mismatch!");
+  if (pSourceTexture == nullptr || pDestinationTexture == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
+  if (pSourceTexture->GetType() != pDestinationTexture->GetType()) {
+    return D3DERR_INVALIDCALL;
+  }
 
   switch (pSourceTexture->GetType()) {
   case D3DRTYPE_TEXTURE:
@@ -995,8 +1004,14 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRenderTargetData(IDirect3DSurface9
   ZoneScoped;
   LogFunctionCall();
 
+  if (pRenderTarget == nullptr || pDestSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const auto pLssSourceSurface = bridge_cast<Direct3DSurface9_LSS*>(pRenderTarget);
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
+  if (pLssSourceSurface == nullptr || pLssDestinationSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
 
   DeviceBridge::ResponseTransaction responseTransaction;
 
@@ -1029,6 +1044,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetFrontBufferData(UINT iSwapChain, I
   requestedSwapChain->Release();
 
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
+  if (pLssDestinationSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
 
   DeviceBridge::ResponseTransaction responseTransaction;
 
@@ -1059,6 +1077,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::StretchRect(IDirect3DSurface9* pSourc
 
   const auto pLssSrcSurface = bridge_cast<Direct3DSurface9_LSS*>(pSourceSurface);
   const auto pLssDstSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
+  if (pLssSrcSurface == nullptr || pLssDstSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   DeviceBridge::ResponseTransaction responseTransaction;
   UID currentUID = 0;
   {
@@ -1083,6 +1104,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ColorFill(IDirect3DSurface9* pSurface
   }
 
   const auto pLssSurface = bridge_cast<Direct3DSurface9_LSS*>(pSurface);
+  if (pLssSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   DeviceBridge::ResponseTransaction responseTransaction;
   UID currentUID = 0;
   {
@@ -3510,14 +3534,20 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ComposeRects(IDirect3DSurface9* pSrc,
 
   // Send command to server and wait for response
   {
+    if (pSrc == nullptr || pDst == nullptr) {
+      return D3DERR_INVALIDCALL;
+    }
     const auto pLssSourceSurface = bridge_cast<Direct3DSurface9_LSS*>(pSrc);
     const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDst);
-
     auto* const pLssSrcRect = bridge_cast<Direct3DVertexBuffer9_LSS*>(pSrcRectDescs);
-    const UID idSrcRect = (pSrcRectDescs) ? (UID) pLssSrcRect->getId() : 0;
-
     auto* const pLssDestRect = bridge_cast<Direct3DVertexBuffer9_LSS*>(pDstRectDescs);
-    const UID idDestRect = (pDstRectDescs) ? (UID) pLssDestRect->getId() : 0;
+    if (pLssSourceSurface == nullptr || pLssDestinationSurface == nullptr
+        || (pSrcRectDescs != nullptr && pLssSrcRect == nullptr)
+        || (pDstRectDescs != nullptr && pLssDestRect == nullptr)) {
+      return D3DERR_INVALIDCALL;
+    }
+    const UID idSrcRect = pLssSrcRect ? (UID) pLssSrcRect->getId() : 0;
+    const UID idDestRect = pLssDestRect ? (UID) pLssDestRect->getId() : 0;
 
     if (pLssSourceSurface && pLssDestinationSurface) {
       DeviceBridge::ResponseTransaction responseTransaction;
