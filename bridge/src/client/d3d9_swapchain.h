@@ -58,23 +58,21 @@ public:
         c.send_data(getId());
       }
 
-      if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
-        if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
-          Logger::err("Implicit swapchain link failed: no response from server.");
-          if (pInitResult != nullptr) {
-            *pInitResult = D3DERR_DEVICELOST;
-          }
-          return;
+      if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+        Logger::err("Implicit swapchain link failed: no response from server.");
+        if (pInitResult != nullptr) {
+          *pInitResult = D3DERR_DEVICELOST;
         }
-        const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
-        DeviceBridge::pop_front();
-        if (FAILED(linkResult)) {
-          Logger::err(format_string("Implicit swapchain link failed: 0x%08x", linkResult));
-          if (pInitResult != nullptr) {
-            *pInitResult = linkResult;
-          }
-          return;
+        return;
+      }
+      const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
+      DeviceBridge::pop_front();
+      if (FAILED(linkResult)) {
+        Logger::err(format_string("Implicit swapchain link failed: 0x%08x", linkResult));
+        if (pInitResult != nullptr) {
+          *pInitResult = linkResult;
         }
+        return;
       }
 
       const HRESULT result = initializeBackBuffers();
