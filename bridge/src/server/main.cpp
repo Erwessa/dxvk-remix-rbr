@@ -2949,21 +2949,55 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(RECT, pRect);
         PULL_D(Flags);
         GET_RES_OPTIONAL_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
-        const uint32_t width = pRect->right - pRect->left;
-        const uint32_t height = pRect->bottom - pRect->top;
         PULL_D(dFormat);
         PULL_D(IncomingPitch);
         const D3DFORMAT format = (D3DFORMAT) dFormat;
+        const bool useSharedHeap = Commands::IsDataInSharedHeap(rpcHeader.flags);
+        UINT width = 0;
+        UINT height = 0;
+        D3DSURFACE_DESC surfaceDesc = {};
+        if (pRect == nullptr
+            || pRect->left < 0 || pRect->top < 0
+            || pRect->right <= pRect->left || pRect->bottom <= pRect->top) {
+          Logger::err("[Bridge] IDirect3DSurface9_UnlockRect received an invalid rectangle; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
+        width = static_cast<UINT>(pRect->right - pRect->left);
+        height = static_cast<UINT>(pRect->bottom - pRect->top);
+        if (pSurface != nullptr) {
+          const HRESULT descResult = pSurface->GetDesc(OUT &surfaceDesc);
+          if (FAILED(descResult) || surfaceDesc.Format != format
+              || static_cast<UINT>(pRect->right) > surfaceDesc.Width
+              || static_cast<UINT>(pRect->bottom) > surfaceDesc.Height) {
+            Logger::err("[Bridge] IDirect3DSurface9_UnlockRect rectangle or format does not match the server surface; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
+        }
         const size_t rowSize = bridge_util::calcRowSize(width, format);
         const uint32_t numRows = bridge_util::calcStride(height, format);
-        // With the shared heap, pHeapData points into a buffer with the surface's full pitch.
-        // Without it, the rows follow in the data queue as one or more blobs of whole rows, IncomingPitch bytes apart.
+        const uint32_t fullRowSize = pSurface != nullptr
+          ? bridge_util::calcRowSize(surfaceDesc.Width, format)
+          : 0;
+        if (rowSize == 0 || numRows == 0 || IncomingPitch == 0
+            || IncomingPitch > static_cast<UINT>(std::numeric_limits<INT>::max())
+            || (useSharedHeap
+              ? (pSurface != nullptr && IncomingPitch < fullRowSize)
+              : IncomingPitch != rowSize)) {
+          Logger::err("[Bridge] IDirect3DSurface9_UnlockRect received an invalid row size or pitch; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
+        // With the shared heap, pHeapData points into the buffer with the surface's full pitch.
+        // Without it, the rows follow in the data queue as blobs exactly one region row wide.
         const uint8_t* pHeapData = nullptr;
-        const bool useSharedHeap = Commands::IsDataInSharedHeap(rpcHeader.flags);
         if (useSharedHeap) {
           PULL_U(allocId);
-          const size_t byteOffset = bridge_util::calcImageByteOffset(IncomingPitch, *pRect, format);
-          pHeapData = SharedHeap::getBuf(allocId) + byteOffset;
+          if (pSurface != nullptr) {
+            const size_t byteOffset = bridge_util::calcImageByteOffset(static_cast<INT>(IncomingPitch), *pRect, format);
+            pHeapData = SharedHeap::getBuf(allocId) + byteOffset;
+          }
         }
 
         // A surface whose (async) create failed has no server object: its rows are read and dropped (counted at the create).
@@ -2972,7 +3006,13 @@ void ProcessDeviceCommandQueue() {
         if (pSurface != nullptr) {
           hresult = pSurface->LockRect(OUT & lockedRect, IN pRect, IN Flags);
         }
-        const bool locked = SUCCEEDED(hresult);
+        bool locked = SUCCEEDED(hresult);
+        if (locked && (lockedRect.Pitch <= 0 || static_cast<size_t>(lockedRect.Pitch) < rowSize)) {
+          Logger::err("[Bridge] IDirect3DSurface9_UnlockRect native surface pitch is smaller than the upload row.");
+          pSurface->UnlockRect();
+          locked = false;
+          hresult = D3DERR_INVALIDCALL;
+        }
 
         if (useSharedHeap) {
           if (locked) {
@@ -2985,12 +3025,12 @@ void ProcessDeviceCommandQueue() {
           while (row < numRows) {
             void* pChunk = nullptr;
             const size_t chunkSize = DeviceBridge::get_data_view(&pChunk);
-            const uint32_t chunkRows = IncomingPitch != 0 ? (uint32_t) (chunkSize / IncomingPitch) : 0;
-            if (pChunk == nullptr || chunkRows == 0 || chunkRows > numRows - row || chunkSize % IncomingPitch != 0) {
+            const uint32_t chunkRows = static_cast<uint32_t>(chunkSize / rowSize);
+            if (pChunk == nullptr || chunkRows == 0 || chunkRows > numRows - row || chunkSize % rowSize != 0) {
               // The data offset check after this command stops the bridge.
               Logger::err(format_string("[Bridge] IDirect3DSurface9_UnlockRect uid=%u: a blob of %zu bytes does not hold whole rows "
-                                        "of %u bytes for the %u of %u rows still expected.",
-                                        (uint32_t) currentUID, chunkSize, (uint32_t) IncomingPitch, numRows - row, numRows));
+                                        "of %zu bytes for the %u of %u rows still expected.",
+                                        (uint32_t) currentUID, chunkSize, rowSize, numRows - row, numRows));
               break;
             }
             if (locked) {
