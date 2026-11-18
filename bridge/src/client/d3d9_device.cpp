@@ -667,11 +667,17 @@ void Direct3DDevice9Ex_LSS<EnableSync>::SetGammaRamp(UINT iSwapChain, DWORD Flag
   if (requestedSwapChain == nullptr) {
     return;
   }
+  {
+    std::lock_guard<std::mutex> registryLock(m_swapChainRegistryMutex);
+    m_swapChainGammaRamps[requestedSwapChain] = *pRamp;
+    if (iSwapChain == 0) {
+      m_gammaRamp = *pRamp;
+    }
+  }
   requestedSwapChain->Release();
-  m_gammaRamp = *pRamp;
   ClientMessage c(Commands::IDirect3DDevice9Ex_SetGammaRamp, getId());
   c.send_many(iSwapChain, Flags);
-  c.send_data(sizeof(D3DGAMMARAMP), (void*) &m_gammaRamp);
+  c.send_data(sizeof(D3DGAMMARAMP), (void*) pRamp);
 }
 
 template<bool EnableSync>
@@ -687,8 +693,12 @@ void Direct3DDevice9Ex_LSS<EnableSync>::GetGammaRamp(UINT iSwapChain, D3DGAMMARA
   if (requestedSwapChain == nullptr) {
     return;
   }
+  {
+    std::lock_guard<std::mutex> registryLock(m_swapChainRegistryMutex);
+    const auto it = m_swapChainGammaRamps.find(requestedSwapChain);
+    *pRamp = it == m_swapChainGammaRamps.end() ? m_defaultGammaRamp : it->second;
+  }
   requestedSwapChain->Release();
-  *pRamp = m_gammaRamp;
   if (GlobalOptions::getSendReadOnlyCalls()) {
     ClientMessage c(Commands::IDirect3DDevice9Ex_GetGammaRamp, getId());
     c.send_data(iSwapChain);
