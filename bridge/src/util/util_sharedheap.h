@@ -39,6 +39,11 @@ namespace bridge_util {
     static BYTE* getBuf(const AllocId id) {
       return get().getBuf(id);
     }
+#ifdef REMIX_BRIDGE_SERVER
+    static BYTE* getBuf(const AllocId id, const size_t offset, const size_t size) {
+      return get().getBuf(id, offset, size);
+    }
+#endif
 #ifdef REMIX_BRIDGE_CLIENT
     static AllocId allocate(const size_t size) {
       return get().allocate(size);
@@ -48,8 +53,8 @@ namespace bridge_util {
     }
 #endif
 #ifdef REMIX_BRIDGE_SERVER
-    static void allocate(const AllocId id, const ChunkId firstChunk) {
-      get().allocate(id, firstChunk);
+    static void allocate(const AllocId id, const ChunkId firstChunk, const uint32_t numChunks) {
+      get().allocate(id, firstChunk, numChunks);
     }
     static void deallocate(const AllocId id) {
       get().deallocate(id);
@@ -68,12 +73,15 @@ namespace bridge_util {
     public:
       Instance();
       BYTE* getBuf(const AllocId id);
+#ifdef REMIX_BRIDGE_SERVER
+      BYTE* getBuf(const AllocId id, const size_t offset, const size_t size);
+#endif
 #ifdef REMIX_BRIDGE_CLIENT
       AllocId allocate(const size_t size);
       void deallocate(const AllocId id);
 #endif
 #ifdef REMIX_BRIDGE_SERVER
-      void allocate(const AllocId id, const ChunkId firstChunk);
+      void allocate(const AllocId id, const ChunkId firstChunk, const uint32_t numChunks);
       void deallocate(const AllocId id);
       void addNewHeapSegment(const uint32_t segmentSize);
 #endif
@@ -87,6 +95,9 @@ namespace bridge_util {
       uint32_t m_defaultSegmentSize;
       uint32_t m_nChunks;
       std::unordered_map<AllocId, ChunkId> m_cache;
+#ifdef REMIX_BRIDGE_SERVER
+      std::unordered_map<AllocId, uint32_t> m_allocationChunkCounts;
+#endif
 #ifdef REMIX_BRIDGE_CLIENT
       AllocId m_nextUid = 0;
       std::map<ChunkId, ChunkId> m_allocations;
