@@ -4348,7 +4348,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitRenderTarget() {
     return linkResult;
   }
 
-  m_state.renderTargets[0] = MakeD3DAutoPtr(m_pImplicitRenderTarget);
+  if (*m_state.renderTargets[0] == nullptr) {
+    m_state.renderTargets[0] = MakeD3DAutoPtr(m_pImplicitRenderTarget);
+  }
   m_implicitRefCnt++;
   return D3D_OK;
 }
@@ -4395,7 +4397,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitDepthStencil() {
     return linkResult;
   }
 
-  m_state.depthStencil = MakeD3DAutoPtr(m_pImplicitDepthStencil);
+  if (*m_state.depthStencil == nullptr) {
+    m_state.depthStencil = MakeD3DAutoPtr(m_pImplicitDepthStencil);
+  }
   m_implicitRefCnt++;
   return D3D_OK;
 }
