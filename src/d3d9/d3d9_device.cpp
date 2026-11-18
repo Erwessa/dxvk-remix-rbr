@@ -179,6 +179,7 @@ namespace dxvk {
     // Every frontend on the shared DXVK device uses the same common objects.
     // An overlay's short-lived probe device must not destroy them under the game's device.
     if (m_dxvkDevice->removeFrontendDevice()) {
+      m_dxvkDevice->releaseOpenVrSceneSession();
       m_dxvkDevice->getCommon()->onDestroy();
     }
     // NV-DXVK end
