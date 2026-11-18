@@ -4979,16 +4979,6 @@ void CALLBACK OnClientExited(void* context, BOOLEAN isTimeout) {
   logRuntimeSessionEnd("the game process ended without closing the bridge (a normal quit or a game crash)");
   gbBridgeRunning = false;
 
-  // Log history of recent client side commands sent and received by the server
-  Logger::info("Most recent Device Queue commands sent from Client");
-  DeviceBridge::Command::print_reader_data_sent();
-  Logger::info("Most recent Device Queue commands received by Server");
-  DeviceBridge::Command::print_reader_data_received();
-  Logger::info("Most recent Module Queue commands sent from Client");
-  ModuleBridge::Command::print_reader_data_sent();
-  Logger::info("Most recent Module Queue commands received by Server");
-  ModuleBridge::Command::print_reader_data_received();
-
   // Give the server some time to shut down, but then force quit so it doesn't hang forever
   uint32_t numRetries = 0;
   uint32_t maxRetries = ServerOptions::getShutdownRetries();
@@ -5189,6 +5179,18 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   ProcessDeviceCommandQueue();
   bSignalDone.store(true);
   moduleCmdProcessingThread.join();
+
+  // Both IPC command consumers have stopped, and the client process has exited.
+  // Snapshot queue history here rather than in OnClientExited(): the queue payload
+  // slots are non-atomic and the SPSC queue does not support concurrent observers.
+  Logger::info("Most recent Device Queue commands sent from Client");
+  DeviceBridge::Command::print_reader_data_sent();
+  Logger::info("Most recent Device Queue commands received by Server");
+  DeviceBridge::Command::print_reader_data_received();
+  Logger::info("Most recent Module Queue commands sent from Client");
+  ModuleBridge::Command::print_reader_data_sent();
+  Logger::info("Most recent Module Queue commands received by Server");
+  ModuleBridge::Command::print_reader_data_received();
 
   if (!dumpLeakedObjects()) {
     bridge_util::Logger::debug("No leaked objects dicovered at Direct3D module eviction.");
