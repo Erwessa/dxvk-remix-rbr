@@ -1536,34 +1536,48 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_D(Type);
         PULL_HND(pHandle);
-        IDirect3DStateBlock9* pSB;
+        IDirect3DStateBlock9* pSB = nullptr;
         const auto hresult = pD3DDevice->CreateStateBlock((D3DSTATEBLOCKTYPE) Type, &pSB);
         if (SUCCEEDED(hresult)) {
           gpD3DStateBlocks[pHandle] = pSB;
         }
-        assert(SUCCEEDED(hresult));
-        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
+        // State-block wrappers are published only after this acknowledgement.
+        ServerMessage c(Commands::Bridge_Response, currentUID);
+        c.send_data(hresult);
         break;
       }
       case IDirect3DDevice9Ex_BeginStateBlock:
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         const auto hresult = pD3DDevice->BeginStateBlock();
-        assert(SUCCEEDED(hresult));
-        SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
+        ServerMessage c(Commands::Bridge_Response, currentUID);
+        c.send_data(hresult);
         break;
       }
       case IDirect3DDevice9Ex_EndStateBlock:
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_HND(pHandle);
-        IDirect3DStateBlock9* pSB;
+        IDirect3DStateBlock9* pSB = nullptr;
         const auto hresult = pD3DDevice->EndStateBlock(&pSB);
         if (SUCCEEDED(hresult)) {
           gpD3DStateBlocks[pHandle] = pSB;
         }
-        assert(SUCCEEDED(hresult));
-        SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
+        ServerMessage c(Commands::Bridge_Response, currentUID);
+        c.send_data(hresult);
+        break;
+      }
+      case IDirect3DDevice9Ex_CancelStateBlock:
+      {
+        GET_RES(pD3DDevice, gpD3DDevices);
+        IDirect3DStateBlock9* pSB = nullptr;
+        // D3D9 has no CancelStateBlock API. End the recording and immediately
+        // release the temporary server object. If no recording is active,
+        // EndStateBlock fails and there is nothing to release.
+        const auto hresult = pD3DDevice->EndStateBlock(&pSB);
+        if (SUCCEEDED(hresult) && pSB) {
+          pSB->Release();
+        }
         break;
       }
       case IDirect3DDevice9Ex_SetClipStatus:
