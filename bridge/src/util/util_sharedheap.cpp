@@ -49,7 +49,8 @@ namespace {
 
   uint32_t getValidatedSharedHeapDefaultSegmentSize(const uint32_t chunkSize) {
     const uint32_t segmentSize = GlobalOptions::getSharedHeapDefaultSegmentSize();
-    if (segmentSize < chunkSize || segmentSize > kSharedHeapMaxSize) {
+    if (segmentSize < chunkSize || segmentSize > kSharedHeapMaxSize
+        || segmentSize % chunkSize != 0) {
       Logger::err(format_string("[SharedHeap] Invalid default segment size %u for chunk size %u.", segmentSize, chunkSize));
       throw std::invalid_argument("Invalid SharedHeap default segment size");
     }
