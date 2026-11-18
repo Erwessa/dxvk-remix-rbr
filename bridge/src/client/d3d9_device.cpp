@@ -4194,12 +4194,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitSwapchain(const D3DPRESEN
     return resetResult;
   }
 
-  // To have a more consistent display when toggling windowed mode
+  m_pSwapchain = pLssSwapChain;
+  registerSwapChain(m_pSwapchain, true);
+  // To have a more consistent display when toggling windowed mode. The
+  // implicit chain must be registered before the indexed SetGammaRamp call.
   if (presParam.Windowed != m_previousPresentParams.Windowed && !(m_createParams.BehaviorFlags & D3DCREATE_NOWINDOWCHANGES)) {
     SetGammaRamp(0, 0, &m_gammaRamp);
   }
-  m_pSwapchain = pLssSwapChain;
-  registerSwapChain(m_pSwapchain, true);
   {
     gSwapChainMapMutex.lock();
     gSwapChainMap[m_pSwapchain->getPresentationParameters().hDeviceWindow] = { m_pSwapchain->getPresentationParameters(), this->getCreateParams(),  m_pSwapchain->getId()};
