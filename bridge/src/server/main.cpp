@@ -1334,7 +1334,7 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL(uint32_t, iSwapChain);
         PULL_HND(pDestSurfaceHandle);
-        const auto& pDestSurface = (IDirect3DSurface9*) gpD3DResources[pDestSurfaceHandle];
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle);
         IDirect3DSurface9* pBackbuffer = nullptr;
         auto hresult = pD3DDevice->GetFrontBufferData(IN iSwapChain, IN pDestSurface);
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
@@ -2180,7 +2180,7 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pSwapChain, gpD3DSwapChains);
         PULL_HND(pDestSurfaceHandle);
-        const auto& pDestSurface = (IDirect3DSurface9*) gpD3DResources[pDestSurfaceHandle];
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle);
         auto hresult = pSwapChain->GetFrontBufferData(pDestSurface);
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pDestSurfaceHandle] = pDestSurface;
