@@ -55,6 +55,17 @@ public:
     }
   }
 
+  void releaseBackBufferReferences() {
+    // Implicit BackBuffer wrappers are created internally before the application
+    // requests them. Drop only those initial references; keep wrappers alive for
+    // any external references until the container itself is destroyed.
+    for (auto* child : m_children) {
+      if (child != nullptr) {
+        child->Release();
+      }
+    }
+  }
+
   HRESULT initializeBackBuffers() {
     for (uint32_t childIdx = 0; childIdx < m_children.size(); ++childIdx) {
       const HRESULT result = initializeBackBuffer(childIdx);
