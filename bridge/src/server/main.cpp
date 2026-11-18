@@ -834,7 +834,9 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pBackbuffer;
         }
-        assert(SUCCEEDED(hresult));
+        if (FAILED(hresult)) {
+          bridge_util::Logger::err(format_string("LinkBackBuffer failed: 0x%08x", hresult));
+        }
         break;
       }
       case IDirect3DDevice9Ex_LinkAutoDepthStencil:
@@ -846,7 +848,9 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pDepthStencil;
         }
-        assert(SUCCEEDED(hresult));
+        if (FAILED(hresult)) {
+          bridge_util::Logger::err(format_string("LinkAutoDepthStencil failed: 0x%08x", hresult));
+        }
         break;
       }
       case IDirect3DDevice9Ex_QueryInterface:
@@ -1006,13 +1010,19 @@ void ProcessDeviceCommandQueue() {
           done = true;
         }
 
-        //Release implicit swapchain
+        // Release the implicit swapchain reference only when GetSwapChain succeeded.
         IDirect3DSwapChain9* pSwapChain = nullptr;
-        pD3DDevice->GetSwapChain(0, &pSwapChain);
-        pSwapChain->Release();
+        const auto swapChainResult = pD3DDevice->GetSwapChain(0, &pSwapChain);
+        if (SUCCEEDED(swapChainResult) && pSwapChain != nullptr) {
+          pSwapChain->Release();
+        } else {
+          bridge_util::Logger::warn(format_string("Reset: GetSwapChain(0) failed: 0x%08x", swapChainResult));
+        }
 
         const auto hresult = pD3DDevice->Reset(&PresentationParameters);
-        assert(SUCCEEDED(hresult));
+        if (FAILED(hresult)) {
+          bridge_util::Logger::err(format_string("IDirect3DDevice9::Reset failed: 0x%08x", hresult));
+        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1031,13 +1041,19 @@ void ProcessDeviceCommandQueue() {
           done = true;
         }
 
-        //Release implicit swapchain
+        // Release the implicit swapchain reference only when GetSwapChain succeeded.
         IDirect3DSwapChain9* pSwapChain = nullptr;
-        pD3DDevice->GetSwapChain(0, &pSwapChain);
-        pSwapChain->Release();
+        const auto swapChainResult = pD3DDevice->GetSwapChain(0, &pSwapChain);
+        if (SUCCEEDED(swapChainResult) && pSwapChain != nullptr) {
+          pSwapChain->Release();
+        } else {
+          bridge_util::Logger::warn(format_string("ResetEx: GetSwapChain(0) failed: 0x%08x", swapChainResult));
+        }
 
         const auto hresult = ((IDirect3DDevice9Ex*) pD3DDevice)->ResetEx(&PresentationParameters, pFullscreenDisplayMode);
-        assert(SUCCEEDED(hresult));
+        if (FAILED(hresult)) {
+          bridge_util::Logger::err(format_string("IDirect3DDevice9Ex::ResetEx failed: 0x%08x", hresult));
+        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
