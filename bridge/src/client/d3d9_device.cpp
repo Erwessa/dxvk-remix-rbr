@@ -1434,7 +1434,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetTransform(D3DTRANSFORMSTATETYPE St
   ZoneScoped;
   LogFunctionCall();
 
-  if (pMatrix == nullptr) {
+  if (pMatrix == nullptr || !isValidD3drtansformstatetype(State)) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1451,7 +1451,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::MultiplyTransform(D3DTRANSFORMSTATETY
   ZoneScoped;
   LogFunctionCall();
 
-  if (pMatrix == nullptr) {
+  if (pMatrix == nullptr || !isValidD3drtansformstatetype(State)) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1676,7 +1676,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetClipPlane(DWORD Index, CONST float
   ZoneScoped;
   LogFunctionCall();
 
-  if (pPlane == nullptr) {
+  if (pPlane == nullptr || Index >= caps::MaxClipPlanes) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1712,7 +1712,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetClipPlane(DWORD Index, float* pPla
   ZoneScoped;
   LogFunctionCall();
 
-  if (pPlane == nullptr) {
+  if (pPlane == nullptr || Index >= caps::MaxClipPlanes) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -1729,7 +1729,11 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) {
   ZoneScoped;
   LogFunctionCall();
-  
+
+  if (static_cast<size_t>(State) >= kNumRenderStates) {
+    return D3DERR_INVALIDCALL;
+  }
+
   const SetterLock setterLock;
 
   UID currentUID = 0;
@@ -1759,10 +1763,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRenderState(D3DRENDERSTATETYPE Sta
   ZoneScoped;
   LogFunctionCall();
 
-  if (pValue == nullptr) {
+  if (pValue == nullptr || static_cast<size_t>(State) >= kNumRenderStates) {
     return D3DERR_INVALIDCALL;
   }
-  
+
   {
     BRIDGE_DEVICE_LOCKGUARD();
     *pValue = m_state.renderStates[State];
@@ -3165,7 +3169,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetStreamSource(UINT StreamNumber, ID
   ZoneScoped;
   LogFunctionCall();
 
-  if (ppStreamData == nullptr) {
+  if (StreamNumber >= D3D_MAX_STREAMS || ppStreamData == nullptr
+      || pOffsetInBytes == nullptr || pStride == nullptr) {
     return D3DERR_INVALIDCALL;
   }
 
@@ -3186,6 +3191,9 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetStreamSourceFreq(UINT StreamNumber, UINT Divider) {
   ZoneScoped;
   LogFunctionCall();
+  if (StreamNumber >= D3D_MAX_STREAMS) {
+    return D3DERR_INVALIDCALL;
+  }
   const SetterLock setterLock;
   UID currentUID = 0;
   {
@@ -3214,7 +3222,7 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetStreamSourceFreq(UINT StreamNumber, UINT* Divider) {
   ZoneScoped;
   LogFunctionCall();
-  if (Divider == nullptr) {
+  if (StreamNumber >= D3D_MAX_STREAMS || Divider == nullptr) {
     return D3DERR_INVALIDCALL;
   }
   {
