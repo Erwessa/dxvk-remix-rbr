@@ -175,6 +175,9 @@ HRESULT Direct3DVolumeTexture9_LSS::UnlockBox(UINT Level) {
 
 HRESULT Direct3DVolumeTexture9_LSS::AddDirtyBox(CONST D3DBOX* pDirtyBox) {
   LogFunctionCall();
+  if (pDirtyBox == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
 
   DeviceBridge::ResponseTransaction responseTransaction;
 
