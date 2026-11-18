@@ -2165,7 +2165,6 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pBackbuffer;
         }
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
