@@ -128,6 +128,13 @@ HRESULT Direct3DSurface9_LSS::LockRect(D3DLOCKED_RECT* pLockedRect, CONST RECT* 
   if (pLockedRect == nullptr) {
     return D3DERR_INVALIDCALL;
   }
+  const RECT rect = resolveLockInfoRect(pRect, m_desc);
+  if (rect.left < 0 || rect.top < 0
+      || rect.right > static_cast<LONG>(m_desc.Width)
+      || rect.bottom > static_cast<LONG>(m_desc.Height)
+      || rect.left >= rect.right || rect.top >= rect.bottom) {
+    return D3DERR_INVALIDCALL;
+  }
   // Store locked rect pointer locally so we can copy the data on unlock
   {
     BRIDGE_PARENT_DEVICE_LOCKGUARD();
