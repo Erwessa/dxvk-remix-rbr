@@ -97,7 +97,11 @@ public:
     if (FAILED(hresultOut)) {
       return;
     }
-    initImplicitObjects(presParams);
+    hresultOut = initImplicitObjects(presParams);
+    if (FAILED(hresultOut)) {
+      releaseInternalObjects();
+      return;
+    }
     ResetState();
 
     if (!(createParams.BehaviorFlags & D3DCREATE_FPU_PRESERVE)) {
@@ -257,10 +261,10 @@ private:
   D3DCAPS9 m_caps;
   HRESULT internalGetDeviceCaps(D3DCAPS9* pCaps);
 
-  void initImplicitObjects(const D3DPRESENT_PARAMETERS& presParam);
-  void initImplicitSwapchain(const D3DPRESENT_PARAMETERS& presParam);
-  void initImplicitRenderTarget();
-  void initImplicitDepthStencil();
+  HRESULT initImplicitObjects(const D3DPRESENT_PARAMETERS& presParam);
+  HRESULT initImplicitSwapchain(const D3DPRESENT_PARAMETERS& presParam);
+  HRESULT initImplicitRenderTarget();
+  HRESULT initImplicitDepthStencil();
   void destroyImplicitObjects();
   template<typename T>
   HRESULT UpdateTextureImpl(IDirect3DBaseTexture9* pSourceTexture, IDirect3DBaseTexture9* pDestinationTexture);
