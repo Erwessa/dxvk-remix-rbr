@@ -380,7 +380,7 @@ namespace dxvk {
           bool                initRtx) {
     // NV-DXVK start: One Remix device per adapter in the unified module
     // Keep ownership outside the adapter/instance to avoid a reference cycle.
-    // A device stays listed until module teardown, or until the last frontend on it retires it.
+    // Retired devices are evicted on the next createDevice call or module teardown.
     struct SharedDevice {
       Rc<DxvkDevice> device;
       bool rtxInitialized;
