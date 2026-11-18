@@ -630,6 +630,7 @@ DECL_COMMAND_FUNC(,Command,const Commands::D3D9Command command,
   // Only start a data batch if the bridge is actually enabled, otherwise this becomes a no-op
   if (gbBridgeRunning) {
     s_pWriterChannel->data->begin_batch();
+    m_batchStarted = true;
   }
   s_pWriterChannel->pbCmdInProgress->store(true);
   s_curBatchStartPos = (int32_t) s_pWriterChannel->data->get_pos();
@@ -652,16 +653,16 @@ DECL_COMMAND_FUNC(,Command,const Commands::D3D9Command command,
     // Send command id as part of data queue for everycommand from client to server
 #ifdef REMIX_BRIDGE_CLIENT
       if (syncDataQueue(1, false)) {
-      const auto result = s_pWriterChannel->data->push((UINT)s_cmdUID);
+        const auto result = s_pWriterChannel->data->push((UINT)s_cmdUID);
 #if defined(_DEBUG) || defined(DEBUGOPT)
       if (GlobalOptions::getLogAllCommands()) {
         Logger::info("Pushed UID: " + std::to_string(s_cmdUID));
       }
 #endif
-      if (RESULT_FAILURE(result)) {
-        // For now just log when things go wrong, but could use some robustness improvements
-        Logger::err("DataQueue send_data: Failed to send data!");
-      }
+        if (RESULT_FAILURE(result)) {
+          // For now just log when things go wrong, but could use some robustness improvements
+          Logger::err("DataQueue send_data: Failed to send data!");
+        }
       }
 #endif
   }
@@ -673,20 +674,26 @@ DECL_COMMAND_FUNC(,~Command) {
     s_blobStaged = false;
     std::vector<uint8_t>().swap(s_blobStaging);
   }
-  // Only actually send the command if the bridge is enabled, otherwise this becomes a no-op
-  if (gbBridgeRunning) {
-    const uint32_t perfDataWords = (m_perfStart != 0) ? (uint32_t) dataWordsSince(s_curBatchStartPos) : 0;
-    s_pWriterChannel->data->end_batch();
-    s_curBatchStartPos = -1;
-    if (s_streamHeaderPushed) {
-      pushHeaderLocked(Commands::Bridge_DataChunk, Commands::FlagBits::DataStreamEnd, m_handle);
+  // Close a batch even after a synchronization failure disabled the bridge.
+  if (m_batchStarted) {
+    if (gbBridgeRunning) {
+      const uint32_t perfDataWords = (m_perfStart != 0) ? (uint32_t) dataWordsSince(s_curBatchStartPos) : 0;
+      s_pWriterChannel->data->end_batch();
+      s_curBatchStartPos = -1;
+      if (s_streamHeaderPushed) {
+        pushHeaderLocked(Commands::Bridge_DataChunk, Commands::FlagBits::DataStreamEnd, m_handle);
+      } else {
+        pushHeaderLocked(m_command, m_commandFlags, m_handle);
+      }
+      if (m_perfStart != 0) {
+        bridge_util::perf::noteSent((uint16_t) m_command);
+        bridge_util::perf::noteCommand((uint16_t) m_command, perfDataWords, bridge_util::perf::now() - m_perfStart);
+      }
     } else {
-      pushHeaderLocked(m_command, m_commandFlags, m_handle);
+      s_pWriterChannel->data->end_batch();
+      s_curBatchStartPos = -1;
     }
-    if (m_perfStart != 0) {
-      bridge_util::perf::noteSent((uint16_t) m_command);
-      bridge_util::perf::noteCommand((uint16_t) m_command, perfDataWords, bridge_util::perf::now() - m_perfStart);
-    }
+    m_batchStarted = false;
   }
   s_streamable = false;
   s_streamHeaderPushed = false;
@@ -734,7 +741,9 @@ DECL_STATE_MESSAGE_FUNC(,StateMessage,const Commands::D3D9Command command, uintp
 
 DECL_STATE_MESSAGE_FUNC(,~StateMessage) {
 #ifdef REMIX_BRIDGE_CLIENT
-  if (s_packetOpen) {
+  if (s_packetOpen && !gbBridgeRunning) {
+    closeStatePacketLocked();
+  } else if (s_packetOpen) {
     ++s_packetRecords;
     if (bridge_util::perf::enabled()) {
       bridge_util::perf::noteRecord((uint16_t) m_command);
