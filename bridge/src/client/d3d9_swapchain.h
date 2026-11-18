@@ -59,6 +59,14 @@ public:
     for (uint32_t childIdx = 0; childIdx < m_children.size(); ++childIdx) {
       const HRESULT result = initializeBackBuffer(childIdx);
       if (FAILED(result)) {
+        // Children hold references to the container. Remove every child before
+        // the caller releases the swapchain, otherwise a partial initialization
+        // failure would leave the container alive through its own children.
+        for (uint32_t cleanupIdx = 0; cleanupIdx < m_children.size(); ++cleanupIdx) {
+          if (getChild(cleanupIdx) != nullptr) {
+            removeChild(cleanupIdx);
+          }
+        }
         return result;
       }
     }
