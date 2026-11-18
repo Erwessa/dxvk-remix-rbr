@@ -1925,6 +1925,8 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetVertexCaptureFlags(BaseDire
   flags.renderStates[D3DRS_SHADEMODE] = true;
 
   flags.vertexDecl = true;
+  flags.nPatchMode = true;
+  flags.fvf = true;
   std::fill(std::begin(flags.streamFreqs), std::end(flags.streamFreqs), true);
   // Include every light and light-enable currently tracked by the client shadow.
   // StateBlock Apply updates this shadow locally after the server confirms success.
@@ -1970,6 +1972,7 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetCaptureFlags(D3DSTATEBLOCKT
     flags.indices = true;
     flags.viewport = true;
     flags.scissorRect = true;
+    flags.currentTexturePalette = true;
 
     std::fill(std::begin(flags.clipPlanes), std::end(flags.clipPlanes), true);
 
@@ -2502,7 +2505,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetCurrentTexturePalette(UINT Palette
   LogFunctionCall();
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    m_curTexPalette = PaletteNumber;
+    if (m_stateRecording) {
+      m_stateRecording->m_captureState.currentTexturePalette = PaletteNumber;
+      m_stateRecording->m_dirtyFlags.currentTexturePalette = true;
+    } else {
+      m_state.currentTexturePalette = PaletteNumber;
+    }
   }
   return S_OK;
 }
@@ -2518,7 +2526,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetCurrentTexturePalette(UINT* pPalet
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pPaletteNumber = m_curTexPalette;
+    *pPaletteNumber = m_state.currentTexturePalette;
   }
   return S_OK;
 }
@@ -2617,7 +2625,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetNPatchMode(float nSegments) {
   {
     {
       BRIDGE_DEVICE_LOCKGUARD();
-      m_NPatchMode = nSegments;
+      if (m_stateRecording) {
+        m_stateRecording->m_captureState.nPatchMode = nSegments;
+        m_stateRecording->m_dirtyFlags.nPatchMode = true;
+      } else {
+        m_state.nPatchMode = nSegments;
+      }
     }
     {
       ClientMessage c(Commands::IDirect3DDevice9Ex_SetNPatchMode, getId());
@@ -2635,7 +2648,7 @@ float Direct3DDevice9Ex_LSS<EnableSync>::GetNPatchMode() {
   float result;
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    result = m_NPatchMode;
+    result = m_state.nPatchMode;
   }
   return result;
 }
@@ -2878,7 +2891,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetFVF(DWORD FVF) {
   UID currentUID = 0;
   {
     {
-      m_FVF = FVF;
+      if (m_stateRecording) {
+        m_stateRecording->m_captureState.fvf = FVF;
+        m_stateRecording->m_dirtyFlags.fvf = true;
+      } else {
+        m_state.fvf = FVF;
+      }
     }
     if (!mustSend(Commands::IDirect3DDevice9Ex_SetFVF, [&](SentState& s) { return s.fvf(FVF); })) {
       return S_OK;
@@ -2903,7 +2921,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetFVF(DWORD* pFVF) {
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pFVF = m_FVF;
+    *pFVF = m_state.fvf;
   }
   return S_OK;
 }
@@ -4305,7 +4323,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetState() {
 
   // Set The Current Texture Palette entry to it's default
   // found through experimentation.
-  m_curTexPalette = 65535;
+  m_state.currentTexturePalette = 65535;
 
   return S_OK;
 }
