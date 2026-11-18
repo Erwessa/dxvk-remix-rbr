@@ -1032,7 +1032,8 @@ void ProcessDeviceCommandQueue() {
         if (FAILED(hresult)) {
           bridge_util::Logger::err(format_string("IDirect3DDevice9::Reset failed: 0x%08x", hresult));
         }
-        SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
+        ServerMessage response(Commands::Bridge_Response, currentUID);
+        response.send_data(hresult);
         break;
       }
       case IDirect3DDevice9Ex_ResetEx:
@@ -1063,7 +1064,8 @@ void ProcessDeviceCommandQueue() {
         if (FAILED(hresult)) {
           bridge_util::Logger::err(format_string("IDirect3DDevice9Ex::ResetEx failed: 0x%08x", hresult));
         }
-        SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
+        ServerMessage response(Commands::Bridge_Response, currentUID);
+        response.send_data(hresult);
         break;
       }
       case IDirect3DDevice9Ex_Present:
