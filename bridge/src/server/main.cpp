@@ -4978,7 +4978,6 @@ bool InitializeD3D() {
 
 void CALLBACK OnClientExited(void* context, BOOLEAN isTimeout) {
   Logger::err("The client process has unexpectedly exited, shutting down server as well!");
-  logRuntimeSessionEnd("the game process ended without closing the bridge (a normal quit or a game crash)");
   gClientProcessExited.store(true);
   gbBridgeRunning = false;
 
@@ -4996,6 +4995,13 @@ void CALLBACK OnClientExited(void* context, BOOLEAN isTimeout) {
 }
 
 static void CompleteServerCleanupAndUnregisterExitCallback() {
+  // Keep module access on the main thread: the exit callback can race DLL startup.
+  if (gClientProcessExited.load()) {
+    logRuntimeSessionEnd("the game process ended without closing the bridge (a normal quit or a game crash)");
+  } else {
+    logRuntimeSessionEnd(gbBridgeRunning ? "the game closed the bridge" : "the bridge stopped, bridge64.log names the cause");
+  }
+
   // Also release an exit callback that may be waiting while startup unwinds.
   gServerCleanupComplete.store(true);
   if (hWait) {
@@ -5229,7 +5235,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
   // Command processing finished, clean up and exit
   Logger::info("Command processing loop finished, cleaning up and exiting...");
-  logRuntimeSessionEnd(gbBridgeRunning ? "the game closed the bridge" : "the bridge stopped, bridge64.log names the cause");
   if (ghModule) {
     // Skip unloading the d3d9.dll for now, since it seems to be doing more harm than good
     // especially with other dependencies loaded by dxvk and threads that may deadlock due
