@@ -83,6 +83,7 @@ private:
 protected:
   // Releases the internal objects, if any.
   void releaseInternalObjects(bool resetState = true);
+  void cancelStateBlockRecording();
   void onDestroy() override;
 
 public:
