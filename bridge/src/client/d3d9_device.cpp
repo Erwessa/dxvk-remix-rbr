@@ -59,7 +59,7 @@
     c.send_data(size, (void*)pConstantData); \
   }
 
-extern NamedSemaphore* gpPresent;
+extern std::unique_ptr<NamedSemaphore> gpPresent;
 extern std::mutex gSwapChainMapMutex;
 extern SwapChainMap gSwapChainMap;
 
