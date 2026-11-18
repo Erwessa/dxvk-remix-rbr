@@ -582,6 +582,14 @@ HRESULT ReturnSurfaceDataToClient(IDirect3DSurface9* pReturnSurfaceData, HRESULT
   // Sending raw surface buffer details to client
   const uint32_t rowSize = bridge_util::calcRowSize(width, format);
   const uint32_t numRows = bridge_util::calcStride(height, format);
+  if (rowSize == 0 || lockedRect.Pitch <= 0
+      || static_cast<uint32_t>(lockedRect.Pitch) < rowSize) {
+    Logger::err("[Bridge] Surface readback has an unsupported row size or invalid native pitch.");
+    pReturnSurfaceData->UnlockRect();
+    hresult = D3DERR_INVALIDCALL;
+    c.send_data(hresult);
+    return hresult;
+  }
   c.send_data(hresult);
   c.send_data(width);
   c.send_data(height);
