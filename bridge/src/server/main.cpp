@@ -978,9 +978,11 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DSurface9* pCursorBitmap = nullptr;
         if (pHandle != NULL) {
-          pCursorBitmap = (IDirect3DSurface9*) gpD3DResources[pHandle];
+          GET_RES_OPTIONAL_BY_HANDLE(pCursorBitmap, gpD3DResources, pHandle, IDirect3DSurface9*);
         }
-        const auto hresult = pD3DDevice->SetCursorProperties(XHotSpot, YHotSpot, pCursorBitmap);
+        const auto hresult = pHandle != NULL && pCursorBitmap == nullptr
+          ? E_FAIL
+          : pD3DDevice->SetCursorProperties(XHotSpot, YHotSpot, pCursorBitmap);
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1410,10 +1412,9 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DSurface9* pRenderTarget = nullptr;
         if (pHandle != NULL) {
-          pRenderTarget = (IDirect3DSurface9*) gpD3DResources[pHandle];
+          GET_RES_OPTIONAL_BY_HANDLE(pRenderTarget, gpD3DResources, pHandle, IDirect3DSurface9*);
         }
-        assert((pHandle != 0 && pRenderTarget != 0) || pHandle == 0);
-        if ((pHandle != 0 && pRenderTarget != 0) || pHandle == 0) {
+        if (pHandle == NULL || pRenderTarget != nullptr) {
           hresult = pD3DDevice->SetRenderTarget(IN RenderTargetIndex, IN pRenderTarget);
           assert(SUCCEEDED(hresult));
         }
@@ -1441,10 +1442,9 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DSurface9* pDepthStencil = nullptr;
         if (pHandle != NULL) {
-          pDepthStencil = (IDirect3DSurface9*) gpD3DResources[pHandle];
+          GET_RES_OPTIONAL_BY_HANDLE(pDepthStencil, gpD3DResources, pHandle, IDirect3DSurface9*);
         }
-        assert((pHandle != 0 && pDepthStencil != 0) || pHandle == 0);
-        if ((pHandle != 0 && pDepthStencil != 0) || pHandle == 0) {
+        if (pHandle == NULL || pDepthStencil != nullptr) {
           hresult = pD3DDevice->SetDepthStencilSurface(IN pDepthStencil);
           assert(SUCCEEDED(hresult));
         }
@@ -1646,11 +1646,14 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DBaseTexture9* pTexture = nullptr;
         if (pHandle != NULL) {
-          pTexture = (IDirect3DBaseTexture9*) gpD3DResources[pHandle];
-          assert(pTexture != nullptr);
+          GET_RES_OPTIONAL_BY_HANDLE(pTexture, gpD3DResources, pHandle, IDirect3DBaseTexture9*);
         }
-        const auto hresult = pD3DDevice->SetTexture(IN Stage, IN pTexture);
-        assert(SUCCEEDED(hresult));
+        const auto hresult = pHandle != NULL && pTexture == nullptr
+          ? E_FAIL
+          : pD3DDevice->SetTexture(IN Stage, IN pTexture);
+        if (SUCCEEDED(hresult)) {
+          assert(SUCCEEDED(hresult));
+        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1824,10 +1827,14 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DVertexDeclaration9* pVertexDecl = nullptr;
         if (pHandle != NULL) {
-          pVertexDecl = (IDirect3DVertexDeclaration9*) gpD3DVertexDeclarations[pHandle];
+          GET_RES_OPTIONAL_BY_HANDLE(pVertexDecl, gpD3DVertexDeclarations, pHandle, IDirect3DVertexDeclaration9*);
         }
-        const auto hresult = pD3DDevice->SetVertexDeclaration(IN pVertexDecl);
-        assert(SUCCEEDED(hresult));
+        const auto hresult = pHandle != NULL && pVertexDecl == nullptr
+          ? E_FAIL
+          : pD3DDevice->SetVertexDeclaration(IN pVertexDecl);
+        if (SUCCEEDED(hresult)) {
+          assert(SUCCEEDED(hresult));
+        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1926,10 +1933,14 @@ void ProcessDeviceCommandQueue() {
         PULL_U(Stride);
         IDirect3DVertexBuffer9* pStreamData = nullptr;
         if (pHandle != NULL) {
-          pStreamData = (IDirect3DVertexBuffer9*) gpD3DResources[pHandle];
+          GET_RES_OPTIONAL_BY_HANDLE(pStreamData, gpD3DResources, pHandle, IDirect3DVertexBuffer9*);
         }
-        const auto hresult = pD3DDevice->SetStreamSource(IN StreamNumber, IN pStreamData, IN OffsetInBytes, IN Stride);
-        assert(SUCCEEDED(hresult));
+        const auto hresult = pHandle != NULL && pStreamData == nullptr
+          ? E_FAIL
+          : pD3DDevice->SetStreamSource(IN StreamNumber, IN pStreamData, IN OffsetInBytes, IN Stride);
+        if (SUCCEEDED(hresult)) {
+          assert(SUCCEEDED(hresult));
+        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1953,10 +1964,14 @@ void ProcessDeviceCommandQueue() {
         PULL_U(pHandle);
         IDirect3DIndexBuffer9* pIndexData = NULL;
         if (pHandle != NULL) {
-          pIndexData = (IDirect3DIndexBuffer9*) gpD3DResources[pHandle];
+          GET_RES_OPTIONAL_BY_HANDLE(pIndexData, gpD3DResources, pHandle, IDirect3DIndexBuffer9*);
         }
-        const auto hresult = pD3DDevice->SetIndices(IN pIndexData);
-        assert(SUCCEEDED(hresult));
+        const auto hresult = pHandle != NULL && pIndexData == nullptr
+          ? E_FAIL
+          : pD3DDevice->SetIndices(IN pIndexData);
+        if (SUCCEEDED(hresult)) {
+          assert(SUCCEEDED(hresult));
+        }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
