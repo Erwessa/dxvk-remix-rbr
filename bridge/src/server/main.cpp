@@ -4995,6 +4995,15 @@ void CALLBACK OnClientExited(void* context, BOOLEAN isTimeout) {
   }
 }
 
+static void CompleteServerCleanupAndUnregisterExitCallback() {
+  // Also release an exit callback that may be waiting while startup unwinds.
+  gServerCleanupComplete.store(true);
+  if (hWait) {
+    UnregisterWaitEx(hWait, INVALID_HANDLE_VALUE);
+    hWait = NULL;
+  }
+}
+
 bool RegisterExitCallback(const uint32_t hProcess) {
   BOOL result = RegisterWaitForSingleObject(&hWait, TRUNCATE_HANDLE(HANDLE, hProcess), OnClientExited, NULL, INFINITE, WT_EXECUTEONLYONCE);
   if (!result) {
@@ -5132,13 +5141,20 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     PULL_U(uid);
   }
   Logger::info("Registering exit callback in case client exits unexpectedly.");
-  RegisterExitCallback(synResponse.pHandle);
+  if (!RegisterExitCallback(synResponse.pHandle)) {
+    Logger::err("Unable to monitor client process lifetime; aborting server startup.");
+    return 1;
+  }
 
-  RegisterMessageChannel();
+  if (!RegisterMessageChannel()) {
+    CompleteServerCleanupAndUnregisterExitCallback();
+    return 1;
+  }
 
   // (2) Load d3d9.dll, which could be original system, dxvk-remix, or something else...
   Logger::info("Initializing D3D9...");
   if (!InitializeD3D()) {
+    CompleteServerCleanupAndUnregisterExitCallback();
     return 1;
   }
   const SentryShutdownOnExit sentryShutdownOnExit;
@@ -5154,11 +5170,13 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   case Result::Timeout:
   {
     Logger::err("Timeout. Application failed to give go-ahead (CONTINUE) to operate.");
+    CompleteServerCleanupAndUnregisterExitCallback();
     return 1;
   }
   case Result::Failure:
   {
     Logger::err("Connection could to client application/game could not be finalized.");
+    CompleteServerCleanupAndUnregisterExitCallback();
     return 1;
   }
   }
@@ -5220,16 +5238,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   }
 
   // The queue workers, leaked-object diagnostics and VR interface cleanup are complete.
-  // Let the exit callback return before waiting for it to unregister.
-  gServerCleanupComplete.store(true);
-
-  // Clean up client exit callback handler
-  if (hWait) {
-    // According to MSDN docs INVALID_HANDLE_VALUE means the function
-    // waits for all callback functions to complete before returning.
-    UnregisterWaitEx(hWait, INVALID_HANDLE_VALUE);
-    hWait = NULL;
-  }
+  CompleteServerCleanupAndUnregisterExitCallback();
 
   Logger::info("Shutdown cleanup successful, exiting now!");
 
