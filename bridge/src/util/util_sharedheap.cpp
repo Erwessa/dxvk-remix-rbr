@@ -102,6 +102,34 @@ BYTE* SharedHeap::Instance::getBuf(const AllocId id) {
   return m_segments[segId].getBuf(allocation->second);
 }
 
+#ifdef REMIX_BRIDGE_CLIENT
+BYTE* SharedHeap::Instance::getBuf(const AllocId id, const size_t offset, const size_t size) {
+  const auto allocation = m_cache.find(id);
+  if (allocation == m_cache.end()) {
+    Logger::err(format_string("[SharedHeap] Unknown allocation id %u.", id));
+    return nullptr;
+  }
+  const auto extent = m_allocations.find(allocation->second);
+  if (extent == m_allocations.end() || extent->second < allocation->second) {
+    Logger::err(format_string("[SharedHeap] Allocation id %u has invalid client extent metadata.", id));
+    return nullptr;
+  }
+  const size_t numChunks = size_t(extent->second) - allocation->second + 1;
+  if (m_chunkSize == 0 || numChunks > std::numeric_limits<size_t>::max() / m_chunkSize) {
+    Logger::err(format_string("[SharedHeap] Invalid allocation extent for id %u.", id));
+    return nullptr;
+  }
+  const size_t totalSize = numChunks * m_chunkSize;
+  if (offset > totalSize || size > totalSize - offset) {
+    Logger::err(format_string("[SharedHeap] Out-of-range client access for allocation id %u (offset %zu, size %zu, allocation %zu).",
+                              id, offset, size, totalSize));
+    return nullptr;
+  }
+  BYTE* const base = getBuf(id);
+  return base != nullptr ? base + offset : nullptr;
+}
+#endif
+
 #ifdef REMIX_BRIDGE_SERVER
 BYTE* SharedHeap::Instance::getBuf(const AllocId id, const size_t offset, const size_t size) {
   const auto allocation = m_cache.find(id);
