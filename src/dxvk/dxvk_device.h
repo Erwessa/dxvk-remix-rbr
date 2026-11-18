@@ -645,7 +645,7 @@ namespace dxvk {
      * used to ensure that resources that were previously
      * used by the GPU can be safely destroyed.
      */
-    void waitForIdle();
+    VkResult waitForIdle();
     
     /**
      * \brief Adds a CPU delay to present calls.
