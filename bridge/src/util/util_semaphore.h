@@ -42,7 +42,7 @@ namespace bridge_util {
     std::string baseName;
     const size_t count;
     size_t avail;
-    HANDLE ghSemaphore;
+    HANDLE ghSemaphore = nullptr;
 
   public:
     NamedSemaphore(const std::string& name, const size_t& init, const size_t& max)
@@ -52,26 +52,33 @@ namespace bridge_util {
 
       const auto uniqueName = gUniqueIdentifier.toString(name);
 
-      // CreateSemaphore will either create OR open an existing named semaphore
+      // CreateSemaphore will either create OR open an existing named semaphore.
+      // Clear the thread's last-error value so ERROR_ALREADY_EXISTS is unambiguous.
+      SetLastError(ERROR_SUCCESS);
       ghSemaphore = CreateSemaphore(
-        nullptr,             // default access
-        avail,               // initial count
-        count,               // maximum count
-        uniqueName.c_str()); // named semaphore
+        nullptr,                    // default access
+        static_cast<LONG>(avail),   // initial count
+        static_cast<LONG>(count),   // maximum count
+        uniqueName.c_str());        // named semaphore
 
-      DWORD err = GetLastError();
-      if (err != ERROR_SUCCESS && err != ERROR_ALREADY_EXISTS) {
+      if (ghSemaphore == nullptr) {
+        const DWORD err = GetLastError();
         std::stringstream ss;
-        ss << "CreateSemaphore failed with error code " << err << " (0x" << std::hex << err << ")\n";
+        ss << "CreateSemaphore failed with error code " << err << " (0x" << std::hex << err << ")\\n";
         Logger::err(ss.str());
-      }
-      if (err == ERROR_ALREADY_EXISTS) {
+      } else if (GetLastError() == ERROR_ALREADY_EXISTS) {
         Logger::debug(format_string("CreateSemaphore returned existing semaphore by the same name %s.", name.c_str()));
       }
     }
 
     ~NamedSemaphore() {
-      CloseHandle(ghSemaphore);
+      if (ghSemaphore != nullptr) {
+        CloseHandle(ghSemaphore);
+      }
+    }
+
+    bool isValid() const {
+      return ghSemaphore != nullptr;
     }
 
     NamedSemaphore(const NamedSemaphore& s) = delete;
