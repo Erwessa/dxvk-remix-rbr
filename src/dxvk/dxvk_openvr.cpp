@@ -598,6 +598,8 @@ namespace dxvk {
     }
     m_externalFrameProvider = owner;
     m_externalFramePending = false;
+    m_latestExternalFrameIndex = 0;
+    m_rtxSubmittedFrameIndex = 0;
   }
 
 
@@ -607,6 +609,8 @@ namespace dxvk {
       return;
     m_externalFrame = frame;
     m_externalFramePending = true;
+    m_latestExternalFrameIndex = frame.frameIndex;
+    m_rtxSubmittedFrameIndex = 0;
   }
 
 
@@ -615,6 +619,8 @@ namespace dxvk {
     if (owner == m_externalFrameProvider) {
       m_externalFramePending = false;
       m_externalFrame = {};
+      m_latestExternalFrameIndex = 0;
+      m_rtxSubmittedFrameIndex = 0;
     }
   }
 
@@ -627,6 +633,20 @@ namespace dxvk {
     frame = m_externalFrame;
     m_externalFramePending = false;
     return true;
+  }
+
+
+  void VrInstance::markRtxFrameSubmitted(uint64_t frameIndex) {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    if (frameIndex != 0 && frameIndex == m_latestExternalFrameIndex)
+      m_rtxSubmittedFrameIndex = frameIndex;
+  }
+
+
+  bool VrInstance::wasRtxFrameSubmittedForLatestExternalFrame() {
+    std::lock_guard<dxvk::mutex> lock(m_mutex);
+    return m_latestExternalFrameIndex != 0
+        && m_rtxSubmittedFrameIndex == m_latestExternalFrameIndex;
   }
 
 
@@ -765,6 +785,8 @@ namespace dxvk {
     m_externalFrameProvider = nullptr;
     m_externalFramePending = false;
     m_externalFrame = {};
+    m_latestExternalFrameIndex = 0;
+    m_rtxSubmittedFrameIndex = 0;
     m_hasLastValidTrackingFromHead = false;
     m_lastValidTrackingFromHead = {};
 
