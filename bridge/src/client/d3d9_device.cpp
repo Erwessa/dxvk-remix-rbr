@@ -1855,18 +1855,18 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetPixelCaptureFlags(BaseDirec
   flags.renderStates[D3DRS_BLENDOPALPHA] = true;
 
   for (uint32_t i = 0; i < caps::MaxTexturesPS; i++) {
-    flags.samplerStates[i][D3DSAMP_ADDRESSU] = true;
-    flags.samplerStates[i][D3DSAMP_ADDRESSV] = true;
-    flags.samplerStates[i][D3DSAMP_ADDRESSW] = true;
-    flags.samplerStates[i][D3DSAMP_BORDERCOLOR] = true;
-    flags.samplerStates[i][D3DSAMP_MAGFILTER] = true;
-    flags.samplerStates[i][D3DSAMP_MINFILTER] = true;
-    flags.samplerStates[i][D3DSAMP_MIPFILTER] = true;
-    flags.samplerStates[i][D3DSAMP_MIPMAPLODBIAS] = true;
-    flags.samplerStates[i][D3DSAMP_MAXMIPLEVEL] = true;
-    flags.samplerStates[i][D3DSAMP_MAXANISOTROPY] = true;
-    flags.samplerStates[i][D3DSAMP_SRGBTEXTURE] = true;
-    flags.samplerStates[i][D3DSAMP_ELEMENTINDEX] = true;
+    flags.samplerStates[i][D3DSAMP_ADDRESSU - 1] = true;
+    flags.samplerStates[i][D3DSAMP_ADDRESSV - 1] = true;
+    flags.samplerStates[i][D3DSAMP_ADDRESSW - 1] = true;
+    flags.samplerStates[i][D3DSAMP_BORDERCOLOR - 1] = true;
+    flags.samplerStates[i][D3DSAMP_MAGFILTER - 1] = true;
+    flags.samplerStates[i][D3DSAMP_MINFILTER - 1] = true;
+    flags.samplerStates[i][D3DSAMP_MIPFILTER - 1] = true;
+    flags.samplerStates[i][D3DSAMP_MIPMAPLODBIAS - 1] = true;
+    flags.samplerStates[i][D3DSAMP_MAXMIPLEVEL - 1] = true;
+    flags.samplerStates[i][D3DSAMP_MAXANISOTROPY - 1] = true;
+    flags.samplerStates[i][D3DSAMP_SRGBTEXTURE - 1] = true;
+    flags.samplerStates[i][D3DSAMP_ELEMENTINDEX - 1] = true;
   }
   for (auto& fConst : flags.pixelConstants.fConsts) {
     fConst = true;
@@ -1953,7 +1953,7 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetVertexCaptureFlags(BaseDire
 
   // The displacement-map sampler is a single vertex-pipeline sampler at
   // D3DDMAPSAMPLER, mapped immediately after the pixel samplers.
-  flags.samplerStates[caps::MaxTexturesPS][D3DSAMP_DMAPOFFSET] = true;
+  flags.samplerStates[caps::MaxTexturesPS][D3DSAMP_DMAPOFFSET - 1] = true;
 
   // These two texture-stage states are shared by the vertex and pixel pipelines.
   for (uint32_t i = 0; i < caps::MaxSimultaneousTextures; i++) {
