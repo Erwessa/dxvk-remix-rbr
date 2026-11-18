@@ -2825,7 +2825,11 @@ void ProcessDeviceCommandQueue() {
           }
         } else {
           const auto size = DeviceBridge::get_data(&data);
-          assert(SizeToLock == size);
+          if (SizeToLock != size || (SizeToLock != 0 && data == nullptr)) {
+            Logger::err("[Bridge] Vertex buffer upload payload size or pointer is invalid; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
         }
 
         // A buffer whose (async) create failed has no server object: skip the upload (counted at the create)
@@ -2939,7 +2943,11 @@ void ProcessDeviceCommandQueue() {
           }
         } else {
           const auto size = DeviceBridge::get_data(&data);
-          assert(SizeToLock == size);
+          if (SizeToLock != size || (SizeToLock != 0 && data == nullptr)) {
+            Logger::err("[Bridge] Index buffer upload payload size or pointer is invalid; stopping the bridge.");
+            gbBridgeRunning = false;
+            break;
+          }
         }
 
         // A buffer whose (async) create failed has no server object: skip the upload (counted at the create)
