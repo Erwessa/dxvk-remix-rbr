@@ -483,8 +483,12 @@ public:
     if (!VrInstance::s_instance.initializeSceneSession(this, params.AdapterOrdinal, true))
       return D3DERR_NOTAVAILABLE;
 
+    if (!VrInstance::s_instance.registerExternalFrameProvider(this)) {
+      VrInstance::s_instance.shutdownSceneSession(this);
+      return D3DERR_NOTAVAILABLE;
+    }
+
     m_openVrSceneSession = true;
-    VrInstance::s_instance.registerExternalFrameProvider(this);
     return D3D_OK;
   }
 
