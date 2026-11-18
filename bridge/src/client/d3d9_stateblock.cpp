@@ -237,7 +237,7 @@ HRESULT Direct3DStateBlock9_LSS::Capture() {
 HRESULT Direct3DStateBlock9_LSS::Apply() {
   LogFunctionCall();
   BRIDGE_PARENT_DEVICE_LOCKGUARD();
-  if (!m_serverCreated) {
+  if (!m_serverCreated || m_pDevice->m_stateRecording) {
     return D3DERR_INVALIDCALL;
   }
 
