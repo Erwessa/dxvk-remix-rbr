@@ -441,8 +441,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
     return createResult;
   }
 
-  // BackBuffer wrappers are created lazily by GetBackBuffer(). The server
-  // swapchain is now registered, so those requests resolve against this chain.
+  // Publish only after the server has acknowledged creation.
+  registerSwapChain(pLssSwapChain, false);
+  // BackBuffer wrappers are created lazily by GetBackBuffer().
   return D3D_OK;
 }
 
@@ -455,15 +456,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetSwapChain(UINT iSwapChain, IDirect
     return D3DERR_INVALIDCALL;
   }
 
-  {
-    BRIDGE_DEVICE_LOCKGUARD();
-    if (m_pSwapchain == nullptr) {
-      *pSwapChain = nullptr;
-      return D3DERR_DEVICELOST;
-    }
-    *pSwapChain = m_pSwapchain;
-    m_pSwapchain->AddRef();
+  auto* const swapChain = getSwapChainAtIndex(iSwapChain);
+  if (swapChain == nullptr) {
+    *pSwapChain = nullptr;
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
   }
+  *pSwapChain = swapChain;
 
   if (GlobalOptions::getSendReadOnlyCalls()) {
     ClientMessage c(Commands::IDirect3DDevice9Ex_GetSwapChain, getId());
@@ -477,13 +475,12 @@ template<bool EnableSync>
 unsigned int Direct3DDevice9Ex_LSS<EnableSync>::GetNumberOfSwapChains() {
   ZoneScoped;
   LogFunctionCall();
-  // DXVK does not support >1 implicit swapchains (those that are created during CreateDevice).
-  static constexpr int kNumImplicitSwapChains = 1;
+  const UINT count = getSwapChainCount();
   if (GlobalOptions::getSendReadOnlyCalls()) {
     ClientMessage c(Commands::IDirect3DDevice9Ex_GetNumberOfSwapChains, getId());
-    c.send_data(kNumImplicitSwapChains);
+    c.send_data(count);
   }
-  return kNumImplicitSwapChains;
+  return count;
 }
 
 template<bool EnableSync>
@@ -603,11 +600,14 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetBackBuffer(UINT iSwapChain, UINT i
   if (ppBackBuffer == nullptr) {
     return D3DERR_INVALIDCALL;
   }
-  if (m_pSwapchain == nullptr) {
+  auto* const swapChain = getSwapChainAtIndex(iSwapChain);
+  if (swapChain == nullptr) {
     *ppBackBuffer = nullptr;
-    return D3DERR_DEVICELOST;
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
   }
-  return m_pSwapchain->GetBackBuffer(iBackBuffer, Type, ppBackBuffer);
+  const HRESULT result = swapChain->GetBackBuffer(iBackBuffer, Type, ppBackBuffer);
+  swapChain->Release();
+  return result;
 }
 
 template<bool EnableSync>
@@ -617,10 +617,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRasterStatus(UINT iSwapChain, D3DR
   if (pRasterStatus == nullptr) {
     return D3DERR_INVALIDCALL;
   }
-  if (m_pSwapchain == nullptr) {
-    return D3DERR_DEVICELOST;
+  auto* const swapChain = getSwapChainAtIndex(iSwapChain);
+  if (swapChain == nullptr) {
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
   }
-  return m_pSwapchain->GetRasterStatus(pRasterStatus);
+  const HRESULT result = swapChain->GetRasterStatus(pRasterStatus);
+  swapChain->Release();
+  return result;
 }
 
 template<bool EnableSync>
@@ -4142,6 +4145,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitSwapchain(const D3DPRESEN
     SetGammaRamp(0, 0, &m_gammaRamp);
   }
   m_pSwapchain = pLssSwapChain;
+  registerSwapChain(m_pSwapchain, true);
   {
     gSwapChainMapMutex.lock();
     gSwapChainMap[m_pSwapchain->getPresentationParameters().hDeviceWindow] = { m_pSwapchain->getPresentationParameters(), this->getCreateParams(),  m_pSwapchain->getId()};
@@ -4266,6 +4270,7 @@ void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects() {
 
   // Release implicit SwapChain, must happen last so PresParam still exist prior
   if (m_pSwapchain != nullptr) {
+    unregisterSwapChain(m_pSwapchain);
     m_pSwapchain->releaseBackBufferReferences();
     const auto scRefCnt = m_pSwapchain->Release();
     assert(scRefCnt == 0 && "Implicit Swapchain has not been released!");
