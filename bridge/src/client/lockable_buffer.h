@@ -136,7 +136,8 @@ protected:
         // and freeing that buffer from the shared heap
         discardedBufferId = m_bufferId;
       }
-      const auto nextBufId = (bDiscard || (m_bufferId == SharedHeap::kInvalidId)) ?
+      const bool bAllocatedNewBuffer = bDiscard || (m_bufferId == SharedHeap::kInvalidId);
+      const auto nextBufId = bAllocatedNewBuffer ?
         m_bufferId = SharedHeap::allocate(m_desc.Size) : m_bufferId;
       if (nextBufId == SharedHeap::kInvalidId) {
         m_bufferId = discardedBufferId;
@@ -153,8 +154,10 @@ protected:
       m_bufferId = nextBufId;
       *ppbData = SharedHeap::getBuf(m_bufferId, offset, dataSize);
       if (*ppbData == nullptr) {
-        SharedHeap::deallocate(m_bufferId);
-        m_bufferId = discardedBufferId;
+        if (bAllocatedNewBuffer) {
+          SharedHeap::deallocate(m_bufferId);
+          m_bufferId = discardedBufferId;
+        }
         return E_FAIL;
       }
       m_lockInfos.push({ offset, size, nullptr, flags, checkPtr, m_bufferId, discardedBufferId });
