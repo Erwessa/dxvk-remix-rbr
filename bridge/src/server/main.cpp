@@ -932,6 +932,8 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         const auto hresult = pD3DDevice->TestCooperativeLevel();
+        ServerMessage response(Commands::Bridge_Response, currentUID);
+        response.send_data(hresult);
         break;
       }
       case IDirect3DDevice9Ex_GetAvailableTextureMem:
