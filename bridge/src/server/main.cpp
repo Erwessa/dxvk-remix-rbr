@@ -2165,7 +2165,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pBackbuffer;
         }
-        SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DSwapChain9_GetRasterStatus:
