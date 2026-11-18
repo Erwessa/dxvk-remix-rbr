@@ -82,7 +82,7 @@ private:
 
 protected:
   // Releases the internal objects, if any.
-  void releaseInternalObjects(bool resetState = true);
+  void releaseInternalObjects(bool resetState = true, bool preserveExplicitState = false, bool cancelRecording = true);
   void cancelStateBlockRecording();
   void onDestroy() override;
 
@@ -265,7 +265,7 @@ private:
   HRESULT initImplicitSwapchain(const D3DPRESENT_PARAMETERS& presParam);
   HRESULT initImplicitRenderTarget();
   HRESULT initImplicitDepthStencil();
-  void destroyImplicitObjects();
+  void destroyImplicitObjects(bool preserveExplicitState = false);
   template<typename T>
   HRESULT UpdateTextureImpl(IDirect3DBaseTexture9* pSourceTexture, IDirect3DBaseTexture9* pDestinationTexture);
   void setupFPU();
