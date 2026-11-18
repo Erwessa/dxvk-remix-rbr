@@ -111,9 +111,14 @@ using namespace remixapi::util;
 #define GET_HDR_VAL(name) \
             const DWORD& name = rpcHeader.pHandle;
 #define GET_RES(name, map) \
-            GET_HND(name##Handle); \
-            const auto& name = map[name##Handle]; \
-            assert(name != NULL)
+            const auto& name##Handle = rpcHeader.pHandle; \
+            const auto name##It = (map).find(name##Handle); \
+            if (name##Handle == NULL || name##It == (map).cend() || name##It->second == nullptr) { \
+              Logger::err(format_string("[Bridge] Invalid or unknown object handle %u; stopping the bridge.", (unsigned) name##Handle)); \
+              gbBridgeRunning = false; \
+              break; \
+            } \
+            const auto& name = name##It->second
 
 // NOTE: MSDN states HWNDs are safe to cross x86-->x64 boundary, and that a truncating cast should be used:
 // https://docs.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication?redirectedfrom=MSDN
