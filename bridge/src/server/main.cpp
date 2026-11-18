@@ -2989,8 +2989,7 @@ void ProcessDeviceCommandQueue() {
         // Currently we only recieve calls for LockRect in cases where backbuffer data is to be copied for screenshots
         GET_HND(pHandle);
         GET_RES_OPTIONAL_BY_HANDLE(pSurface, gpD3DResources, pHandle, IDirect3DSurface9*);
-        HRESULT hresult = ReturnSurfaceDataToClient(pSurface, pSurface != nullptr ? S_OK : E_FAIL, currentUID);
-        assert(SUCCEEDED(hresult));
+        ReturnSurfaceDataToClient(pSurface, pSurface != nullptr ? S_OK : E_FAIL, currentUID);
         break;
       }
       case IDirect3DSurface9_UnlockRect:
