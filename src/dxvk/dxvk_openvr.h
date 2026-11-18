@@ -149,8 +149,8 @@ namespace dxvk {
     bool isSceneSessionActive() const { return m_sceneSessionActive; }
 
     // Acquires poses and both eyes' optical parameters as one synchronized
-    // frame snapshot. The caller must hold DxvkDevice's submission queue gate
-    // around this call because WaitGetPoses may access the Vulkan queue.
+    // frame snapshot. WaitGetPoses is serialized by m_mutex with submission;
+    // it does not require the Vulkan submission queue gate.
     bool acquireFrame(OpenVrFrameState& frame);
 
     // Submits a completed left/right Vulkan image pair. The caller must hold
