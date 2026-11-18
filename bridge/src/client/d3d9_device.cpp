@@ -2904,7 +2904,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetVertexDeclaration(IDirect3DVertexD
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    auto* const pLssVertexDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(*m_state.vertexDecl);
+    auto* pLssVertexDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(*m_state.vertexDecl);
     if (m_stateRecording && m_stateRecording->m_dirtyFlags.vertexDecl) {
       pLssVertexDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(*m_stateRecording->m_captureState.vertexDecl);
     }
