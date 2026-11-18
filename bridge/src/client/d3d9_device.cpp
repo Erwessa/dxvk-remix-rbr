@@ -1789,6 +1789,12 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetPixelCaptureFlags(BaseDirec
   flags.renderStates[D3DRS_ZENABLE] = true;
   flags.renderStates[D3DRS_FILLMODE] = true;
   flags.renderStates[D3DRS_SHADEMODE] = true;
+  flags.renderStates[D3DRS_SPECULARENABLE] = true;
+  flags.renderStates[D3DRS_LOCALVIEWER] = true;
+  flags.renderStates[D3DRS_EMISSIVEMATERIALSOURCE] = true;
+  flags.renderStates[D3DRS_AMBIENTMATERIALSOURCE] = true;
+  flags.renderStates[D3DRS_DIFFUSEMATERIALSOURCE] = true;
+  flags.renderStates[D3DRS_SPECULARMATERIALSOURCE] = true;
   flags.renderStates[D3DRS_ZWRITEENABLE] = true;
   flags.renderStates[D3DRS_ALPHATESTENABLE] = true;
   flags.renderStates[D3DRS_LASTPIXEL] = true;
