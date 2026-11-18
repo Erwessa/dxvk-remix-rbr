@@ -145,6 +145,15 @@ void Direct3DStateBlock9_LSS::StateTransfer(const BaseDirect3DDevice9Ex_LSS::Sta
   if (flags.scissorRect) {
     dst.scissorRect = src.scissorRect;
   }
+  if (flags.currentTexturePalette) {
+    dst.currentTexturePalette = src.currentTexturePalette;
+  }
+  if (flags.nPatchMode) {
+    dst.nPatchMode = src.nPatchMode;
+  }
+  if (flags.fvf) {
+    dst.fvf = src.fvf;
+  }
   for (int i = 0; i < flags.clipPlanes.size(); i++) {
     if (flags.clipPlanes[i]) {
       for (int j = 0; j < 4; j++) {
