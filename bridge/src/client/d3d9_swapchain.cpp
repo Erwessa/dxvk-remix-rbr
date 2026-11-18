@@ -219,7 +219,8 @@ HRESULT Direct3DSwapChain9_LSS::GetFrontBufferData(IDirect3DSurface9* pDestSurfa
     return D3DERR_INVALIDCALL;
   }
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
-  if (pLssDestinationSurface == nullptr) {
+  if (pLssDestinationSurface == nullptr
+      || pLssDestinationSurface->getOwningDevice() != static_cast<IUnknown*>(m_pDevice)) {
     return D3DERR_INVALIDCALL;
   }
   const auto pIDestinationSurface = pLssDestinationSurface->D3D<IDirect3DSurface9>();
