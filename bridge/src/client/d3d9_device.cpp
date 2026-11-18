@@ -457,6 +457,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetSwapChain(UINT iSwapChain, IDirect
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
+    if (m_pSwapchain == nullptr) {
+      *pSwapChain = nullptr;
+      return D3DERR_DEVICELOST;
+    }
     *pSwapChain = m_pSwapchain;
     m_pSwapchain->AddRef();
   }
@@ -586,6 +590,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::Present(CONST RECT* pSourceRect, CONS
     remixapi::g_presentCallback();
   }
 
+  if (m_pSwapchain == nullptr) {
+    return D3DERR_DEVICELOST;
+  }
   return m_pSwapchain->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, 0);
 }
 
@@ -593,6 +600,12 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetBackBuffer(UINT iSwapChain, UINT iBackBuffer, D3DBACKBUFFER_TYPE Type, IDirect3DSurface9** ppBackBuffer) {
   ZoneScoped;
   LogFunctionCall();
+  if (m_pSwapchain == nullptr) {
+    if (ppBackBuffer != nullptr) {
+      *ppBackBuffer = nullptr;
+    }
+    return D3DERR_DEVICELOST;
+  }
   return m_pSwapchain->GetBackBuffer(iBackBuffer, Type, ppBackBuffer);
 }
 
@@ -600,6 +613,9 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRasterStatus(UINT iSwapChain, D3DRASTER_STATUS* pRasterStatus) {
   ZoneScoped;
   LogFunctionCall();
+  if (m_pSwapchain == nullptr) {
+    return D3DERR_DEVICELOST;
+  }
   return m_pSwapchain->GetRasterStatus(pRasterStatus);
 }
 
@@ -3482,6 +3498,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::PresentEx(CONST RECT* pSourceRect, CO
     return D3D_OK;
   }
 
+  if (m_pSwapchain == nullptr) {
+    return D3DERR_DEVICELOST;
+  }
   return m_pSwapchain->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
 }
 
