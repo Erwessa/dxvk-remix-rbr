@@ -3289,7 +3289,7 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetStreamSource(UINT StreamNumber, IDirect3DVertexBuffer9* pStreamData, UINT OffsetInBytes, UINT Stride) {
   ZoneScoped;
   LogFunctionCall();
-  if (StreamNumber >= D3D_MAX_STREAMS) {
+  if (StreamNumber >= caps::MaxStreams) {
     return D3DERR_INVALIDCALL;
   }
   auto* const pLssStreamData = bridge_cast<Direct3DVertexBuffer9_LSS*>(pStreamData);
@@ -3335,7 +3335,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetStreamSource(UINT StreamNumber, ID
   ZoneScoped;
   LogFunctionCall();
 
-  if (StreamNumber >= D3D_MAX_STREAMS || ppStreamData == nullptr
+  if (StreamNumber >= caps::MaxStreams || ppStreamData == nullptr
       || pOffsetInBytes == nullptr || pStride == nullptr) {
     return D3DERR_INVALIDCALL;
   }
@@ -3360,7 +3360,7 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetStreamSourceFreq(UINT StreamNumber, UINT Divider) {
   ZoneScoped;
   LogFunctionCall();
-  if (StreamNumber >= D3D_MAX_STREAMS) {
+  if (StreamNumber >= caps::MaxStreams) {
     return D3DERR_INVALIDCALL;
   }
   const SetterLock setterLock;
@@ -3391,7 +3391,7 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetStreamSourceFreq(UINT StreamNumber, UINT* Divider) {
   ZoneScoped;
   LogFunctionCall();
-  if (StreamNumber >= D3D_MAX_STREAMS || Divider == nullptr) {
+  if (StreamNumber >= caps::MaxStreams || Divider == nullptr) {
     return D3DERR_INVALIDCALL;
   }
   {
