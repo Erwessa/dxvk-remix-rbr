@@ -114,8 +114,7 @@ SharedHeap::Id SharedHeap::Instance::chunkIdToSegId(const ChunkId chunkId) const
       return segId;
     }
   }
-  assert(!"chunkIdToSegId failed!");
-  return -1;
+  return kInvalidId;
 }
 
 #ifdef REMIX_BRIDGE_CLIENT
@@ -263,6 +262,19 @@ bool SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk, 
       || size_t(numChunks) > segmentEnd - firstChunk) {
     Logger::err(format_string("[SharedHeap] Allocation %u crosses or exceeds its heap segment.", id));
     return false;
+  }
+  const size_t allocationEnd = size_t(firstChunk) + numChunks;
+  for (const auto& [otherId, otherFirstChunk] : m_cache) {
+    const auto otherCount = m_allocationChunkCounts.find(otherId);
+    if (otherCount == m_allocationChunkCounts.end()) {
+      Logger::err("[SharedHeap] Existing allocation metadata is inconsistent.");
+      return false;
+    }
+    const size_t otherEnd = size_t(otherFirstChunk) + otherCount->second;
+    if (size_t(firstChunk) < otherEnd && size_t(otherFirstChunk) < allocationEnd) {
+      Logger::err(format_string("[SharedHeap] Allocation %u overlaps existing allocation %u.", id, otherId));
+      return false;
+    }
   }
   m_cache.emplace(id, firstChunk);
   m_allocationChunkCounts.emplace(id, numChunks);
