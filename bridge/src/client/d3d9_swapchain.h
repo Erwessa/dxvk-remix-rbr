@@ -35,7 +35,8 @@ class Direct3DSwapChain9_LSS: public Direct3DContainer9_LSS<D3DBase<IDirect3DSwa
 public:
   Direct3DSwapChain9_LSS(BaseDirect3DDevice9Ex_LSS* const pDevice,
                          const D3DPRESENT_PARAMETERS& presParam,
-                         bool linkImplicitSwapchain = true)
+                         bool linkImplicitSwapchain = true,
+                         HRESULT* pInitResult = nullptr)
     : Direct3DContainer9_LSS(nullptr, pDevice)
     , m_presParam(sanitizePresentationParameters(presParam, pDevice->getCreateParams())) {
     m_window = m_presParam.hDeviceWindow;
@@ -45,12 +46,43 @@ public:
     m_behaviorFlag = pDevice->getCreateParams().BehaviorFlags;
 
     m_children.resize(m_presParam.BackBufferCount);
+    if (pInitResult != nullptr) {
+      *pInitResult = D3D_OK;
+    }
     if (linkImplicitSwapchain) {
-      ClientMessage c(Commands::IDirect3DDevice9Ex_LinkSwapchain, pDevice->getId());
-      c.send_data(getId());
+      DeviceBridge::ResponseTransaction responseTransaction;
+      UID currentUID = 0;
+      {
+        ClientMessage c(Commands::IDirect3DDevice9Ex_LinkSwapchain, pDevice->getId());
+        currentUID = c.get_uid();
+        c.send_data(getId());
+      }
+
+      if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
+        if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+          Logger::err("Implicit swapchain link failed: no response from server.");
+          if (pInitResult != nullptr) {
+            *pInitResult = D3DERR_DEVICELOST;
+          }
+          return;
+        }
+        const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
+        DeviceBridge::pop_front();
+        if (FAILED(linkResult)) {
+          Logger::err(format_string("Implicit swapchain link failed: 0x%08x", linkResult));
+          if (pInitResult != nullptr) {
+            *pInitResult = linkResult;
+          }
+          return;
+        }
+      }
+
       const HRESULT result = initializeBackBuffers();
       if (FAILED(result)) {
         Logger::err(format_string("Implicit swapchain BackBuffer initialization failed: 0x%08x", result));
+        if (pInitResult != nullptr) {
+          *pInitResult = result;
+        }
       }
     }
   }
