@@ -3494,9 +3494,10 @@ void ProcessDeviceCommandQueue() {
       case Bridge_UnlinkResource:
       {
         GET_HND(pHandle);
-        // Child surfaces returned by GetSurfaceLevel() carry a COM reference
-        // independent of their parent texture. Drop that reference before
-        // unlinking the child handle; the parent releases its own reference.
+        // Non-standalone child surfaces returned by texture/cube-map and
+        // swapchain backbuffer getters carry their own server-side COM reference.
+        // Release it before unlinking the child handle; the parent owns its
+        // separate reference and remains responsible for its own destruction.
         if (const auto it = gpD3DResources.find(pHandle); it != gpD3DResources.end()) {
           if (it->second)
             it->second->Release();
