@@ -8,6 +8,7 @@
 #include "../dxgi/dxgi_object.h"
 #include "../dxgi/dxgi_interfaces.h"
 
+#include "../dxvk/dxvk_device.h"
 #include "../dxvk/dxvk_cs.h"
 
 #include "../d3d10/d3d10_device.h"
