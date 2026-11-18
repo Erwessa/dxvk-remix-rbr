@@ -2205,13 +2205,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::SetTexture(DWORD Stage, IDirect3DBase
   }
   if (pTexture != nullptr) {
     const auto type = pTexture->GetType();
+    const auto pLssTexture = bridge_cast<Direct3DTexture9_LSS*>(pTexture);
+    const auto pLssCubeTexture = bridge_cast<Direct3DCubeTexture9_LSS*>(pTexture);
+    const auto pLssVolumeTexture = bridge_cast<Direct3DVolumeTexture9_LSS*>(pTexture);
     const bool isBridgeTexture =
-      (type == D3DRTYPE_TEXTURE
-        && ownsResource(bridge_cast<Direct3DTexture9_LSS*>(pTexture)))
-      || (type == D3DRTYPE_CUBETEXTURE
-        && ownsResource(bridge_cast<Direct3DCubeTexture9_LSS*>(pTexture)))
-      || (type == D3DRTYPE_VOLUMETEXTURE
-        && ownsResource(bridge_cast<Direct3DVolumeTexture9_LSS*>(pTexture)));
+      (type == D3DRTYPE_TEXTURE && pLssTexture != nullptr && ownsResource(pLssTexture))
+      || (type == D3DRTYPE_CUBETEXTURE && pLssCubeTexture != nullptr && ownsResource(pLssCubeTexture))
+      || (type == D3DRTYPE_VOLUMETEXTURE && pLssVolumeTexture != nullptr && ownsResource(pLssVolumeTexture));
     if (!isBridgeTexture) {
       return D3DERR_INVALIDCALL;
     }
