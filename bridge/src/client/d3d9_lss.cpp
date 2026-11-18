@@ -295,6 +295,7 @@ void InitServer() {
   {
     Logger::err("Timeout. Connection not established to server.");
     Logger::err("Are you sure the server was invoked by this application and is running?");
+    GlobalOptions::disableSharedHeap();
     BridgeState::setServerState(BridgeState::ProcessState::DoneProcessing);
     gbBridgeRunning = false;
     return;
@@ -302,6 +303,7 @@ void InitServer() {
   case Result::Failure:
   {
     Logger::err("Failed to connect to server.");
+    GlobalOptions::disableSharedHeap();
     BridgeState::setServerState(BridgeState::ProcessState::DoneProcessing);
     gbBridgeRunning = false;
     return;
@@ -348,6 +350,7 @@ void InitServer() {
       SharedHeap::init();
     } catch (const std::exception& err) {
       Logger::err(format_string("[Bridge] Failed to initialize SharedHeap: %s", err.what()));
+      GlobalOptions::disableSharedHeap();
       // Keep the command channel enabled until the server has acknowledged termination.
       BridgeState::setClientState(BridgeState::ProcessState::DoneProcessing);
       if (gpServer != nullptr) {
