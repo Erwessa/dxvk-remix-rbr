@@ -32,13 +32,17 @@ namespace bridge_util {
 
   Result NamedSemaphore::wait(const DWORD timeoutMS) {
     // Note: WaitXXX commands decrement the semaphore value by 1
+    if (ghSemaphore == nullptr) {
+      Logger::err(format_string("[%s] WaitForSingleObject skipped: semaphore handle is invalid.", baseName.c_str()));
+      return Result::Failure;
+    }
     DWORD dwWaitResult = WaitForSingleObject(ghSemaphore, timeoutMS);
     if (dwWaitResult == WAIT_OBJECT_0) {
       avail--;
       return Result::Success;
     } else if ((dwWaitResult != WAIT_TIMEOUT) || (timeoutMS == INFINITE)) {
       DWORD err = GetLastError();
-      Logger::err(format_string("[%s] WaitForSingleObject failed (0x%x): 0x%x, avail = %d", baseName.c_str(), dwWaitResult, err, avail));
+      Logger::err(format_string("[%s] WaitForSingleObject failed (0x%x): 0x%x, avail = %zu", baseName.c_str(), dwWaitResult, err, avail));
       return Result::Failure;
     } else {
       return Result::Timeout;
@@ -47,7 +51,11 @@ namespace bridge_util {
 
   void NamedSemaphore::release(LONG batchSize) {
     // Note: explicit increment by batch size, defaults to 1
-    if (ReleaseSemaphore(ghSemaphore, batchSize, (LPLONG) &avail)) {
+    if (ghSemaphore == nullptr) {
+      Logger::err(format_string("[%s] ReleaseSemaphore skipped: semaphore handle is invalid.", baseName.c_str()));
+      return;
+    }
+    if (ReleaseSemaphore(ghSemaphore, batchSize, nullptr)) {
       // We increase the semaphore counter by the number of data or commands that were batched up,
       // so that on the server side we know how many to read until the queue is empty. Note that
       // the avail member isn't an accurate representation of the actual current counter value,
@@ -63,7 +71,7 @@ namespace bridge_util {
       // batch, however on the server side when reading it will release the writer semaphore for
       // each item read, which will result in trying to release more often than needed.
       if (err != ERROR_TOO_MANY_POSTS) {
-        Logger::err(format_string("[%s] ReleaseSemaphore failed: 0x%x, avail = %d", baseName.c_str(), err, avail));
+        Logger::err(format_string("[%s] ReleaseSemaphore failed: 0x%x, avail = %zu", baseName.c_str(), err, avail));
       }
     }
   }
