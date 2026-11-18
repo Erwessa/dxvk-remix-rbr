@@ -27,11 +27,14 @@ public:
   HRESULT createRemote() {
     OutputDebugStringA("[Bridge x86] D3D9VR_Create: createRemote entered\n");
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Create, m_id);
-    const auto uid = command.get_uid();
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command created\n");
-    command.send_data(static_cast<uint32_t>(m_device->getId()));
-    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command sent; waiting for server\n");
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Create, m_id);
+      const auto commandUid = command.get_uid();
+      OutputDebugStringA("[Bridge x86] D3D9VR_Create: command created\n");
+      command.send_data(static_cast<uint32_t>(m_device->getId()));
+      return commandUid;
+    }();
+    OutputDebugStringA("[Bridge x86] D3D9VR_Create: command published; waiting for server\n");
 
     WAIT_FOR_SERVER_RESPONSE("Direct3DCreateVR", E_FAIL, uid);
     OutputDebugStringA("[Bridge x86] D3D9VR_Create: server response received\n");
@@ -44,9 +47,12 @@ public:
 
   HRESULT invoke(D3D9VRCommand method) {
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    command.send_data(static_cast<uint32_t>(method));
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      command.send_data(static_cast<uint32_t>(method));
+      return commandUid;
+    }();
     WAIT_FOR_SERVER_RESPONSE("IDirect3DVR9 method", E_FAIL, uid);
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
     DeviceBridge::pop_front();
@@ -56,10 +62,13 @@ public:
   template<typename Writer>
   HRESULT invoke(D3D9VRCommand method, Writer&& writer) {
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    command.send_data(static_cast<uint32_t>(method));
-    writer(command);
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      command.send_data(static_cast<uint32_t>(method));
+      writer(command);
+      return commandUid;
+    }();
     WAIT_FOR_SERVER_RESPONSE("IDirect3DVR9 method", E_FAIL, uid);
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
     DeviceBridge::pop_front();
@@ -68,9 +77,12 @@ public:
 
   HRESULT invokeFrame(D3D9VRCommand method, void* output, size_t outputSize) {
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    command.send_data(static_cast<uint32_t>(method));
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      command.send_data(static_cast<uint32_t>(method));
+      return commandUid;
+    }();
     if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
       return E_FAIL;
 
@@ -201,10 +213,13 @@ public:
       return D3DERR_INVALIDCALL;
 
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode),
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetSPIRVShaderCode),
                       static_cast<uint32_t>(bridgeShader->getId()), out ? *size : 0u);
+      return commandUid;
+    }();
     if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
       return E_FAIL;
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
@@ -234,10 +249,13 @@ public:
     if (!bridgeShader)
       return D3DERR_INVALIDCALL;
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetShaderConstantCount),
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetShaderConstantCount),
                       static_cast<uint32_t>(bridgeShader->getId()));
+      return commandUid;
+    }();
     if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
       return E_FAIL;
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
@@ -273,10 +291,13 @@ public:
     if (!bridgeShader)
       return D3DERR_INVALIDCALL;
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetShaderHash),
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      command.send_many(static_cast<uint32_t>(D3D9VRCommand::GetShaderHash),
                       static_cast<uint32_t>(bridgeShader->getId()));
+      return commandUid;
+    }();
     if (DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid) != Result::Success)
       return E_FAIL;
     const HRESULT result = static_cast<HRESULT>(DeviceBridge::get_data());
@@ -296,11 +317,14 @@ public:
   HRESULT STDMETHODCALLTYPE InitializeOpenVRScene() override {
     OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: entering proxy method\n");
     DeviceBridge::ResponseTransaction transaction;
-    ClientMessage command(Commands::D3D9VR_Invoke, m_id);
-    const auto uid = command.get_uid();
-    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: command created\n");
-    command.send_data(static_cast<uint32_t>(D3D9VRCommand::InitializeOpenVRScene));
-    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: command sent; waiting for server\n");
+    const auto uid = [&]() {
+      ClientMessage command(Commands::D3D9VR_Invoke, m_id);
+      const auto commandUid = command.get_uid();
+      OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: command created\n");
+      command.send_data(static_cast<uint32_t>(D3D9VRCommand::InitializeOpenVRScene));
+      return commandUid;
+    }();
+    OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: command published; waiting for server\n");
     const auto waitResult = DeviceBridge::waitForCommand(
       Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, uid);
     OutputDebugStringA("[Bridge x86] InitializeOpenVRScene: server wait returned\n");
