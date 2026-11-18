@@ -77,14 +77,33 @@ static bool rejectUnknownFormat(const char* function, D3DFORMAT format) {
 
 template<bool EnableSync>
 void Direct3DDevice9Ex_LSS<EnableSync>::onDestroy() {
+  // A recording wrapper does not own the device. Cancel the server-side recording
+  // before destroying the device so neither side retains an unfinished state block.
+  cancelStateBlockRecording();
+
   // At this point the underlying d3d9 device's refcount should be 0 and device released
   assert(getRef<D3DRefCounted::Ref::Object>() == 0 &&
          "Destroying an LSS device object with underlying D3D9 object refcount > 0!");
-   ClientMessage c { Commands::IDirect3DDevice9Ex_Destroy, getId() };
+  ClientMessage c { Commands::IDirect3DDevice9Ex_Destroy, getId() };
+}
+
+template<bool EnableSync>
+void Direct3DDevice9Ex_LSS<EnableSync>::cancelStateBlockRecording() {
+  if (!m_stateRecording) {
+    return;
+  }
+
+  ClientMessage { Commands::IDirect3DDevice9Ex_CancelStateBlock, getId() };
+  auto* recording = m_stateRecording;
+  m_stateRecording = nullptr;
+  recording->Release();
 }
 
 template<bool EnableSync>
 void Direct3DDevice9Ex_LSS<EnableSync>::releaseInternalObjects(bool resetState) {
+  // Reset and ResetEx invalidate any in-progress recording on both processes.
+  cancelStateBlockRecording();
+
   // Take references first so that the device won't be
   // destroyed unintentionally and to prevent releaseInternalObjects()
   // recursion.
@@ -1815,28 +1834,42 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateStateBlock(D3DSTATEBLOCKTYPE Ty
   if (ppSB == nullptr) {
     return D3DERR_INVALIDCALL;
   }
+  *ppSB = nullptr;
 
+  BRIDGE_DEVICE_LOCKGUARD();
   DeviceBridge::ResponseTransaction responseTransaction;
+
+  auto* pLssSB = trackWrapper(new Direct3DStateBlock9_LSS(this));
+  StateBlockSetCaptureFlags(Type, pLssSB->m_dirtyFlags);
+  pLssSB->LocalCapture();
 
   UID currentUID = 0;
   {
-    
-    Direct3DStateBlock9_LSS* pLssSB = nullptr;
-    {
-      BRIDGE_DEVICE_LOCKGUARD();
-      // Insert our own IDirect3DStateBlock9 interface implementation
-      pLssSB = trackWrapper(new Direct3DStateBlock9_LSS(this));
-      (*ppSB) = pLssSB;
-      StateBlockSetCaptureFlags(Type, pLssSB->m_dirtyFlags);
-      pLssSB->LocalCapture();
-    }
-    {
-      ClientMessage c(Commands::IDirect3DDevice9Ex_CreateStateBlock, getId());
-      currentUID = c.get_uid();
-      c.send_many(Type, (uint32_t) pLssSB->getId());
-    }
+    ClientMessage c(Commands::IDirect3DDevice9Ex_CreateStateBlock, getId());
+    currentUID = c.get_uid();
+    c.send_many(Type, (uint32_t) pLssSB->getId());
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateStateBlock()", D3DERR_INVALIDCALL, currentUID);
+
+  // State-block creation is always acknowledged: the wrapper must not be
+  // published, or retain the device, until the server object exists.
+  if (Result::Success != DeviceBridge::waitForCommand(
+        Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("CreateStateBlock() failed: no response from server.");
+    pLssSB->markServerObjectMayExist();
+    pLssSB->Release(); // queues Destroy after the possibly completed CreateStateBlock
+    return D3DERR_DEVICELOST;
+  }
+
+  const HRESULT result = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(result)) {
+    pLssSB->Release();
+    return result;
+  }
+
+  pLssSB->markServerCreated();
+  *ppSB = pLssSB;
+  return result;
 }
 
 template<bool EnableSync>
@@ -1844,20 +1877,35 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::BeginStateBlock() {
   ZoneScoped;
   LogFunctionCall();
 
-  {
-    BRIDGE_DEVICE_LOCKGUARD();
-    if (m_stateRecording) {
-      return D3DERR_INVALIDCALL;
-    }
-    m_stateRecording = trackWrapper(new Direct3DStateBlock9_LSS(this));
+  BRIDGE_DEVICE_LOCKGUARD();
+  if (m_stateRecording) {
+    return D3DERR_INVALIDCALL;
   }
+
+  m_stateRecording = trackWrapper(new Direct3DStateBlock9_LSS(this));
   DeviceBridge::ResponseTransaction responseTransaction;
+
   UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DDevice9Ex_BeginStateBlock, getId());
     currentUID = c.get_uid();
   }
-  WAIT_FOR_OPTIONAL_SERVER_RESPONSE("BeginStateBlock()", D3DERR_INVALIDCALL, currentUID);
+
+  // BeginStateBlock must be confirmed even when ordinary server responses
+  // are disabled; otherwise client setters can race a failed server Begin.
+  if (Result::Success != DeviceBridge::waitForCommand(
+        Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("BeginStateBlock() failed: no response from server.");
+    cancelStateBlockRecording();
+    return D3DERR_DEVICELOST;
+  }
+
+  const HRESULT result = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(result)) {
+    cancelStateBlockRecording();
+  }
+  return result;
 }
 
 template<bool EnableSync>
@@ -1868,25 +1916,48 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::EndStateBlock(IDirect3DStateBlock9** 
   if (ppSB == nullptr) {
     return D3DERR_INVALIDCALL;
   }
+  *ppSB = nullptr;
 
   BRIDGE_DEVICE_LOCKGUARD();
-
-  if (!m_stateRecording) {
+  auto* recording = m_stateRecording;
+  if (!recording) {
     return D3DERR_INVALIDCALL;
   }
-  (*ppSB) = m_stateRecording;
 
   DeviceBridge::ResponseTransaction responseTransaction;
 
   UID currentUID = 0;
   {
-    // Add a handle for the sb
     ClientMessage c(Commands::IDirect3DDevice9Ex_EndStateBlock, getId());
     currentUID = c.get_uid();
-    c.send_data((uint32_t) m_stateRecording->getId());
-    m_stateRecording = nullptr;
+    c.send_data((uint32_t) recording->getId());
   }
-  WAIT_FOR_OPTIONAL_SERVER_RESPONSE("EndStateBlock()", D3DERR_INVALIDCALL, currentUID);
+
+  // EndStateBlock is also always acknowledged. Only publish the wrapper
+  // after the server has inserted its matching object into the handle map.
+  if (Result::Success != DeviceBridge::waitForCommand(
+        Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("EndStateBlock() failed: no response from server.");
+    m_stateRecording = nullptr;
+    recording->markServerObjectMayExist();
+    recording->Release(); // queues Destroy after the possibly completed EndStateBlock
+    ClientMessage { Commands::IDirect3DDevice9Ex_CancelStateBlock, getId() };
+    return D3DERR_DEVICELOST;
+  }
+
+  const HRESULT result = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  m_stateRecording = nullptr;
+
+  if (FAILED(result)) {
+    recording->Release();
+    ClientMessage { Commands::IDirect3DDevice9Ex_CancelStateBlock, getId() };
+    return result;
+  }
+
+  recording->markServerCreated();
+  *ppSB = recording;
+  return result;
 }
 
 template<bool EnableSync>
