@@ -2095,6 +2095,9 @@ namespace dxvk {
   }
 
   void D3D9Rtx::onReset() {
+    // A device reset invalidates the raw game camera independently of whether
+    // an ordinary presented frame reached EndFrame.
+    m_gameCameraValid = false;
     m_frontendApp.onDeviceReset();
     if (m_windowInactive.load(std::memory_order_acquire)) {
       m_endingFramesWithoutPresent = true;
