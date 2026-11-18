@@ -118,6 +118,14 @@ protected:
       return D3DERR_INVALIDCALL;
     }
 
+    if (size_t(offset) > m_desc.Size) {
+      return D3DERR_INVALIDCALL;
+    }
+    const size_t dataSize = (size == 0) ? size_t(m_desc.Size) - offset : size;
+    if (dataSize > size_t(m_desc.Size) - offset) {
+      return D3DERR_INVALIDCALL;
+    }
+
     uint32_t* checkPtr = nullptr;
 
     if (m_bUseSharedHeap) {
@@ -142,12 +150,16 @@ protected:
         return E_FAIL;
       }
       m_bufferId = nextBufId;
-      *ppbData = SharedHeap::getBuf(m_bufferId) + offset;
+      *ppbData = SharedHeap::getBuf(m_bufferId, offset, dataSize);
+      if (*ppbData == nullptr) {
+        SharedHeap::deallocate(m_bufferId);
+        m_bufferId = discardedBufferId;
+        return E_FAIL;
+      }
       m_lockInfos.push({ offset, size, nullptr, flags, checkPtr, m_bufferId, discardedBufferId });
     } else {
       *ppbData = m_shadow.get() + offset;
 
-      const size_t dataSize = (size == 0) ? m_desc.Size : size;
       // A lock larger than one data queue item uses the shadow, which streams on unlock.
       if (m_optimizedLock && dataSize + sizeof(kLockCheckValue) + kSIMDAlign <= DeviceBridge::maxItemBytes()) {
         // Send the buffer lock parameters and handle
