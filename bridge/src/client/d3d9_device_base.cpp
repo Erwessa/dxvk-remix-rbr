@@ -164,7 +164,11 @@ void BaseDirect3DDevice9Ex_LSS::unregisterSwapChain(Direct3DSwapChain9_LSS* swap
   std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
   const auto it = std::find(m_swapChainRegistry.begin(), m_swapChainRegistry.end(), swapChain);
   if (it != m_swapChainRegistry.end()) {
-    m_swapChainRegistry.erase(it);
+    if (it == m_swapChainRegistry.begin()) {
+      *it = nullptr;
+    } else {
+      m_swapChainRegistry.erase(it);
+    }
   }
 }
 
