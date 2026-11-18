@@ -320,6 +320,7 @@ class D3DBase: public T, public D3DRefCounted, private D3DRefCounted::RefCountTy
   friend class Direct3DContainer9_LSS;
 
   IUnknown* m_pParent;
+  IUnknown* m_pOwningDevice;
   const D3D9ObjectType m_type;
   const bool m_standalone;
   const size_t m_id;
@@ -354,6 +355,7 @@ protected:
     : D3DRefCounted(*static_cast<RefCountType*>(this),
                     DeleterType([this]() { destroy(); }))
     , m_pParent(pParent)
+    , m_pOwningDevice(pParent)
     , m_type(toD3D9ObjectType<T>())
     , m_standalone(true)
     , m_id(D3dBaseIdFactory::getNextId()) {
@@ -367,6 +369,7 @@ protected:
   D3DBase(T* pD3DObject, IUnknown* const pDevice, ContainerType* pContainer)
     : D3DRefCounted(*pContainer)
     , m_pParent(pContainer)
+    , m_pOwningDevice(pDevice)
     , m_type(toD3D9ObjectType<T>())
     , m_standalone(false)
     , m_id(D3dBaseIdFactory::getNextId()) {
@@ -400,6 +403,10 @@ public:
 
   IUnknown* getParent() const {
     return m_pParent;
+  }
+
+  IUnknown* getOwningDevice() const {
+    return m_pOwningDevice;
   }
 
   bool isStandalone() const {
