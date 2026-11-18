@@ -91,6 +91,9 @@ DECL_BRIDGE_FUNC(void, perfOnFrame) {
 }
 
 DECL_BRIDGE_FUNC(bool, syncDataQueue, size_t expectedMemUsage, bool posResetOnLastIndex) {
+  if (!gbBridgeRunning) {
+    return false;
+  }
   // The flag is read before the position. The reader resets its position before it clears the flag, so a clear flag
   // is never paired with a position from the reader's previous lap.
   const bool serverLapBehind = *static_cast<volatile bool*>(s_pWriterChannel->serverResetPosRequired);
@@ -725,6 +728,9 @@ DECL_STATE_MESSAGE_FUNC(,StateMessage,const Commands::D3D9Command command, uintp
   }
   if (!s_packetOpen) {
     openStatePacketLocked(handle);
+  }
+  if (!gbBridgeRunning || !s_packetOpen) {
+    return;
   }
   // Record header: the setter's command id. Its arguments follow through the DataWriter methods.
   if (!syncDataQueue(1, false)) {
