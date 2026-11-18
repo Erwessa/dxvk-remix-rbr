@@ -230,7 +230,8 @@ bool Direct3DSurface9_LSS::lock(D3DLOCKED_RECT& lockedRect, const RECT* pRect, c
   if (m_bUseSharedHeap) {
     auto discardBufId = SharedHeap::kInvalidId;
     const bool bDiscard = (flags & D3DLOCK_DISCARD) != 0;
-    if (bDiscard || (m_bufferId == SharedHeap::kInvalidId)) {
+    const bool bAllocatedNewBuffer = bDiscard || (m_bufferId == SharedHeap::kInvalidId);
+    if (bAllocatedNewBuffer) {
       discardBufId = m_bufferId;
       m_bufferId = SharedHeap::allocate(surfaceSize);
     }
@@ -240,8 +241,10 @@ bool Direct3DSurface9_LSS::lock(D3DLOCKED_RECT& lockedRect, const RECT* pRect, c
     }
     lockedRect.pBits = getBufPtr(lockedRect.Pitch, rect);
     if (lockedRect.pBits == nullptr) {
-      SharedHeap::deallocate(m_bufferId);
-      m_bufferId = discardBufId;
+      if (bAllocatedNewBuffer) {
+        SharedHeap::deallocate(m_bufferId);
+        m_bufferId = discardBufId;
+      }
       return false;
     }
     m_lockInfoQueue.push({ lockedRect, rect, flags, m_bufferId, discardBufId });
