@@ -2054,7 +2054,8 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_U(ISwapChain);
         const auto hresult = ((IDirect3DDevice9Ex*) pD3DDevice)->WaitForVBlank(IN ISwapChain);
-        assert(SUCCEEDED(hresult));
+        ServerMessage response(Commands::Bridge_Response, currentUID);
+        response.send_data(hresult);
         break;
       }
       case IDirect3DDevice9Ex_SetConvolutionMonoKernel:
