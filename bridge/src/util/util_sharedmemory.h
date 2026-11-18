@@ -25,6 +25,7 @@
 #include <windows.h>
 #include <memory.h>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_map>
 
 #include "log/log.h"
@@ -45,7 +46,7 @@ namespace bridge_util {
         std::stringstream ss;
         ss << "Shared memory: [" << name << "] failed during creation/initialization.";
         Logger::debug(ss.str());
-        throw;
+        throw std::runtime_error("Failed to create or initialize shared memory");
       }
     }
     SharedMemory(const SharedMemory& rhs) = delete;
