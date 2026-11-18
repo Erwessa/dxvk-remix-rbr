@@ -3727,8 +3727,12 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetEx(D3DPRESENT_PARAMETERS* pPrese
       }
     }
 
-    // Reset swapchain and link server backbuffer/depth buffer after the server reset its swapchain, or we will link to the old backbuffer/depth resources
-    initImplicitObjects(presParam);
+    // Rebuild implicit resources only after the server has completed ResetEx.
+    const HRESULT implicitResult = initImplicitObjects(presParam);
+    if (FAILED(implicitResult)) {
+      releaseInternalObjects(false);
+      return implicitResult;
+    }
     // Keeping a track of previous present parameters, to detect and handle mode changes
     m_previousPresentParams = *pPresentationParameters;
   }
