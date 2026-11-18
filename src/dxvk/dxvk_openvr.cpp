@@ -500,11 +500,6 @@ namespace dxvk {
     m_compositor = compositor;
     m_compositor->SetTrackingSpace(vr::TrackingUniverseStanding);
     m_system = system;
-    error = vr::VRInitError_None;
-    m_chaperone = reinterpret_cast<vr::IVRChaperone*>(
-      g_vrFunctions.getGenericInterface(vr::IVRChaperone_Version, &error));
-    if (error != vr::VRInitError_None)
-      m_chaperone = nullptr;
     m_initializedOpenVr = initializedHere;
     m_sceneSessionAdapterId = adapterId;
     m_sceneSessionOwners.insert(owner);
@@ -552,7 +547,7 @@ namespace dxvk {
         &next.projection[i].right,
         &next.projection[i].top,
         &next.projection[i].bottom);
-      next.projectionMatrix[i] = m_system->GetProjectionMatrix(eyes[i], 0.01f, 10000.0f, false);
+      next.projectionMatrix[i] = m_system->GetProjectionMatrix(eyes[i], 0.01f, 10000.0f);
 
       if (next.hmdPoseValid) {
         const auto headFromEye = OpenVrMatrix4::fromHmdMatrix34(next.eyeToHead[i]);
@@ -617,9 +612,12 @@ namespace dxvk {
 
   bool VrInstance::resetView() {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
-    if (!m_sceneSessionActive || !m_chaperone)
+    if (!m_sceneSessionActive || !m_system)
       return false;
-    m_chaperone->ResetZeroPose(vr::TrackingUniverseStanding);
+
+    // The current OpenVR IVRSystem API exposes seated-origin recentering.
+    // It does not provide the former standing chaperone zero-pose reset.
+    m_system->ResetSeatedZeroPose();
     return true;
   }
 
@@ -693,7 +691,6 @@ namespace dxvk {
     m_sceneSessionAdapterId = UINT32_MAX;
     m_compositor = nullptr;
     m_system = nullptr;
-    m_chaperone = nullptr;
 
     if (m_loadedOvrApi)
       this->freeLibrary();
@@ -749,7 +746,7 @@ namespace dxvk {
       HKEY root;
       const char* subkey;
     };
-    constexpr RegistryLocation locations[] = {
+    const RegistryLocation locations[] = {
       { HKEY_CURRENT_USER, "Software\\Valve\\Steam" },
       { HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam" },
       { HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Valve\\Steam" },
