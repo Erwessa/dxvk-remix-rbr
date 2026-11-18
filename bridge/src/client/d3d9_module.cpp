@@ -683,5 +683,10 @@ std::tuple<HRESULT, BaseDirect3DDevice9Ex_LSS*> Direct3D9Ex_LSS::createDevice(
     pNewDevice = new Direct3DDevice9Ex_LSS<false>(
       bExtended, pDirect3D, createParams, localPresParam, pFullscreenDisplayMode, createDeviceHresult);
   }
+
+  if (FAILED(createDeviceHresult) && pNewDevice != nullptr) {
+    pNewDevice->Release();
+    pNewDevice = nullptr;
+  }
   return { createDeviceHresult, pNewDevice };
 }
