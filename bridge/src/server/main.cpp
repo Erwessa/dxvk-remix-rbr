@@ -2983,7 +2983,7 @@ void ProcessDeviceCommandQueue() {
         if (rowSize == 0 || numRows == 0 || IncomingPitch == 0
             || IncomingPitch > static_cast<UINT>(std::numeric_limits<INT>::max())
             || (useSharedHeap
-              ? (pSurface != nullptr && IncomingPitch < fullRowSize)
+              ? (pSurface != nullptr && (fullRowSize == 0 || IncomingPitch < fullRowSize))
               : IncomingPitch != rowSize)) {
           Logger::err("[Bridge] IDirect3DSurface9_UnlockRect received an invalid row size or pitch; stopping the bridge.");
           gbBridgeRunning = false;
@@ -3025,14 +3025,15 @@ void ProcessDeviceCommandQueue() {
           while (row < numRows) {
             void* pChunk = nullptr;
             const size_t chunkSize = DeviceBridge::get_data_view(&pChunk);
-            const uint32_t chunkRows = static_cast<uint32_t>(chunkSize / rowSize);
-            if (pChunk == nullptr || chunkRows == 0 || chunkRows > numRows - row || chunkSize % rowSize != 0) {
+            const size_t chunkRowsWide = chunkSize / rowSize;
+            if (pChunk == nullptr || chunkRowsWide == 0 || chunkRowsWide > numRows - row || chunkSize % rowSize != 0) {
               // The data offset check after this command stops the bridge.
               Logger::err(format_string("[Bridge] IDirect3DSurface9_UnlockRect uid=%u: a blob of %zu bytes does not hold whole rows "
                                         "of %zu bytes for the %u of %u rows still expected.",
                                         (uint32_t) currentUID, chunkSize, rowSize, numRows - row, numRows));
               break;
             }
+            const uint32_t chunkRows = static_cast<uint32_t>(chunkRowsWide);
             if (locked) {
               for (uint32_t r = 0; r < chunkRows; ++r) {
                 memcpy((PBYTE) lockedRect.pBits + size_t(row + r) * lockedRect.Pitch,
