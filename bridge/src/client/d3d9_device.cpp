@@ -2544,7 +2544,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetCurrentTexturePalette(UINT* pPalet
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pPaletteNumber = m_state.currentTexturePalette;
+    *pPaletteNumber = (m_stateRecording && m_stateRecording->m_dirtyFlags.currentTexturePalette)
+      ? m_stateRecording->m_captureState.currentTexturePalette
+      : m_state.currentTexturePalette;
   }
   return S_OK;
 }
@@ -2666,7 +2668,9 @@ float Direct3DDevice9Ex_LSS<EnableSync>::GetNPatchMode() {
   float result;
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    result = m_state.nPatchMode;
+    result = (m_stateRecording && m_stateRecording->m_dirtyFlags.nPatchMode)
+      ? m_stateRecording->m_captureState.nPatchMode
+      : m_state.nPatchMode;
   }
   return result;
 }
@@ -2901,6 +2905,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetVertexDeclaration(IDirect3DVertexD
   {
     BRIDGE_DEVICE_LOCKGUARD();
     auto* const pLssVertexDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(*m_state.vertexDecl);
+    if (m_stateRecording && m_stateRecording->m_dirtyFlags.vertexDecl) {
+      pLssVertexDecl = bridge_cast<Direct3DVertexDeclaration9_LSS*>(*m_stateRecording->m_captureState.vertexDecl);
+    }
     *ppDecl = (IDirect3DVertexDeclaration9*) pLssVertexDecl;
     if ((*ppDecl)) {
       (*ppDecl)->AddRef();
@@ -2950,7 +2957,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetFVF(DWORD* pFVF) {
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pFVF = m_state.fvf;
+    *pFVF = (m_stateRecording && m_stateRecording->m_dirtyFlags.fvf)
+      ? m_stateRecording->m_captureState.fvf
+      : m_state.fvf;
   }
   return S_OK;
 }
