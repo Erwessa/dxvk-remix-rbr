@@ -664,10 +664,15 @@ namespace dxvk {
       return &m_objects;
     }
 
-    // Registers a D3D9 device that uses this device's common objects.
-    void addD3D9Device() {
+    // Atomically registers a D3D9 device unless the shared device has retired.
+    // This closes the race between acquiring a cached VkDevice and its last frontend
+    // destroying the common objects.
+    bool tryAddD3D9Device() {
       std::lock_guard<sync::Spinlock> lock(m_d3d9DeviceLock);
+      if (m_retired.load())
+        return false;
       ++m_d3d9DeviceCount;
+      return true;
     }
 
     // Unregisters a D3D9 device.
