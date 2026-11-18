@@ -5128,7 +5128,12 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
   initDeviceBridge();
 
   if (GlobalOptions::getUseSharedHeap()) {
-    SharedHeap::init();
+    try {
+      SharedHeap::init();
+    } catch (const std::exception& err) {
+      Logger::err(format_string("[Bridge] Failed to initialize SharedHeap: %s", err.what()));
+      return 1;
+    }
   }
 
   // Same counts as the client (d3d9_lss.cpp). Normally the client created the semaphore first and these are ignored.
