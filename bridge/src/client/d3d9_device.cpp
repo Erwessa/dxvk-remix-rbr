@@ -312,6 +312,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetDisplayMode(UINT iSwapChain, D3DDI
   if (pMode == NULL)
     return D3DERR_INVALIDCALL;
 
+  BRIDGE_DEVICE_LOCKGUARD();
+  auto* const requestedSwapChain = getSwapChainAtIndex(iSwapChain);
+  if (requestedSwapChain == nullptr) {
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
+  }
+  requestedSwapChain->Release();
+
   DeviceBridge::ResponseTransaction responseTransaction;
 
   UID currentUID = 0;
@@ -412,6 +419,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
     return D3DERR_INVALIDCALL;
   }
 
+  BRIDGE_DEVICE_LOCKGUARD();
   const auto presentationParameters = Direct3DSwapChain9_LSS::sanitizePresentationParameters(*pPresentationParameters, getCreateParams());
 
   // Additional swapchains must be created on the server before their BackBuffers are linked.
@@ -456,6 +464,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetSwapChain(UINT iSwapChain, IDirect
     return D3DERR_INVALIDCALL;
   }
 
+  BRIDGE_DEVICE_LOCKGUARD();
   auto* const swapChain = getSwapChainAtIndex(iSwapChain);
   if (swapChain == nullptr) {
     *pSwapChain = nullptr;
@@ -475,6 +484,7 @@ template<bool EnableSync>
 unsigned int Direct3DDevice9Ex_LSS<EnableSync>::GetNumberOfSwapChains() {
   ZoneScoped;
   LogFunctionCall();
+  BRIDGE_DEVICE_LOCKGUARD();
   const UINT count = getSwapChainCount();
   if (GlobalOptions::getSendReadOnlyCalls()) {
     ClientMessage c(Commands::IDirect3DDevice9Ex_GetNumberOfSwapChains, getId());
@@ -600,6 +610,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetBackBuffer(UINT iSwapChain, UINT i
   if (ppBackBuffer == nullptr) {
     return D3DERR_INVALIDCALL;
   }
+  BRIDGE_DEVICE_LOCKGUARD();
   auto* const swapChain = getSwapChainAtIndex(iSwapChain);
   if (swapChain == nullptr) {
     *ppBackBuffer = nullptr;
@@ -617,6 +628,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRasterStatus(UINT iSwapChain, D3DR
   if (pRasterStatus == nullptr) {
     return D3DERR_INVALIDCALL;
   }
+  BRIDGE_DEVICE_LOCKGUARD();
   auto* const swapChain = getSwapChainAtIndex(iSwapChain);
   if (swapChain == nullptr) {
     return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
@@ -646,11 +658,17 @@ template<bool EnableSync>
 void Direct3DDevice9Ex_LSS<EnableSync>::SetGammaRamp(UINT iSwapChain, DWORD Flags, CONST D3DGAMMARAMP* pRamp) {
   ZoneScoped;
   LogFunctionCall();
-
-  {
-    BRIDGE_DEVICE_LOCKGUARD();
-    m_gammaRamp = *pRamp;
+  if (pRamp == nullptr) {
+    return;
   }
+
+  BRIDGE_DEVICE_LOCKGUARD();
+  auto* const requestedSwapChain = getSwapChainAtIndex(iSwapChain);
+  if (requestedSwapChain == nullptr) {
+    return;
+  }
+  requestedSwapChain->Release();
+  m_gammaRamp = *pRamp;
   ClientMessage c(Commands::IDirect3DDevice9Ex_SetGammaRamp, getId());
   c.send_many(iSwapChain, Flags);
   c.send_data(sizeof(D3DGAMMARAMP), (void*) &m_gammaRamp);
@@ -660,11 +678,17 @@ template<bool EnableSync>
 void Direct3DDevice9Ex_LSS<EnableSync>::GetGammaRamp(UINT iSwapChain, D3DGAMMARAMP* pRamp) {
   ZoneScoped;
   LogFunctionCall();
-
-  {
-    BRIDGE_DEVICE_LOCKGUARD();
-    *pRamp = m_gammaRamp;
+  if (pRamp == nullptr) {
+    return;
   }
+
+  BRIDGE_DEVICE_LOCKGUARD();
+  auto* const requestedSwapChain = getSwapChainAtIndex(iSwapChain);
+  if (requestedSwapChain == nullptr) {
+    return;
+  }
+  requestedSwapChain->Release();
+  *pRamp = m_gammaRamp;
   if (GlobalOptions::getSendReadOnlyCalls()) {
     ClientMessage c(Commands::IDirect3DDevice9Ex_GetGammaRamp, getId());
     c.send_data(iSwapChain);
@@ -986,6 +1010,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetFrontBufferData(UINT iSwapChain, I
   if (pDestSurface == nullptr) {
     return D3DERR_INVALIDCALL;
   }
+
+  BRIDGE_DEVICE_LOCKGUARD();
+  auto* const requestedSwapChain = getSwapChainAtIndex(iSwapChain);
+  if (requestedSwapChain == nullptr) {
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
+  }
+  requestedSwapChain->Release();
 
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
 
@@ -3543,6 +3574,7 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::WaitForVBlank(UINT iSwapChain) {
   ZoneScoped;
   LogFunctionCall();
+  BRIDGE_DEVICE_LOCKGUARD();
 
   auto* const swapChain = getSwapChainAtIndex(iSwapChain);
   if (swapChain == nullptr) {
@@ -3799,7 +3831,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetDisplayModeEx(UINT iSwapChain, D3D
   if (pMode == NULL || pRotation == NULL)
     return D3DERR_INVALIDCALL;
 
-  
+  BRIDGE_DEVICE_LOCKGUARD();
+  auto* const requestedSwapChain = getSwapChainAtIndex(iSwapChain);
+  if (requestedSwapChain == nullptr) {
+    return m_pSwapchain == nullptr && iSwapChain == 0 ? D3DERR_DEVICELOST : D3DERR_INVALIDCALL;
+  }
+  requestedSwapChain->Release();
+
   DeviceBridge::ResponseTransaction responseTransaction;
 
 
