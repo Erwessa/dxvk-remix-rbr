@@ -1447,7 +1447,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetTransform(D3DTRANSFORMSTATETYPE St
   const auto idx = mapXformStateTypeToIdx(State);
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pMatrix = m_state.transforms[idx];
+    *pMatrix = (m_stateRecording && m_stateRecording->m_dirtyFlags.transforms[idx])
+      ? m_stateRecording->m_captureState.transforms[idx]
+      : m_state.transforms[idx];
   }
   return S_OK;
 }
@@ -1530,7 +1532,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetViewport(D3DVIEWPORT9* pViewport) 
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pViewport = m_state.viewport;
+    *pViewport = (m_stateRecording && m_stateRecording->m_dirtyFlags.viewport)
+      ? m_stateRecording->m_captureState.viewport
+      : m_state.viewport;
   }
   return S_OK;
 }
@@ -1579,7 +1583,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetMaterial(D3DMATERIAL9* pMaterial) 
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pMaterial = m_state.material;
+    *pMaterial = (m_stateRecording && m_stateRecording->m_dirtyFlags.material)
+      ? m_stateRecording->m_captureState.material
+      : m_state.material;
   }
   return S_OK;
 }
@@ -1628,8 +1634,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetLight(DWORD Index, D3DLIGHT9* pLig
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    const auto light = m_state.lights.find(Index);
-    if (light == m_state.lights.end()) {
+    const auto& lights = (m_stateRecording && m_stateRecording->m_dirtyFlags.lights.contains(Index))
+      ? m_stateRecording->m_captureState.lights : m_state.lights;
+    const auto light = lights.find(Index);
+    if (light == lights.end()) {
       return D3DERR_INVALIDCALL;
     }
     *pLight = light->second;
@@ -1676,7 +1684,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetLightEnable(DWORD Index, BOOL* pEn
     BRIDGE_DEVICE_LOCKGUARD();
     // This is the true value for light-enables found through experimentation
     constexpr BOOL LightEnableTrue = 128;
-    *pEnable = m_state.bLightEnables[Index] ? LightEnableTrue : 0;
+    const auto& enables = (m_stateRecording && m_stateRecording->m_dirtyFlags.bLightEnables.contains(Index))
+      ? m_stateRecording->m_captureState.bLightEnables : m_state.bLightEnables;
+    const auto enable = enables.find(Index);
+    *pEnable = enable != enables.end() && enable->second ? LightEnableTrue : 0;
   }
   return S_OK;
 }
@@ -1729,7 +1740,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetClipPlane(DWORD Index, float* pPla
   {
     BRIDGE_DEVICE_LOCKGUARD();
     for (int i = 0; i < 4; i++) {
-      pPlane[i] = m_state.clipPlanes[Index][i];
+      pPlane[i] = (m_stateRecording && m_stateRecording->m_dirtyFlags.clipPlanes[Index])
+        ? m_stateRecording->m_captureState.clipPlanes[Index][i]
+        : m_state.clipPlanes[Index][i];
     }
   }
   return S_OK;
@@ -1779,7 +1792,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetRenderState(D3DRENDERSTATETYPE Sta
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pValue = m_state.renderStates[State];
+    *pValue = (m_stateRecording && m_stateRecording->m_dirtyFlags.renderStates[State])
+      ? m_stateRecording->m_captureState.renderStates[State]
+      : m_state.renderStates[State];
   }
   return S_OK;
 }
@@ -2202,21 +2217,25 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetTexture(DWORD Stage, IDirect3DBase
   {
     BRIDGE_DEVICE_LOCKGUARD();
 
-    if (*m_state.textures[idx] != nullptr) {
-      switch (m_state.textureTypes[idx]) {
+    const auto& textures = (m_stateRecording && m_stateRecording->m_dirtyFlags.textures[idx])
+      ? m_stateRecording->m_captureState.textures : m_state.textures;
+    const auto& textureTypes = (m_stateRecording && m_stateRecording->m_dirtyFlags.textures[idx])
+      ? m_stateRecording->m_captureState.textureTypes : m_state.textureTypes;
+    if (*textures[idx] != nullptr) {
+      switch (textureTypes[idx]) {
       case D3DRTYPE_TEXTURE:
       {
-        (*ppTexture) = bridge_cast<Direct3DTexture9_LSS*>(*m_state.textures[idx]);
+        (*ppTexture) = bridge_cast<Direct3DTexture9_LSS*>(*textures[idx]);
         break;
       }
       case D3DRTYPE_CUBETEXTURE:
       {
-        (*ppTexture) = bridge_cast<Direct3DCubeTexture9_LSS*>(*m_state.textures[idx]);
+        (*ppTexture) = bridge_cast<Direct3DCubeTexture9_LSS*>(*textures[idx]);
         break;
       }
       case D3DRTYPE_VOLUMETEXTURE:
       {
-        (*ppTexture) = bridge_cast<Direct3DVolumeTexture9_LSS*>(*m_state.textures[idx]);
+        (*ppTexture) = bridge_cast<Direct3DVolumeTexture9_LSS*>(*textures[idx]);
         break;
       }
       default:
@@ -2379,7 +2398,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetTextureStageState(DWORD Stage, D3D
   const auto stageIdx = mapSamplerStageToIdx(Stage);
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pValue = m_state.textureStageStates[stageIdx][typeIdx];
+    *pValue = (m_stateRecording && m_stateRecording->m_dirtyFlags.textureStageStates[stageIdx][typeIdx])
+      ? m_stateRecording->m_captureState.textureStageStates[stageIdx][typeIdx]
+      : m_state.textureStageStates[stageIdx][typeIdx];
   }
   return S_OK;
 }
@@ -2434,7 +2455,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetSamplerState(DWORD Sampler, D3DSAM
   const auto samplerIdx = mapSamplerStageToIdx(Sampler);
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pValue = m_state.samplerStates[samplerIdx][typeIdx];
+    *pValue = (m_stateRecording && m_stateRecording->m_dirtyFlags.samplerStates[samplerIdx][typeIdx])
+      ? m_stateRecording->m_captureState.samplerStates[samplerIdx][typeIdx]
+      : m_state.samplerStates[samplerIdx][typeIdx];
   }
   return S_OK;
 }
@@ -2601,7 +2624,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetScissorRect(RECT* pRect) {
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *pRect = m_state.scissorRect;
+    *pRect = (m_stateRecording && m_stateRecording->m_dirtyFlags.scissorRect)
+      ? m_stateRecording->m_captureState.scissorRect
+      : m_state.scissorRect;
   }
   return S_OK;
 }
@@ -3051,7 +3076,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetVertexShader(IDirect3DVertexShader
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    auto pLssVertexShader = bridge_cast<Direct3DVertexShader9_LSS*>(*m_state.vertexShader);
+    auto pLssVertexShader = bridge_cast<Direct3DVertexShader9_LSS*>(
+      *(m_stateRecording && m_stateRecording->m_dirtyFlags.vertexShader
+        ? m_stateRecording->m_captureState.vertexShader : m_state.vertexShader));
     (*ppShader) = (IDirect3DVertexShader9*) pLssVertexShader;
     if ((*ppShader)) {
       (*ppShader)->AddRef();
@@ -3301,10 +3328,13 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetStreamSource(UINT StreamNumber, ID
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    auto* pLssVertexBuffer = bridge_cast<Direct3DVertexBuffer9_LSS*>(*m_state.streams[StreamNumber]);
+    const bool recordingStream = m_stateRecording && m_stateRecording->m_dirtyFlags.streams[StreamNumber];
+    const bool recordingLayout = m_stateRecording && m_stateRecording->m_dirtyFlags.streamOffsetsAndStrides[StreamNumber];
+    const auto& streams = recordingStream ? m_stateRecording->m_captureState.streams : m_state.streams;
+    auto* pLssVertexBuffer = bridge_cast<Direct3DVertexBuffer9_LSS*>(*streams[StreamNumber]);
     (*ppStreamData) = (IDirect3DVertexBuffer9*) pLssVertexBuffer;
-    (*pOffsetInBytes) = m_state.streamOffsets[StreamNumber];
-    (*pStride) = m_state.streamStrides[StreamNumber];
+    (*pOffsetInBytes) = recordingLayout ? m_stateRecording->m_captureState.streamOffsets[StreamNumber] : m_state.streamOffsets[StreamNumber];
+    (*pStride) = recordingLayout ? m_stateRecording->m_captureState.streamStrides[StreamNumber] : m_state.streamStrides[StreamNumber];
     if ((*ppStreamData)) {
       (*ppStreamData)->AddRef();
     }
@@ -3352,7 +3382,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetStreamSourceFreq(UINT StreamNumber
   }
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    *Divider = m_state.streamFreqs[StreamNumber];
+    *Divider = (m_stateRecording && m_stateRecording->m_dirtyFlags.streamFreqs[StreamNumber])
+      ? m_stateRecording->m_captureState.streamFreqs[StreamNumber]
+      : m_state.streamFreqs[StreamNumber];
   }
   return S_OK;
 }
@@ -3400,7 +3432,8 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetIndices(IDirect3DIndexBuffer9** pp
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    auto* pLssIndexBuffer = bridge_cast<Direct3DIndexBuffer9_LSS*>(*m_state.indices);
+    auto* pLssIndexBuffer = bridge_cast<Direct3DIndexBuffer9_LSS*>(*(m_stateRecording && m_stateRecording->m_dirtyFlags.indices
+      ? m_stateRecording->m_captureState.indices : m_state.indices));
     (*ppIndexData) = (IDirect3DIndexBuffer9*) pLssIndexBuffer;
     if ((*ppIndexData)) {
       (*ppIndexData)->AddRef();
@@ -3490,7 +3523,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::GetPixelShader(IDirect3DPixelShader9*
 
   {
     BRIDGE_DEVICE_LOCKGUARD();
-    auto pLssPixelShader = bridge_cast<Direct3DPixelShader9_LSS*>(*m_state.pixelShader);
+    auto pLssPixelShader = bridge_cast<Direct3DPixelShader9_LSS*>(
+      *(m_stateRecording && m_stateRecording->m_dirtyFlags.pixelShader
+        ? m_stateRecording->m_captureState.pixelShader : m_state.pixelShader));
     (*ppShader) = (IDirect3DPixelShader9*) pLssPixelShader;
     if ((*ppShader)) {
       (*ppShader)->AddRef();
@@ -4192,9 +4227,40 @@ HRESULT BaseDirect3DDevice9Ex_LSS::getShaderConstants(const uint32_t startRegist
     }
     return D3D_OK;
   };
-  return ShaderT == ShaderType::Vertex
+  BRIDGE_DEVICE_LOCKGUARD();
+  const HRESULT result = ShaderT == ShaderType::Vertex
     ? getHelper(m_state.vertexConstants)
     : getHelper(m_state.pixelConstants);
+  if (FAILED(result) || !m_stateRecording) {
+    return result;
+  }
+
+  const auto& recordedConstants = ShaderT == ShaderType::Vertex
+    ? m_stateRecording->m_captureState.vertexConstants
+    : m_stateRecording->m_captureState.pixelConstants;
+  const auto& dirtyConstants = ShaderT == ShaderType::Vertex
+    ? m_stateRecording->m_dirtyFlags.vertexConstants
+    : m_stateRecording->m_dirtyFlags.pixelConstants;
+
+  for (uint32_t i = 0; i < adjCount; i++) {
+    const uint32_t registerIndex = startRegister + i;
+    if constexpr (ConstantT == ConstantType::Float) {
+      if (dirtyConstants.fConsts[registerIndex]) {
+        std::memcpy(pConstantData + i * 4, recordedConstants.fConsts[registerIndex].data, sizeof(Vec4f));
+      }
+    } else if constexpr (ConstantT == ConstantType::Int) {
+      if (dirtyConstants.iConsts[registerIndex]) {
+        std::memcpy(pConstantData + i * 4, recordedConstants.iConsts[registerIndex].data, sizeof(Vec4i));
+      }
+    } else {
+      if (dirtyConstants.bConsts[registerIndex]) {
+        const uint32_t arrayIdx = registerIndex / 32;
+        const uint32_t bitIdx = registerIndex % 32;
+        pConstantData[i] = (recordedConstants.bConsts[arrayIdx] & (1u << bitIdx)) ? TRUE : FALSE;
+      }
+    }
+  }
+  return result;
 }
 
 template <ShaderType   ShaderT,
