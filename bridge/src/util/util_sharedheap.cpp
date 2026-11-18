@@ -21,6 +21,8 @@
  */
 #include "util_sharedheap.h"
 
+#include <limits>
+
 #include "util_bytes.h"
 #include "util_devicecommand.h"
 #include "config/global_options.h"
@@ -91,7 +93,12 @@ bool SharedHeap::Instance::addNewHeapSegment() {
   const std::string shMemName =
     std::string("SharedHeap_data_") + std::to_string(m_segments.size());
   bool bSuccess = false;
-  const size_t segmentSizeUnaligned = std::min((kMax32BitHeapSize - getTotalHeapSize()), m_defaultSegmentSize);
+  const size_t totalHeapSize = getTotalHeapSize();
+  if (totalHeapSize >= kMax32BitHeapSize) {
+    Logger::err("[SharedHeap][addNewHeapSegment] SharedHeap has reached its 2 GiB limit.");
+    return false;
+  }
+  const size_t segmentSizeUnaligned = std::min((kMax32BitHeapSize - totalHeapSize), m_defaultSegmentSize);
   // Align segment size to chunk size
   size_t segmentSize = segmentSizeUnaligned & ~(m_chunkSize - 1);
   Logger::debug("[SharedHeap][addNewHeapSegment] Attempting to create new SharedHeap segment.");
@@ -149,10 +156,15 @@ void SharedHeap::Instance::addNewHeapSegment(const uint32_t segmentSize) {
 
 #ifdef REMIX_BRIDGE_CLIENT
 SharedHeap::AllocId SharedHeap::Instance::allocate(const size_t size) {
+  if (size == 0 || size > kMax32BitHeapSize || m_chunkSize == 0) {
+    Logger::err(format_string("[SharedHeap][allocate] Unsupported allocation size: %s",
+                              bridge_util::toByteUnitString(size).c_str()));
+    return kInvalidId;
+  }
   if (size > m_defaultSegmentSize) {
     size_t newDefaultSegmentSize = m_defaultSegmentSize;
-    while (size > newDefaultSegmentSize) {
-      newDefaultSegmentSize = newDefaultSegmentSize << 1;
+    while (size > newDefaultSegmentSize && newDefaultSegmentSize < kMax32BitHeapSize) {
+      newDefaultSegmentSize = std::min(newDefaultSegmentSize * 2, size_t(kMax32BitHeapSize));
     }
     std::stringstream ss;
     ss << "[SharedHeap][allocate] Allocating size: ";
@@ -162,11 +174,15 @@ SharedHeap::AllocId SharedHeap::Instance::allocate(const size_t size) {
     ss << ". New default segment size: ";
     ss << bridge_util::toByteUnitString(newDefaultSegmentSize);
     Logger::warn(ss.str());
-    m_defaultSegmentSize = newDefaultSegmentSize;
+    m_defaultSegmentSize = static_cast<uint32_t>(newDefaultSegmentSize);
   }
-  // Resolve the number of chunks we need to allocate
-  const uint32_t numChunks =
-    ((size % m_chunkSize) == 0) ? (size / m_chunkSize) : (size / m_chunkSize + 1);
+  // Resolve the number of chunks without narrowing the intermediate result.
+  const size_t numChunksWide = size / m_chunkSize + (size % m_chunkSize != 0);
+  if (numChunksWide == 0 || numChunksWide > std::numeric_limits<uint32_t>::max()) {
+    Logger::err("[SharedHeap][allocate] Allocation requires an unsupported number of chunks.");
+    return kInvalidId;
+  }
+  const uint32_t numChunks = static_cast<uint32_t>(numChunksWide);
 
   const auto alloc = findAllocation(numChunks);
   assert(isValidAllocation(alloc));
