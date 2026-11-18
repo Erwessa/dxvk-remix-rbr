@@ -427,20 +427,18 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
     c.send_data(sizeof(D3DPRESENT_PARAMETERS), &presentationParameters);
   }
 
-  if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
-    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
-      Logger::err("CreateAdditionalSwapChain() failed: no response from server.");
-      *ppSwapChain = nullptr;
-      pLssSwapChain->Release();
-      return D3DERR_NOTAVAILABLE;
-    }
-    const HRESULT createResult = (HRESULT) DeviceBridge::get_data();
-    DeviceBridge::pop_front();
-    if (FAILED(createResult)) {
-      *ppSwapChain = nullptr;
-      pLssSwapChain->Release();
-      return createResult;
-    }
+  if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("CreateAdditionalSwapChain() failed: no response from server.");
+    *ppSwapChain = nullptr;
+    pLssSwapChain->Release();
+    return D3DERR_NOTAVAILABLE;
+  }
+  const HRESULT createResult = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(createResult)) {
+    *ppSwapChain = nullptr;
+    pLssSwapChain->Release();
+    return createResult;
   }
 
   // BackBuffer wrappers are created lazily by GetBackBuffer(). The server
