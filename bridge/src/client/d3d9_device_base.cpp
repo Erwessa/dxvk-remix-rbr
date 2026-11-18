@@ -152,11 +152,13 @@ void BaseDirect3DDevice9Ex_LSS::registerSwapChain(Direct3DSwapChain9_LSS* swapCh
       // client wrapper but the server's implicit chain still exists.
       m_swapChainRegistry[0] = swapChain;
     }
+    m_swapChainGammaRamps[swapChain] = m_gammaRamp;
   } else {
     if (m_swapChainRegistry.empty()) {
       m_swapChainRegistry.push_back(nullptr);
     }
     m_swapChainRegistry.push_back(swapChain);
+    m_swapChainGammaRamps[swapChain] = m_defaultGammaRamp;
   }
 }
 
@@ -164,6 +166,7 @@ void BaseDirect3DDevice9Ex_LSS::unregisterSwapChain(Direct3DSwapChain9_LSS* swap
   std::lock_guard<std::mutex> lock(m_swapChainRegistryMutex);
   const auto it = std::find(m_swapChainRegistry.begin(), m_swapChainRegistry.end(), swapChain);
   if (it != m_swapChainRegistry.end()) {
+    m_swapChainGammaRamps.erase(swapChain);
     if (it == m_swapChainRegistry.begin()) {
       *it = nullptr;
     } else {
@@ -205,4 +208,5 @@ void BaseDirect3DDevice9Ex_LSS::InitRamp() {
     m_gammaRamp.green[i] = identity;
     m_gammaRamp.blue[i] = identity;
   }
+  m_defaultGammaRamp = m_gammaRamp;
 }
