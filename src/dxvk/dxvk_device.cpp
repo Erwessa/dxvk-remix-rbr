@@ -168,10 +168,7 @@ namespace dxvk {
 
     // Release the process-wide OpenVR scene claim before device-owned Vulkan
     // state is destroyed. A host-owned OpenVR runtime is not shut down here.
-    if (m_openVrSessionOwned) {
-      VrInstance::s_instance.shutdownSceneSession(this);
-      m_openVrSessionOwned = false;
-    }
+    releaseOpenVrSceneSession();
 
     // NV-DXVK start: RTX initializer
     m_objects.getRtxInitializer().release();
@@ -203,6 +200,14 @@ namespace dxvk {
     // Stop workers explicitly in order to prevent
     // access to structures that are being destroyed.
     m_objects.pipelineManager().stopWorkerThreads();
+  }
+
+
+  void DxvkDevice::releaseOpenVrSceneSession() {
+    if (m_openVrSessionOwned) {
+      VrInstance::s_instance.shutdownSceneSession(this);
+      m_openVrSessionOwned = false;
+    }
   }
 
 
