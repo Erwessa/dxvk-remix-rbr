@@ -767,7 +767,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pSurface;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -785,7 +785,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pSurface;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -805,7 +805,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pSurface;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1131,7 +1131,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pTexture;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1151,7 +1151,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pVolumeTexture;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1169,7 +1169,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pCubeTexture;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1186,7 +1186,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pVertexBuffer;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1203,7 +1203,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pIndexBuffer;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1222,7 +1222,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pSurface;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1241,7 +1241,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pSurface;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1345,7 +1345,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pHandle] = pSurface;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1761,7 +1761,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DVertexDeclarations[pHandle] = pDecl;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1803,7 +1803,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DVertexShaders[pHandle] = pShader;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1921,7 +1921,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DPixelShaders[pHandle] = pShader;
         }
-        assert(SUCCEEDED(hresult));
+
         SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
