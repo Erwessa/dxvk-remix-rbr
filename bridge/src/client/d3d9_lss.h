@@ -23,6 +23,7 @@
 #define D3D9_LSS_H_
 
 #include <d3d9.h>
+#include <atomic>
 
 #include "base.h"
 #include "d3d9_base_texture.h"
@@ -44,7 +45,7 @@ typedef HRESULT(WINAPI* LPDirect3DCreate9Ex)(UINT SDKVersion, IDirect3D9Ex** ppD
 extern LPDirect3DCreate9Ex orig_Direct3DCreate9Ex;
 
 extern Process* gpServer;
-extern bool gbBridgeRunning;
+extern std::atomic<bool> gbBridgeRunning;
 
 void SetupExceptionHandler();
 
