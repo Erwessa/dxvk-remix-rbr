@@ -218,9 +218,15 @@ HRESULT Direct3DSurface9_LSS::ReleaseDC(HDC hdc) {
 
 bool Direct3DSurface9_LSS::lock(D3DLOCKED_RECT& lockedRect, const RECT* pRect, const DWORD& flags) {
   const RECT rect = resolveLockInfoRect(pRect, m_desc);
-  lockedRect.Pitch = bridge_util::calcRowSize(m_desc.Width, m_desc.Format);
-  const auto surfaceSize =
+  const uint32_t rowSize = bridge_util::calcRowSize(m_desc.Width, m_desc.Format);
+  const uint32_t surfaceSize =
     bridge_util::calcTotalSizeOfRect(m_desc.Width, m_desc.Height, m_desc.Format);
+  if (rowSize == 0 || rowSize > static_cast<uint32_t>(std::numeric_limits<INT>::max())
+      || surfaceSize == 0) {
+    Logger::err("[Direct3DSurface9_LSS][lock] Surface dimensions exceed the supported bridge buffer size.");
+    return false;
+  }
+  lockedRect.Pitch = static_cast<INT>(rowSize);
   if (m_bUseSharedHeap) {
     auto discardBufId = SharedHeap::kInvalidId;
     const bool bDiscard = (flags & D3DLOCK_DISCARD) != 0;
