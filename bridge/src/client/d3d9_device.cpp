@@ -1928,11 +1928,11 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetVertexCaptureFlags(BaseDire
   std::fill(std::begin(flags.streamFreqs), std::end(flags.streamFreqs), true);
   // Include every light and light-enable currently tracked by the client shadow.
   // StateBlock Apply updates this shadow locally after the server confirms success.
-  for (const auto& [index, light] : m_state.lights) {
-    flags.lights[index] = true;
+  for (const auto& light : m_state.lights) {
+    flags.lights[light.first] = true;
   }
-  for (const auto& [index, enabled] : m_state.bLightEnables) {
-    flags.bLightEnables[index] = true;
+  for (const auto& enable : m_state.bLightEnables) {
+    flags.bLightEnables[enable.first] = true;
   }
   for (uint32_t i = caps::MaxTexturesPS + 1; i < BaseDirect3DDevice9Ex_LSS::kMaxStageSamplerStateTypes; i++) {
     flags.samplerStates[i][D3DSAMP_DMAPOFFSET] = true;
