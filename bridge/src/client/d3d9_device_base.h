@@ -32,6 +32,8 @@
 #include "shadow_map.h"
 
 #include <array>
+#include <mutex>
+#include <vector>
 
 class Direct3D9Ex_LSS;
 class Direct3DSwapChain9_LSS;
@@ -297,6 +299,9 @@ protected:
   Direct3DStateBlock9_LSS* m_stateRecording = nullptr;
 
   // What the server's device state is known to hold (d3d9_sent_state.h).
+  mutable std::mutex m_swapChainRegistryMutex;
+  std::vector<Direct3DSwapChain9_LSS*> m_swapChainRegistry;
+
   SentState m_sentState;
   bool m_dropRedundantState = false;  // bridge.conf client.dropRedundantState, read at device creation
 
@@ -318,6 +323,14 @@ protected:
   }
 
 public:
+  // Non-owning registry: swapchain wrappers keep the device alive through their COM parent reference.
+  // Index zero is the current implicit swapchain; additional chains follow creation order.
+  void registerSwapChain(Direct3DSwapChain9_LSS* swapChain, bool implicitSwapChain);
+  void unregisterSwapChain(Direct3DSwapChain9_LSS* swapChain);
+  Direct3DSwapChain9_LSS* getSwapChainAtIndex(UINT index) const;
+  UINT getSwapChainIndex(const Direct3DSwapChain9_LSS* swapChain) const;
+  UINT getSwapChainCount() const;
+
   // The server's device state changed in a way this client cannot follow (StateBlock Apply, Reset).
   void invalidateSentState() {
     m_sentState.invalidateAll();
