@@ -305,6 +305,8 @@ HRESULT Direct3DSwapChain9_LSS::GetRasterStatus(D3DRASTER_STATUS* pRasterStatus)
 
   auto frametimeUs = std::chrono::microseconds(1000000u / mode.RefreshRate);
   auto scanLineUs = frametimeUs / scanLineCount;
+  if (scanLineUs.count() == 0)
+    return D3DERR_NOTAVAILABLE;
 
   pRasterStatus->ScanLine = (nowUs % frametimeUs) / scanLineUs;
   pRasterStatus->InVBlank = pRasterStatus->ScanLine >= mode.Height;
