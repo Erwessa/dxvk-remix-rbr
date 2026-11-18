@@ -204,6 +204,14 @@ public:
     return get().useSharedHeap;
   }
 
+  // Keep client resource paths on their local-memory fallback if bridge startup
+  // failed before the SharedHeap singleton could be initialized.
+  static void disableSharedHeap() {
+    auto& options = get();
+    options.useSharedHeap = false;
+    options.sharedHeapPolicy = SharedHeapPolicy::None;
+  }
+
   static bool getUseSharedHeapForTextures() {
     return (get().sharedHeapPolicy & SharedHeapPolicy::Textures) != 0;
   }
