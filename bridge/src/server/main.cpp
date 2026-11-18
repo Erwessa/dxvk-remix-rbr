@@ -3494,26 +3494,19 @@ void ProcessDeviceCommandQueue() {
       case Bridge_UnlinkResource:
       {
         GET_HND(pHandle);
-        // Non-standalone child surfaces returned by texture/cube-map and
-        // swapchain backbuffer getters carry their own server-side COM reference.
-        // Release it before unlinking the child handle; the parent owns its
-        // separate reference and remains responsible for its own destruction.
-        if (const auto it = gpD3DResources.find(pHandle); it != gpD3DResources.end()) {
-          if (it->second)
-            it->second->Release();
-          gpD3DResources.erase(it);
-        }
+        // Non-standalone child resources are owned by their container. The
+        // container's Destroy command is sent before its destructor unlinks
+        // child wrappers, and safeDestroy() releases the server-side COM refs.
+        // Only remove the now-stale child handle here; do not Release it again.
+        gpD3DResources.erase(pHandle);
         break;
       }
       case Bridge_UnlinkVolumeResource:
       {
         GET_HND(pHandle);
-        // GetVolumeLevel() returns an independently referenced child volume.
-        if (const auto it = gpD3DVolumes.find(pHandle); it != gpD3DVolumes.end()) {
-          if (it->second)
-            it->second->Release();
-          gpD3DVolumes.erase(it);
-        }
+        // Volume textures own their child volumes; the parent Destroy path
+        // releases their COM refs before the child handles are unlinked.
+        gpD3DVolumes.erase(pHandle);
         break;
       }
       /*
