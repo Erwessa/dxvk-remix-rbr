@@ -484,6 +484,8 @@ namespace Commands {
     D3D9VR_Create,
     D3D9VR_Destroy,
     D3D9VR_Invoke,
+    // Cancels an active BeginStateBlock recording and releases the temporary server block.
+    IDirect3DDevice9Ex_CancelStateBlock,
   };
 
   // Maybe this will be useful...  
@@ -656,6 +658,7 @@ namespace Commands {
     case IDirect3DDevice9Ex_CreateStateBlock: return "IDirect3DDevice9Ex_CreateStateBlock";
     case IDirect3DDevice9Ex_BeginStateBlock: return "IDirect3DDevice9Ex_BeginStateBlock";
     case IDirect3DDevice9Ex_EndStateBlock: return "IDirect3DDevice9Ex_EndStateBlock";
+    case IDirect3DDevice9Ex_CancelStateBlock: return "IDirect3DDevice9Ex_CancelStateBlock";
     case IDirect3DDevice9Ex_SetClipStatus: return "IDirect3DDevice9Ex_SetClipStatus";
     case IDirect3DDevice9Ex_GetClipStatus: return "IDirect3DDevice9Ex_GetClipStatus";
     case IDirect3DDevice9Ex_GetTexture: return "IDirect3DDevice9Ex_GetTexture";
