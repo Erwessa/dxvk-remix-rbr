@@ -179,6 +179,20 @@ protected:
     m_children[idx] = child;
   }
 
+  inline void removeChild(uint32_t idx) {
+    BRIDGE_PARENT_DEVICE_LOCKGUARD();
+    assert(idx < m_children.size() && "Child index overrun!");
+
+    auto* child = m_children[idx];
+    m_children[idx] = nullptr;
+    if (child) {
+      // Child wrappers share the container's refcount. Drop the reference
+      // acquired by the child's constructor before destroying the wrapper.
+      child->Release();
+      child->destroy();
+    }
+  }
+
   BaseDirect3DDevice9Ex_LSS* const m_pDevice;
   std::vector<ChildType*> m_children;
 };
