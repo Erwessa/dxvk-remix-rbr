@@ -278,6 +278,7 @@ HRESULT Direct3DSwapChain9_LSS::GetBackBuffer(UINT iBackBuffer, D3DBACKBUFFER_TY
 
 HRESULT Direct3DSwapChain9_LSS::GetRasterStatus(D3DRASTER_STATUS* pRasterStatus) {
   LogFunctionCall();
+  BRIDGE_PARENT_DEVICE_LOCKGUARD();
   // NOTE: Borrowed from DXVK
   // 
   // We could use D3DKMTGetScanLine but Wine doesn't implement that.
@@ -316,6 +317,7 @@ HRESULT Direct3DSwapChain9_LSS::GetRasterStatus(D3DRASTER_STATUS* pRasterStatus)
 
 HRESULT Direct3DSwapChain9_LSS::GetDisplayMode(D3DDISPLAYMODE* pMode) {
   LogFunctionCall();
+  BRIDGE_PARENT_DEVICE_LOCKGUARD();
   if (pMode == nullptr) {
     return D3DERR_INVALIDCALL;
   }
