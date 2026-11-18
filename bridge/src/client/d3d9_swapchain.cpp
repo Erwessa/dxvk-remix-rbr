@@ -288,12 +288,10 @@ HRESULT Direct3DSwapChain9_LSS::GetRasterStatus(D3DRASTER_STATUS* pRasterStatus)
   if (pRasterStatus == nullptr)
     return D3DERR_INVALIDCALL;
 
-  D3DDISPLAYMODEEX mode;
-  mode.Size = sizeof(mode);
-  D3DDISPLAYROTATION rotation;
+  D3DDISPLAYMODE mode;
   const UINT swapChainIndex = m_pDevice->getSwapChainIndex(this);
   if (swapChainIndex == static_cast<UINT>(-1)
-      || FAILED(m_pDevice->GetDisplayModeEx(swapChainIndex, &mode, &rotation)))
+      || FAILED(m_pDevice->GetDisplayMode(swapChainIndex, &mode)))
     return D3DERR_INVALIDCALL;
   if (mode.RefreshRate == 0)
     return D3DERR_NOTAVAILABLE;
