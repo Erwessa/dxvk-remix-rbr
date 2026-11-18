@@ -262,7 +262,21 @@ SharedHeap::AllocId SharedHeap::Instance::allocate(const size_t size) {
     return kInvalidId;
   }
 
-  const auto id = m_nextUid++;
+  AllocId id = kInvalidId;
+  for (size_t attempt = 0; attempt <= m_cache.size(); ++attempt) {
+    if (m_nextUid == kInvalidId) {
+      m_nextUid = 0;
+    }
+    const AllocId candidate = m_nextUid++;
+    if (m_cache.find(candidate) == m_cache.end()) {
+      id = candidate;
+      break;
+    }
+  }
+  if (id == kInvalidId) {
+    Logger::err("[SharedHeap][allocate] No unused allocation identifiers are available.");
+    return kInvalidId;
+  }
   m_cache[id] = alloc.firstChunk;
   m_allocations[alloc.firstChunk] = alloc.finalChunk;
   {
@@ -319,18 +333,22 @@ bool SharedHeap::Instance::allocate(const AllocId id, const ChunkId firstChunk, 
   m_allocationChunkCounts.emplace(id, numChunks);
   return true;
 }
-void SharedHeap::Instance::deallocate(const AllocId id) {
+bool SharedHeap::Instance::deallocate(const AllocId id) {
   const auto allocation = m_cache.find(id);
   const auto allocationSize = m_allocationChunkCounts.find(id);
   if (allocation == m_cache.end() || allocationSize == m_allocationChunkCounts.end()) {
     Logger::err(format_string("[SharedHeap] Rejecting deallocation of unknown allocation id %u.", id));
-    return;
+    return false;
   }
   const auto firstChunk = allocation->second;
-  assert(getChunkState(firstChunk) == ChunkState::Allocated);
+  if (getChunkState(firstChunk) != ChunkState::Allocated) {
+    Logger::err(format_string("[SharedHeap] Allocation id %u has an invalid chunk state during deallocation.", id));
+    return false;
+  }
   setChunkState(firstChunk, ChunkState::Deallocated);
   m_cache.erase(allocation);
   m_allocationChunkCounts.erase(allocationSize);
+  return true;
 }
 #endif
 
