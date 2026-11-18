@@ -68,13 +68,25 @@ extern bool gbBridgeRunning;
     } \
   } 
 
-#define WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(func, value, uidVal) \
+#define WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT(func, value, uidVal, ppOutput) \
   { \
     if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) { \
-      WAIT_FOR_SERVER_RESPONSE(func, value, uidVal) \
+      const uint32_t timeoutMs = GlobalOptions::getAckTimeout(); \
+      if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, timeoutMs, nullptr, true, uidVal)) { \
+        Logger::err(func " failed with: no response from server."); \
+        auto* pFailedObject = *(ppOutput); \
+        *(ppOutput) = nullptr; \
+        if (pFailedObject != nullptr) pFailedObject->Release(); \
+        return value; \
+      } \
       HRESULT res = (HRESULT) DeviceBridge::get_data(); \
       DeviceBridge::pop_front(); \
-      return  res; \
+      if (FAILED(res)) { \
+        auto* pFailedObject = *(ppOutput); \
+        *(ppOutput) = nullptr; \
+        if (pFailedObject != nullptr) pFailedObject->Release(); \
+      } \
+      return res; \
     } else { \
       return D3D_OK; \
     } \
