@@ -60,6 +60,7 @@ namespace bridge_util {
     if (m_lpvMem == NULL) {
       Logger::debug(format_string("The shared memory map view could not be created (error code %d)!", GetLastError()));
       CloseHandle(m_hMapObject);
+      m_hMapObject = nullptr;
       return false;
     }
 
@@ -73,10 +74,14 @@ namespace bridge_util {
   }
 
   void SharedMemory::releaseSharedMemory() {
-    // Unmap shared memory from the process's address space
-    auto ignore = UnmapViewOfFile(m_lpvMem);
-    // Close the process's handle to the file-mapping object
-    ignore = CloseHandle(m_hMapObject);
+    if (m_lpvMem != nullptr) {
+      UnmapViewOfFile(m_lpvMem);
+      m_lpvMem = nullptr;
+    }
+    if (m_hMapObject != nullptr) {
+      CloseHandle(m_hMapObject);
+      m_hMapObject = nullptr;
+    }
   }
 
 }
