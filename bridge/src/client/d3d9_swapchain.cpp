@@ -215,7 +215,13 @@ HRESULT Direct3DSwapChain9_LSS::Present(CONST RECT* pSourceRect, CONST RECT* pDe
 HRESULT Direct3DSwapChain9_LSS::GetFrontBufferData(IDirect3DSurface9* pDestSurface) {
   LogFunctionCall();
 
+  if (pDestSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const auto pLssDestinationSurface = bridge_cast<Direct3DSurface9_LSS*>(pDestSurface);
+  if (pLssDestinationSurface == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   const auto pIDestinationSurface = pLssDestinationSurface->D3D<IDirect3DSurface9>();
 
   DeviceBridge::ResponseTransaction responseTransaction;
