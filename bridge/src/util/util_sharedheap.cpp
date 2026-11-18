@@ -22,6 +22,7 @@
 #include "util_sharedheap.h"
 
 #include <limits>
+#include <stdexcept>
 
 #include "util_bytes.h"
 #include "util_devicecommand.h"
@@ -32,6 +33,29 @@
 using namespace bridge_util;
 
 using ChunkId = SharedHeap::ChunkId;
+
+namespace {
+  constexpr uint32_t kSharedHeapMaxSize = 2u << 30;
+
+  uint32_t getValidatedSharedHeapChunkSize() {
+    const uint32_t chunkSize = GlobalOptions::getSharedHeapChunkSize();
+    if (chunkSize == 0 || chunkSize > kSharedHeapMaxSize
+        || (chunkSize & (chunkSize - 1)) != 0) {
+      Logger::err(format_string("[SharedHeap] Invalid chunk size %u; expected a nonzero power of two no larger than 2 GiB.", chunkSize));
+      throw std::invalid_argument("Invalid SharedHeap chunk size");
+    }
+    return chunkSize;
+  }
+
+  uint32_t getValidatedSharedHeapDefaultSegmentSize(const uint32_t chunkSize) {
+    const uint32_t segmentSize = GlobalOptions::getSharedHeapDefaultSegmentSize();
+    if (segmentSize < chunkSize || segmentSize > kSharedHeapMaxSize) {
+      Logger::err(format_string("[SharedHeap] Invalid default segment size %u for chunk size %u.", segmentSize, chunkSize));
+      throw std::invalid_argument("Invalid SharedHeap default segment size");
+    }
+    return segmentSize;
+  }
+}
 
 void SharedHeap::init() {
   static bool bIsInit = false;
@@ -44,17 +68,21 @@ void SharedHeap::init() {
 }
 
 SharedHeap::Instance::Instance()
-  : m_chunkSize(GlobalOptions::getSharedHeapChunkSize())
-  , m_defaultSegmentSize(GlobalOptions::getSharedHeapDefaultSegmentSize())
+  : m_chunkSize(getValidatedSharedHeapChunkSize())
+  , m_defaultSegmentSize(getValidatedSharedHeapDefaultSegmentSize(m_chunkSize))
   , m_nChunks(0)
   , m_metaShMem("SharedHeap_meta", (kMax32BitHeapSize / m_chunkSize)) {
 #ifdef REMIX_BRIDGE_CLIENT
-  assert(GlobalOptions::getUseSharedHeap());
-  assert(m_defaultSegmentSize % m_chunkSize == 0);
+  if (!GlobalOptions::getUseSharedHeap()) {
+    throw std::invalid_argument("SharedHeap initialized while shared heap is disabled");
+  }
   for (ChunkId chunkId = 0; chunkId < (kMax32BitHeapSize / m_chunkSize); ++chunkId) {
     setChunkState(chunkId, ChunkState::Unallocated);
   }
-  addNewHeapSegment();
+  if (!addNewHeapSegment()) {
+    Logger::err("[SharedHeap] Failed to create the initial shared heap segment.");
+    throw std::runtime_error("Failed to initialize SharedHeap segment");
+  }
   assert(m_segments.size() == 1);
 #endif
 }
@@ -131,7 +159,7 @@ bool SharedHeap::Instance::addNewHeapSegment() {
   // Align segment size to chunk size
   size_t segmentSize = segmentSizeUnaligned & ~(m_chunkSize - 1);
   Logger::debug("[SharedHeap][addNewHeapSegment] Attempting to create new SharedHeap segment.");
-  while (!bSuccess && (segmentSize > m_chunkSize)) {
+  while (!bSuccess && (segmentSize >= m_chunkSize)) {
     try {
       m_segments.emplace_back(shMemName, segmentSize, m_chunkSize, m_nChunks);
       bSuccess = true;
@@ -140,7 +168,7 @@ bool SharedHeap::Instance::addNewHeapSegment() {
       Logger::debug(format_string(
         "[SharedHeap][addNewHeapSegment] Failed to create SharedHeap segment of size: %s",
         bridge_util::toByteUnitString(segmentSize).c_str()));
-      segmentSize = segmentSize >> 1; // cut in half
+      segmentSize = (segmentSize >> 1) & ~(m_chunkSize - 1); // halve and preserve chunk alignment
     }
   }
   if (bSuccess) {
