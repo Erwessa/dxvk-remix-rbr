@@ -524,7 +524,11 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::Reset(D3DPRESENT_PARAMETERS* pPresent
     }
 
     // Reset swapchain and link server backbuffer/depth buffer after the server reset its swapchain, or we will link to the old backbuffer/depth resources
-    initImplicitObjects(presParam);
+    const HRESULT implicitResult = initImplicitObjects(presParam);
+    if (FAILED(implicitResult)) {
+      releaseInternalObjects();
+      return implicitResult;
+    }
     // Keeping a track of previous present parameters, to detect and handle mode changes
     m_previousPresentParams = *pPresentationParameters;
   }
@@ -4060,17 +4064,36 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetState() {
 }
 
 template<bool EnableSync>
-void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitObjects(const D3DPRESENT_PARAMETERS& presParam) {
-  initImplicitSwapchain(presParam);
-  initImplicitRenderTarget();
-  if (presParam.EnableAutoDepthStencil) {
-    initImplicitDepthStencil();
+HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitObjects(const D3DPRESENT_PARAMETERS& presParam) {
+  HRESULT result = initImplicitSwapchain(presParam);
+  if (FAILED(result)) {
+    return result;
   }
+
+  result = initImplicitRenderTarget();
+  if (FAILED(result)) {
+    return result;
+  }
+
+  if (presParam.EnableAutoDepthStencil) {
+    result = initImplicitDepthStencil();
+    if (FAILED(result)) {
+      return result;
+    }
+  }
+
+  return D3D_OK;
 }
 
 template<bool EnableSync>
-void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitSwapchain(const D3DPRESENT_PARAMETERS& presParam) {
-  auto* const pLssSwapChain = trackWrapper(new Direct3DSwapChain9_LSS(this, presParam));
+HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitSwapchain(const D3DPRESENT_PARAMETERS& presParam) {
+  HRESULT initResult = D3D_OK;
+  auto* const pLssSwapChain = trackWrapper(new Direct3DSwapChain9_LSS(this, presParam, true, &initResult));
+  if (FAILED(initResult)) {
+    pLssSwapChain->Release();
+    return initResult;
+  }
+
   // To have a more consistent display when toggling windowed mode
   if (presParam.Windowed != m_previousPresentParams.Windowed && !(m_createParams.BehaviorFlags & D3DCREATE_NOWINDOWCHANGES)) {
     SetGammaRamp(0, 0, &m_gammaRamp);
@@ -4084,12 +4107,11 @@ void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitSwapchain(const D3DPRESENT_P
   }
 
   m_implicitRefCnt++;
+  return D3D_OK;
 }
 
 template<bool EnableSync>
-void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitRenderTarget() {
-  IDirect3DSurface9* pRenderTarget = nullptr;
-
+HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitRenderTarget() {
   // Creating a place-holder surface
   D3DSURFACE_DESC desc;
   desc.Width = GET_PRES_PARAM().BackBufferWidth;
@@ -4101,23 +4123,43 @@ void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitRenderTarget() {
   desc.Pool = D3DPOOL_DEFAULT;
   desc.Type = D3DRTYPE_SURFACE;
 
-  // Insert our own IDirect3DSurface9 interface implementation
-  Direct3DSurface9_LSS* pLssSurface = trackWrapper(new Direct3DSurface9_LSS(this, desc));
-  pRenderTarget = (IDirect3DSurface9*) pLssSurface;
+  m_pImplicitRenderTarget = trackWrapper(new Direct3DSurface9_LSS(this, desc));
 
-  m_pImplicitRenderTarget = bridge_cast<Direct3DSurface9_LSS*>(pRenderTarget);
+  DeviceBridge::ResponseTransaction responseTransaction;
+  UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DDevice9Ex_LinkBackBuffer, getId());
+    currentUID = c.get_uid();
     c.send_many(0, m_pImplicitRenderTarget->getId());
   }
+
+  if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
+    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+      Logger::err("LinkBackBuffer failed: no response from server.");
+      auto* failedSurface = m_pImplicitRenderTarget;
+      m_pImplicitRenderTarget = nullptr;
+      failedSurface->Release();
+      return D3DERR_DEVICELOST;
+    }
+    const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
+    DeviceBridge::pop_front();
+    if (FAILED(linkResult)) {
+      Logger::err(format_string("LinkBackBuffer failed: 0x%08x", linkResult));
+      auto* failedSurface = m_pImplicitRenderTarget;
+      m_pImplicitRenderTarget = nullptr;
+      failedSurface->Release();
+      return linkResult;
+    }
+  }
+
   m_state.renderTargets[0] = MakeD3DAutoPtr(m_pImplicitRenderTarget);
   m_implicitRefCnt++;
+  return D3D_OK;
 }
 
 template<bool EnableSync>
-void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitDepthStencil() {
+HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitDepthStencil() {
   assert(GET_PRES_PARAM().EnableAutoDepthStencil);
-  IDirect3DSurface9* pShadowDepthBuffer = nullptr;
 
   // Creating a place-holder surface
   D3DSURFACE_DESC desc;
@@ -4130,42 +4172,68 @@ void Direct3DDevice9Ex_LSS<EnableSync>::initImplicitDepthStencil() {
   desc.Pool = D3DPOOL_DEFAULT;
   desc.Type = D3DRTYPE_SURFACE;
 
-  Direct3DSurface9_LSS* pLssSurface = trackWrapper(new Direct3DSurface9_LSS(this, desc));
-  pShadowDepthBuffer = (IDirect3DSurface9*) pLssSurface;
+  m_pImplicitDepthStencil = trackWrapper(new Direct3DSurface9_LSS(this, desc));
 
-  m_pImplicitDepthStencil = bridge_cast<Direct3DSurface9_LSS*>(pShadowDepthBuffer);
+  DeviceBridge::ResponseTransaction responseTransaction;
+  UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DDevice9Ex_LinkAutoDepthStencil, getId());
+    currentUID = c.get_uid();
     c.send_data(m_pImplicitDepthStencil->getId());
   }
+
+  if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
+    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+      Logger::err("LinkAutoDepthStencil failed: no response from server.");
+      auto* failedSurface = m_pImplicitDepthStencil;
+      m_pImplicitDepthStencil = nullptr;
+      failedSurface->Release();
+      return D3DERR_DEVICELOST;
+    }
+    const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
+    DeviceBridge::pop_front();
+    if (FAILED(linkResult)) {
+      Logger::err(format_string("LinkAutoDepthStencil failed: 0x%08x", linkResult));
+      auto* failedSurface = m_pImplicitDepthStencil;
+      m_pImplicitDepthStencil = nullptr;
+      failedSurface->Release();
+      return linkResult;
+    }
+  }
+
   m_state.depthStencil = MakeD3DAutoPtr(m_pImplicitDepthStencil);
   m_implicitRefCnt++;
+  return D3D_OK;
 }
 
 template<bool EnableSync>
 void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects() {
   // Release implicit RenderTarget
-  const auto rtRefCnt = m_pImplicitRenderTarget->Release();
-  assert(rtRefCnt == 0 && "Implicit RenderTarget has not been released!");
-  m_pImplicitRenderTarget = nullptr;
-  --m_implicitRefCnt;
+  if (m_pImplicitRenderTarget != nullptr) {
+    const auto rtRefCnt = m_pImplicitRenderTarget->Release();
+    assert(rtRefCnt == 0 && "Implicit RenderTarget has not been released!");
+    m_pImplicitRenderTarget = nullptr;
+    --m_implicitRefCnt;
+  }
   m_state.renderTargets[0].reset(nullptr);
 
-  // Release implicit DepthStencil
-  if (GET_PRES_PARAM().EnableAutoDepthStencil) {
+  // Release implicit DepthStencil only when one was successfully linked.
+  if (m_pImplicitDepthStencil != nullptr) {
     const auto dsRefCnt = m_pImplicitDepthStencil->Release();
     assert(dsRefCnt == 0 && "Implicit DepthStencil has not been released!");
     m_pImplicitDepthStencil = nullptr;
     --m_implicitRefCnt;
-    m_state.depthStencil.reset(nullptr);
   }
+  m_state.depthStencil.reset(nullptr);
 
-  m_pSwapchain->releaseBackBufferReferences();
   // Release implicit SwapChain, must happen last so PresParam still exist prior
-  const auto scRefCnt = m_pSwapchain->Release();
-  assert(scRefCnt == 0 && "Implicit Swapchain has not been released!");
-  m_pSwapchain = nullptr;
-  --m_implicitRefCnt;
+  if (m_pSwapchain != nullptr) {
+    m_pSwapchain->releaseBackBufferReferences();
+    const auto scRefCnt = m_pSwapchain->Release();
+    assert(scRefCnt == 0 && "Implicit Swapchain has not been released!");
+    m_pSwapchain = nullptr;
+    --m_implicitRefCnt;
+  }
 }
 
 template<bool EnableSync>
