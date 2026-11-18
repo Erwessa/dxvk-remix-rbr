@@ -160,6 +160,8 @@ namespace dxvk {
     void publishExternalFrame(const void* owner, const OpenVrFrameState& frame);
     void invalidateExternalFrame(const void* owner);
     bool consumeExternalFrame(OpenVrFrameState& frame, bool& providerActive);
+    void markRtxFrameSubmitted(uint64_t frameIndex);
+    bool wasRtxFrameSubmittedForLatestExternalFrame();
 
     // Submits a completed left/right Vulkan image pair. The caller must hold
     // DxvkDevice's submission queue gate for the duration of this call.
@@ -197,6 +199,8 @@ namespace dxvk {
     bool m_externalFramePending = false;
     OpenVrMatrix4 m_lastValidTrackingFromHead = {};
     bool m_hasLastValidTrackingFromHead = false;
+    uint64_t m_latestExternalFrameIndex = 0;
+    uint64_t m_rtxSubmittedFrameIndex = 0;
     uint64_t m_frameIndex = 0;
     uint64_t m_waitGetPosesFailures = 0;
     bool m_initializedInsExt = false;
