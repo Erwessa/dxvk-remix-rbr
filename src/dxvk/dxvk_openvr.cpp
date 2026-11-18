@@ -586,20 +586,21 @@ namespace dxvk {
   }
 
 
-  void VrInstance::registerExternalFrameProvider(const void* owner) {
+  bool VrInstance::registerExternalFrameProvider(const void* owner) {
     std::lock_guard<dxvk::mutex> lock(m_mutex);
     if (!owner || !m_sceneSessionActive || m_sceneSessionOwners.find(owner) == m_sceneSessionOwners.end()) {
       Logger::warn("OpenVR: refusing external frame provider registration from a non-owner");
-      return;
+      return false;
     }
     if (m_externalFrameProvider && m_externalFrameProvider != owner) {
       Logger::warn("OpenVR: refusing a second external frame provider");
-      return;
+      return false;
     }
     m_externalFrameProvider = owner;
     m_externalFramePending = false;
     m_latestExternalFrameIndex = 0;
     m_rtxSubmittedFrameIndex = 0;
+    return true;
   }
 
 
