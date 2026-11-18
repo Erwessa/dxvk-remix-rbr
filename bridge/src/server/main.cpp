@@ -2054,6 +2054,7 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DQuery[pHandle] = ppQuery;
         }
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       /*
