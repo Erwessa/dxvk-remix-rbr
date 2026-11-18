@@ -146,6 +146,11 @@ protected:
                             const D3DDISPLAYMODEEX* const pFullscreenDisplayMode,
                             HRESULT& hresultOut);
 
+  template<typename T>
+  bool ownsResource(const T* resource) const {
+    return resource == nullptr || resource->getOwningDevice() == static_cast<const IUnknown*>(this);
+  }
+
   HWND getFocusHwnd() const { return m_createParams.hFocusWindow; }
   HWND getPresentationHwnd() const { return m_presParams.hDeviceWindow; }
   HWND getWinProcHwnd() const { return getPresentationHwnd() ? getPresentationHwnd() : getFocusHwnd(); }
