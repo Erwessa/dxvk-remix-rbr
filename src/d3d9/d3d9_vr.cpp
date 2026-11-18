@@ -6,6 +6,7 @@
 #include "d3d9_device.h"
 #include "d3d9_shader.h"
 #include "../dxvk/dxvk_openvr.h"
+#include "../util/util_defer.h"
 
 #include <atomic>
 #include <vector>
@@ -494,9 +495,9 @@ public:
     m_device->SynchronizeCsThread();
     auto device = m_device->GetDXVKDevice();
     device->lockSubmission();
+    DEFER(unlockSubmission, device->unlockSubmission(););
     OpenVrFrameState snapshot = {};
     const bool acquired = VrInstance::s_instance.acquireFrame(snapshot);
-    device->unlockSubmission();
     if (!acquired)
       return D3DERR_NOTAVAILABLE;
 
