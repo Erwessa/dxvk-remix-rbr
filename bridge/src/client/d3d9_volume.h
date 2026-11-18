@@ -52,6 +52,8 @@ public:
     , m_desc(desc) {
   }
 
+  ~Direct3DVolume9_LSS();
+
   /*** IUnknown methods ***/
   STDMETHOD(QueryInterface)(THIS_ REFIID riid, void** ppvObj);
   STDMETHOD_(ULONG, AddRef)(THIS);
