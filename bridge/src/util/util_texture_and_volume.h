@@ -27,6 +27,7 @@
 #include <d3d9.h>
 #include <algorithm>
 #include <functional>
+#include <limits>
 
  // Driver Hacks / Unofficial Formats
 #define D3DFMT_ATI1 MAKEFOURCC('A', 'T', 'I', '1')
@@ -244,23 +245,34 @@ namespace bridge_util {
       : 0;
   }
 
+  // Returns zero when the row size cannot be represented by the 32-bit
+  // pitch/size fields used by the D3D9 bridge.
   static inline uint32_t calcRowSize(const uint32_t width, const D3DFORMAT format) {
-    const uint32_t numPixelsInRow = calcStride(width, format);
-    const uint32_t bytesPerPixel = getBytesFromFormat(format);
-    return std::max(caps::MinSurfacePitch, numPixelsInRow * bytesPerPixel);
+    const uint64_t numPixelsInRow = calcStride(width, format);
+    const uint64_t bytesPerPixel = getBytesFromFormat(format);
+    const uint64_t rowSize = std::max<uint64_t>(
+      caps::MinSurfacePitch, numPixelsInRow * bytesPerPixel);
+    return rowSize <= std::numeric_limits<uint32_t>::max()
+      ? static_cast<uint32_t>(rowSize)
+      : 0;
   }
 
+  // Returns zero when the complete image size overflows the bridge's
+  // 32-bit surface-size representation.
   static inline uint32_t calcTotalSizeOfRect(const uint32_t width, const uint32_t height, const D3DFORMAT format) {
-    const uint32_t numRows = calcStride(height, format);
-    const uint32_t rowSize = calcRowSize(width, format);
-    return numRows * rowSize;
+    const uint64_t numRows = calcStride(height, format);
+    const uint64_t rowSize = calcRowSize(width, format);
+    const uint64_t totalSize = numRows * rowSize;
+    return rowSize != 0 && totalSize <= std::numeric_limits<uint32_t>::max()
+      ? static_cast<uint32_t>(totalSize)
+      : 0;
   }
 
   static inline size_t calcImageByteOffset(const int32_t pitch, const RECT& rect, const D3DFORMAT format) {
-    const uint32_t y = calcStride(rect.top, format); // unit: unitless ('y' is a row ID); pitch unit: bytes
-    const uint32_t x = calcStride(rect.left, format); // unit: pixels
-    const uint32_t bytesPerPixel = getBytesFromFormat(format);
-    return  y * pitch + bytesPerPixel * x;
+    const size_t y = calcStride(static_cast<uint32_t>(rect.top), format);
+    const size_t x = calcStride(static_cast<uint32_t>(rect.left), format);
+    const size_t bytesPerPixel = getBytesFromFormat(format);
+    return y * static_cast<size_t>(pitch) + bytesPerPixel * x;
   }
 
   struct RectDecompInfo {
