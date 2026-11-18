@@ -406,12 +406,11 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
 
   const auto presentationParameters = Direct3DSwapChain9_LSS::sanitizePresentationParameters(*pPresentationParameters, getCreateParams());
 
-  // Insert our own IDirect3DTexture9 interface implementation
-  Direct3DSwapChain9_LSS* pLssSwapChain = trackWrapper(new Direct3DSwapChain9_LSS(this, presentationParameters));
+  // Additional swapchains must be created on the server before their BackBuffers are linked.
+  Direct3DSwapChain9_LSS* pLssSwapChain = trackWrapper(new Direct3DSwapChain9_LSS(this, presentationParameters, false));
   (*ppSwapChain) = pLssSwapChain;
 
   DeviceBridge::ResponseTransaction responseTransaction;
-
   UID currentUID = 0;
   {
     ClientMessage c(Commands::IDirect3DDevice9Ex_CreateAdditionalSwapChain, getId());
@@ -419,7 +418,30 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
     c.send_data((uint32_t) pLssSwapChain->getId());
     c.send_data(sizeof(D3DPRESENT_PARAMETERS), &presentationParameters);
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateAdditionalSwapChain()", D3DERR_NOTAVAILABLE, currentUID, ppSwapChain);
+
+  if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
+    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+      Logger::err("CreateAdditionalSwapChain() failed: no response from server.");
+      *ppSwapChain = nullptr;
+      pLssSwapChain->Release();
+      return D3DERR_NOTAVAILABLE;
+    }
+    const HRESULT createResult = (HRESULT) DeviceBridge::get_data();
+    DeviceBridge::pop_front();
+    if (FAILED(createResult)) {
+      *ppSwapChain = nullptr;
+      pLssSwapChain->Release();
+      return createResult;
+    }
+  }
+
+  const HRESULT backBufferResult = pLssSwapChain->initializeBackBuffers();
+  if (FAILED(backBufferResult)) {
+    *ppSwapChain = nullptr;
+    pLssSwapChain->Release();
+    return backBufferResult;
+  }
+  return D3D_OK;
 }
 
 template<bool EnableSync>
