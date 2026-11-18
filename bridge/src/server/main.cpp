@@ -3420,7 +3420,9 @@ void ProcessDeviceCommandQueue() {
         if (vrInterface) {
           switch (static_cast<D3D9VRCommand>(methodValue)) {
           case D3D9VRCommand::InitializeOpenVRScene:
+            OutputDebugStringA("[Bridge x64] InitializeOpenVRScene: dispatch entered\\n");
             hresult = vrInterface->InitializeOpenVRScene();
+            OutputDebugStringA("[Bridge x64] InitializeOpenVRScene: runtime call returned\\n");
             break;
 
           case D3D9VRCommand::AcquireOpenVRFrame:
