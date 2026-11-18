@@ -199,8 +199,8 @@ public:
       m_device->Flush();
       m_device->SynchronizeCsThread();
     }
-    m_device->GetDXVKDevice()->waitForIdle();
-    return D3D_OK;
+    const VkResult result = m_device->GetDXVKDevice()->waitForIdle();
+    return result == VK_SUCCESS ? D3D_OK : D3DERR_NOTAVAILABLE;
   }
 
   HRESULT STDMETHODCALLTYPE WaitGraphicsQueueIdle(BOOL flush) {
