@@ -20,8 +20,13 @@ public:
 
   ~D3D9VR() {
     restorePendingVrImages();
-    if (m_openVrSceneSession)
+    if (m_openVrSceneSession) {
+      // OpenVR may still have asynchronous compositor work queued for textures
+      // submitted by this owner. Drain this device before releasing the scene
+      // claim, which may perform the final OpenVR_Shutdown.
+      m_device->GetDXVKDevice()->waitForIdle();
       VrInstance::s_instance.shutdownSceneSession(this);
+    }
   }
 
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) {
