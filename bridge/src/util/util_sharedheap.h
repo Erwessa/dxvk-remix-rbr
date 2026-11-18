@@ -39,6 +39,11 @@ namespace bridge_util {
     static BYTE* getBuf(const AllocId id) {
       return get().getBuf(id);
     }
+#ifdef REMIX_BRIDGE_CLIENT
+    static BYTE* getBuf(const AllocId id, const size_t offset, const size_t size) {
+      return get().getBuf(id, offset, size);
+    }
+#endif
 #ifdef REMIX_BRIDGE_SERVER
     static BYTE* getBuf(const AllocId id, const size_t offset, const size_t size) {
       return get().getBuf(id, offset, size);
@@ -73,6 +78,9 @@ namespace bridge_util {
     public:
       Instance();
       BYTE* getBuf(const AllocId id);
+#ifdef REMIX_BRIDGE_CLIENT
+      BYTE* getBuf(const AllocId id, const size_t offset, const size_t size);
+#endif
 #ifdef REMIX_BRIDGE_SERVER
       BYTE* getBuf(const AllocId id, const size_t offset, const size_t size);
 #endif
