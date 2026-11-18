@@ -394,6 +394,9 @@ BOOL Direct3DDevice9Ex_LSS<EnableSync>::ShowCursor(BOOL bShow) {
 
 template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_PARAMETERS* pPresentationParameters, IDirect3DSwapChain9** ppSwapChain) {
+  if (ppSwapChain == nullptr) {
+    return D3DERR_INVALIDCALL;
+  }
   ZoneScoped;
   LogFunctionCall();
 
@@ -416,7 +419,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateAdditionalSwapChain(D3DPRESENT_
     c.send_data((uint32_t) pLssSwapChain->getId());
     c.send_data(sizeof(D3DPRESENT_PARAMETERS), &presentationParameters);
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateAdditionalSwapChain()", D3DERR_NOTAVAILABLE, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateAdditionalSwapChain()", D3DERR_NOTAVAILABLE, currentUID, ppSwapChain);
 }
 
 template<bool EnableSync>
@@ -642,7 +645,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateTexture(UINT Width, UINT Height
       c.send_many(Width, Height, Levels, Usage, Format, Pool, (uint32_t) pLssTexture->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateTexture()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateTexture()", D3DERR_INVALIDCALL, currentUID, ppTexture);
 }
 
 template<bool EnableSync>
@@ -672,7 +675,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateVolumeTexture(UINT Width, UINT 
       c.send_many(Width, Height, Depth, Levels, Usage, Format, Pool, (uint32_t) pLssVolumeTexture->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateVolumeTexture()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateVolumeTexture()", D3DERR_INVALIDCALL, currentUID, ppVolumeTexture);
 }
 
 template<bool EnableSync>
@@ -702,7 +705,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateCubeTexture(UINT EdgeLength, UI
       c.send_many(EdgeLength, Levels, Usage, Format, Pool, (uint32_t) pLssCubeTexture->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateCubeTexture()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateCubeTexture()", D3DERR_INVALIDCALL, currentUID, ppCubeTexture);
 }
 
 template<bool EnableSync>
@@ -729,7 +732,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateVertexBuffer(UINT Length, DWORD
       c.send_many(Length, Usage, FVF, Pool, (uint32_t) pLssVertexBuffer->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateVertexBuffer()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateVertexBuffer()", D3DERR_INVALIDCALL, currentUID, ppVertexBuffer);
 }
 
 template<bool EnableSync>
@@ -757,7 +760,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateIndexBuffer(UINT Length, DWORD 
       c.send_many(Length, Usage, Format, Pool, (uint32_t) pLssIndexBuffer->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateIndexBuffer()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateIndexBuffer()", D3DERR_INVALIDCALL, currentUID, ppIndexBuffer);
 }
 
 template<bool EnableSync>
@@ -794,7 +797,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateRenderTarget(UINT Width, UINT H
       c.send_many(Width, Height, Format, MultiSample, MultisampleQuality, Lockable, pLssSurface->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateRenderTarget()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateRenderTarget()", D3DERR_INVALIDCALL, currentUID, ppSurface);
 }
 
 template<bool EnableSync>
@@ -829,7 +832,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateDepthStencilSurface(UINT Width,
       c.send_many(Width, Height, Format, MultiSample, MultisampleQuality, Discard, pLssSurface->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateDepthStencilSurface()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateDepthStencilSurface()", D3DERR_INVALIDCALL, currentUID, ppSurface);
 }
 
 template<bool EnableSync>
@@ -1032,7 +1035,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateOffscreenPlainSurface(UINT Widt
       c.send_many(Width, Height, Format, Pool, pLssSurface->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateOffscreenPlainSurface()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateOffscreenPlainSurface()", D3DERR_INVALIDCALL, currentUID, ppSurface);
 }
 
 template<bool EnableSync>
@@ -2606,7 +2609,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateVertexDeclaration(CONST D3DVERT
       c.send_data((uint32_t) pLssVtxDecl->getId());
     }
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateVertexDeclaration()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateVertexDeclaration()", D3DERR_INVALIDCALL, currentUID, ppDecl);
 }
 
 template<bool EnableSync>
@@ -2726,7 +2729,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateVertexShader(CONST DWORD* pFunc
     c.send_data(dataSize, (void*) pFunction);
     
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateVertexShader()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateVertexShader()", D3DERR_INVALIDCALL, currentUID, ppShader);
 }
 
 template<bool EnableSync>
@@ -3153,7 +3156,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreatePixelShader(CONST DWORD* pFunct
     c.send_data(dataSize);
     c.send_data(dataSize, (void*) pFunction);
   }
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreatePixelShader()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreatePixelShader()", D3DERR_INVALIDCALL, currentUID, ppShader);
 }
 
 template<bool EnableSync>
@@ -3579,7 +3582,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateRenderTargetEx(UINT Width, UINT
     c.send_many(Width, Height, Format, MultiSample, MultisampleQuality, Lockable, Usage, pLssSurface->getId());
   }
 
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateRenderTargetEx()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateRenderTargetEx()", D3DERR_INVALIDCALL, currentUID, ppSurface);
 }
 
 template<bool EnableSync>
@@ -3616,7 +3619,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateOffscreenPlainSurfaceEx(UINT Wi
     c.send_many(Width, Height, Format, Pool, Usage, pLssSurface->getId());
   }
 
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateOffscreenPlainSurfaceEx()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateOffscreenPlainSurfaceEx()", D3DERR_INVALIDCALL, currentUID, ppSurface);
 }
 
 template<bool EnableSync>
@@ -3651,7 +3654,7 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::CreateDepthStencilSurfaceEx(UINT Widt
     c.send_many(Width, Height, Format, MultiSample, MultisampleQuality, Discard, Usage, pLssSurface->getId());
   }
 
-  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE("CreateDepthStencilSurfaceEx()", D3DERR_INVALIDCALL, currentUID);
+  WAIT_FOR_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE_WITH_OUTPUT("CreateDepthStencilSurfaceEx()", D3DERR_INVALIDCALL, currentUID, ppSurface);
 }
 
 template<bool EnableSync>
