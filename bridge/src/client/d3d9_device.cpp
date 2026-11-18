@@ -2111,6 +2111,9 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::EndStateBlock(IDirect3DStateBlock9** 
     return result;
   }
 
+  // The recorded setters changed the real device while the block was being
+  // built. Bring the client shadow up to date before exposing the block.
+  recording->StateTransfer(recording->m_dirtyFlags, recording->m_captureState, m_state);
   recording->markServerCreated();
   *ppSB = recording;
   return result;
@@ -4321,9 +4324,10 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::ResetState() {
     m_state.streamFreqs[i] = 1;
   }
 
-  // Set The Current Texture Palette entry to it's default
-  // found through experimentation.
+  // Reset state-block tracked values to their D3D9 defaults.
   m_state.currentTexturePalette = 65535;
+  m_state.nPatchMode = 0.0f;
+  m_state.fvf = 0;
 
   return S_OK;
 }
