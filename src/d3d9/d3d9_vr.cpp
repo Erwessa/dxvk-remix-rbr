@@ -486,10 +486,17 @@ public:
     if (!m_openVrSceneSession)
       return D3DERR_NOTAVAILABLE;
 
-    // WaitGetPoses does not access the Vulkan queue. Keep the wait outside
-    // DXVK's submission lock so the compositor cannot stall command submission.
+    // WaitGetPoses may access the Vulkan queue unless Explicit Timing mode
+    // and application-owned PostPresentHandoff are enabled. The compositor
+    // session may be host-owned, so serialize this call with DXVK queue access
+    // instead of changing the host's global compositor timing mode.
+    D3D9DeviceLock lock = m_device->LockDevice();
+    m_device->SynchronizeCsThread();
+    auto device = m_device->GetDXVKDevice();
+    device->lockSubmission();
     OpenVrFrameState snapshot = {};
     const bool acquired = VrInstance::s_instance.acquireFrame(snapshot);
+    device->unlockSubmission();
     if (!acquired)
       return D3DERR_NOTAVAILABLE;
 
