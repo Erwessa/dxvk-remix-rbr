@@ -4141,23 +4141,21 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitRenderTarget() {
     c.send_many(0, m_pImplicitRenderTarget->getId());
   }
 
-  if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
-    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
-      Logger::err("LinkBackBuffer failed: no response from server.");
-      auto* failedSurface = m_pImplicitRenderTarget;
-      m_pImplicitRenderTarget = nullptr;
-      failedSurface->Release();
-      return D3DERR_DEVICELOST;
-    }
-    const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
-    DeviceBridge::pop_front();
-    if (FAILED(linkResult)) {
-      Logger::err(format_string("LinkBackBuffer failed: 0x%08x", linkResult));
-      auto* failedSurface = m_pImplicitRenderTarget;
-      m_pImplicitRenderTarget = nullptr;
-      failedSurface->Release();
-      return linkResult;
-    }
+  if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("LinkBackBuffer failed: no response from server.");
+    auto* failedSurface = m_pImplicitRenderTarget;
+    m_pImplicitRenderTarget = nullptr;
+    failedSurface->Release();
+    return D3DERR_DEVICELOST;
+  }
+  const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(linkResult)) {
+    Logger::err(format_string("LinkBackBuffer failed: 0x%08x", linkResult));
+    auto* failedSurface = m_pImplicitRenderTarget;
+    m_pImplicitRenderTarget = nullptr;
+    failedSurface->Release();
+    return linkResult;
   }
 
   m_state.renderTargets[0] = MakeD3DAutoPtr(m_pImplicitRenderTarget);
@@ -4190,23 +4188,21 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitDepthStencil() {
     c.send_data(m_pImplicitDepthStencil->getId());
   }
 
-  if (GlobalOptions::getSendCreateFunctionServerResponses() || GlobalOptions::getSendAllServerResponses()) {
-    if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
-      Logger::err("LinkAutoDepthStencil failed: no response from server.");
-      auto* failedSurface = m_pImplicitDepthStencil;
-      m_pImplicitDepthStencil = nullptr;
-      failedSurface->Release();
-      return D3DERR_DEVICELOST;
-    }
-    const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
-    DeviceBridge::pop_front();
-    if (FAILED(linkResult)) {
-      Logger::err(format_string("LinkAutoDepthStencil failed: 0x%08x", linkResult));
-      auto* failedSurface = m_pImplicitDepthStencil;
-      m_pImplicitDepthStencil = nullptr;
-      failedSurface->Release();
-      return linkResult;
-    }
+  if (Result::Success != DeviceBridge::waitForCommand(Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("LinkAutoDepthStencil failed: no response from server.");
+    auto* failedSurface = m_pImplicitDepthStencil;
+    m_pImplicitDepthStencil = nullptr;
+    failedSurface->Release();
+    return D3DERR_DEVICELOST;
+  }
+  const HRESULT linkResult = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(linkResult)) {
+    Logger::err(format_string("LinkAutoDepthStencil failed: 0x%08x", linkResult));
+    auto* failedSurface = m_pImplicitDepthStencil;
+    m_pImplicitDepthStencil = nullptr;
+    failedSurface->Release();
+    return linkResult;
   }
 
   m_state.depthStencil = MakeD3DAutoPtr(m_pImplicitDepthStencil);
