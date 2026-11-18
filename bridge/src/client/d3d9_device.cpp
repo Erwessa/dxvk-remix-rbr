@@ -4092,12 +4092,18 @@ HRESULT Direct3DDevice9Ex_LSS<EnableSync>::initImplicitSwapchain(const D3DPRESEN
     return initResult;
   }
 
+  const HRESULT resetResult = pLssSwapChain->reset(presParam);
+  if (FAILED(resetResult)) {
+    pLssSwapChain->releaseBackBufferReferences();
+    pLssSwapChain->Release();
+    return resetResult;
+  }
+
   // To have a more consistent display when toggling windowed mode
   if (presParam.Windowed != m_previousPresentParams.Windowed && !(m_createParams.BehaviorFlags & D3DCREATE_NOWINDOWCHANGES)) {
     SetGammaRamp(0, 0, &m_gammaRamp);
   }
   m_pSwapchain = pLssSwapChain;
-  m_pSwapchain->reset(presParam);
   {
     gSwapChainMapMutex.lock();
     gSwapChainMap[m_pSwapchain->getPresentationParameters().hDeviceWindow] = { m_pSwapchain->getPresentationParameters(), this->getCreateParams(),  m_pSwapchain->getId()};
