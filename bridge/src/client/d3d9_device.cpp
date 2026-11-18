@@ -4249,30 +4249,33 @@ HRESULT BaseDirect3DDevice9Ex_LSS::getShaderConstants(const uint32_t startRegist
     return result;
   }
 
-  const auto& recordedConstants = ShaderT == ShaderType::Vertex
-    ? m_stateRecording->m_captureState.vertexConstants
-    : m_stateRecording->m_captureState.pixelConstants;
-  const auto& dirtyConstants = ShaderT == ShaderType::Vertex
-    ? m_stateRecording->m_dirtyFlags.vertexConstants
-    : m_stateRecording->m_dirtyFlags.pixelConstants;
-
-  for (uint32_t i = 0; i < adjCount; i++) {
-    const uint32_t registerIndex = startRegister + i;
-    if constexpr (ConstantT == ConstantType::Float) {
-      if (dirtyConstants.fConsts[registerIndex]) {
-        std::memcpy(pConstantData + i * 4, recordedConstants.fConsts[registerIndex].data, sizeof(Vec4f));
-      }
-    } else if constexpr (ConstantT == ConstantType::Int) {
-      if (dirtyConstants.iConsts[registerIndex]) {
-        std::memcpy(pConstantData + i * 4, recordedConstants.iConsts[registerIndex].data, sizeof(Vec4i));
-      }
-    } else {
-      if (dirtyConstants.bConsts[registerIndex]) {
-        const uint32_t arrayIdx = registerIndex / 32;
-        const uint32_t bitIdx = registerIndex % 32;
-        pConstantData[i] = (recordedConstants.bConsts[arrayIdx] & (1u << bitIdx)) ? TRUE : FALSE;
+  auto applyRecordedConstants = [&](const auto& recordedConstants, const auto& dirtyConstants) {
+    for (uint32_t i = 0; i < adjCount; i++) {
+      const uint32_t registerIndex = startRegister + i;
+      if constexpr (ConstantT == ConstantType::Float) {
+        if (dirtyConstants.fConsts[registerIndex]) {
+          std::memcpy(pConstantData + i * 4, recordedConstants.fConsts[registerIndex].data, sizeof(Vec4f));
+        }
+      } else if constexpr (ConstantT == ConstantType::Int) {
+        if (dirtyConstants.iConsts[registerIndex]) {
+          std::memcpy(pConstantData + i * 4, recordedConstants.iConsts[registerIndex].data, sizeof(Vec4i));
+        }
+      } else {
+        if (dirtyConstants.bConsts[registerIndex]) {
+          const uint32_t arrayIdx = registerIndex / 32;
+          const uint32_t bitIdx = registerIndex % 32;
+          pConstantData[i] = (recordedConstants.bConsts[arrayIdx] & (1u << bitIdx)) ? TRUE : FALSE;
+        }
       }
     }
+  };
+
+  if constexpr (ShaderT == ShaderType::Vertex) {
+    applyRecordedConstants(m_stateRecording->m_captureState.vertexConstants,
+                           m_stateRecording->m_dirtyFlags.vertexConstants);
+  } else {
+    applyRecordedConstants(m_stateRecording->m_captureState.pixelConstants,
+                           m_stateRecording->m_dirtyFlags.pixelConstants);
   }
   return result;
 }
