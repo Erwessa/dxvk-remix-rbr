@@ -64,7 +64,7 @@ namespace bridge_util {
       if (ghSemaphore == nullptr) {
         const DWORD err = GetLastError();
         std::stringstream ss;
-        ss << "CreateSemaphore failed with error code " << err << " (0x" << std::hex << err << ")\\n";
+        ss << "CreateSemaphore failed with error code " << err << " (0x" << std::hex << err << ")\n";
         Logger::err(ss.str());
       } else if (GetLastError() == ERROR_ALREADY_EXISTS) {
         Logger::debug(format_string("CreateSemaphore returned existing semaphore by the same name %s.", name.c_str()));
