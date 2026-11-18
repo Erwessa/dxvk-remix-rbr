@@ -202,11 +202,27 @@ HRESULT Direct3DStateBlock9_LSS::Capture() {
   if (!m_serverCreated || m_pDevice->m_stateRecording) {
     return D3DERR_INVALIDCALL;
   }
-  LocalCapture();
+
+  // Do not update the local snapshot until the server confirms Capture().
+  bridge_util::ResponseTransaction transaction;
+  UID currentUID = 0;
   {
-    ClientMessage { Commands::IDirect3DStateBlock9_Capture, getId() };
+    ClientMessage c(Commands::IDirect3DStateBlock9_Capture, getId());
+    currentUID = c.get_uid();
   }
-  return S_OK;
+  if (Result::Success != DeviceBridge::waitForCommand(
+        Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("StateBlock::Capture() failed: no response from server.");
+    return D3DERR_DEVICELOST;
+  }
+  const HRESULT result = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(result)) {
+    return result;
+  }
+
+  LocalCapture();
+  return result;
 }
 
 HRESULT Direct3DStateBlock9_LSS::Apply() {
@@ -215,13 +231,27 @@ HRESULT Direct3DStateBlock9_LSS::Apply() {
   if (!m_serverCreated) {
     return D3DERR_INVALIDCALL;
   }
-  // Same lock order as the setters: the client bridge mutex, then the channel (inside ClientMessage).
+
+  // The server is authoritative: update the local shadow only after Apply succeeds.
   bridge_util::ResponseTransaction transaction;
-  StateTransfer(m_dirtyFlags, m_captureState, m_pDevice->m_state);
+  UID currentUID = 0;
   {
-    ClientMessage { Commands::IDirect3DStateBlock9_Apply, getId() };
+    ClientMessage c(Commands::IDirect3DStateBlock9_Apply, getId());
+    currentUID = c.get_uid();
   }
+  if (Result::Success != DeviceBridge::waitForCommand(
+        Commands::Bridge_Response, GlobalOptions::getAckTimeout(), nullptr, true, currentUID)) {
+    Logger::err("StateBlock::Apply() failed: no response from server.");
+    return D3DERR_DEVICELOST;
+  }
+  const HRESULT result = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  if (FAILED(result)) {
+    return result;
+  }
+
+  StateTransfer(m_dirtyFlags, m_captureState, m_pDevice->m_state);
   // The server's state now holds the block's values; the sent-state shadow (A3a) no longer knows it.
   m_pDevice->invalidateSentState();
-  return S_OK;
+  return result;
 }
