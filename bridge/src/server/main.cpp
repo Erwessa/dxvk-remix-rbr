@@ -119,6 +119,14 @@ using namespace remixapi::util;
               break; \
             } \
             const auto& name = name##It->second
+#define GET_RES_BY_HANDLE(name, map, handle) \
+            const auto name##It = (map).find(handle); \
+            if ((handle) == NULL || name##It == (map).cend() || name##It->second == nullptr) { \
+              Logger::err(format_string("[Bridge] Invalid or unknown object handle %u; stopping the bridge.", (unsigned) (handle))); \
+              gbBridgeRunning = false; \
+              break; \
+            } \
+            const auto& name = name##It->second
 
 // NOTE: MSDN states HWNDs are safe to cross x86-->x64 boundary, and that a truncating cast should be used:
 // https://docs.microsoft.com/en-us/windows/win32/winprog64/interprocess-communication?redirectedfrom=MSDN
@@ -1285,10 +1293,8 @@ void ProcessDeviceCommandQueue() {
         PULL_OBJ(RECT, pSourceRect);
         PULL_HND(pDestHandle);
         PULL_OBJ(POINT, pDestPoint);
-        const auto& pSourceSurface = (IDirect3DSurface9*) gpD3DResources[pSourceHandle];
-        assert(pSourceSurface != nullptr);
-        const auto& pDestinationSurface = (IDirect3DSurface9*) gpD3DResources[pDestHandle];
-        assert(pDestinationSurface != nullptr);
+        GET_RES_BY_HANDLE(pSourceSurface, gpD3DResources, pSourceHandle);
+        GET_RES_BY_HANDLE(pDestinationSurface, gpD3DResources, pDestHandle);
         if (pSourceSurface != nullptr && pDestinationSurface != nullptr) {
           hresult = pD3DDevice->UpdateSurface(IN pSourceSurface, IN pSourceRect, IN pDestinationSurface, IN pDestPoint);
           assert(SUCCEEDED(hresult));
@@ -1302,10 +1308,8 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_HND(pSourceTextureHandle);
         PULL_HND(pDestinationTextureHandle);
-        const auto& pSourceTexture = (IDirect3DBaseTexture9*) gpD3DResources[pSourceTextureHandle];
-        assert(pSourceTexture != nullptr);
-        const auto& pDestinationTexture = (IDirect3DBaseTexture9*) gpD3DResources[pDestinationTextureHandle];
-        assert(pDestinationTexture != nullptr);
+        GET_RES_BY_HANDLE(pSourceTexture, gpD3DResources, pSourceTextureHandle);
+        GET_RES_BY_HANDLE(pDestinationTexture, gpD3DResources, pDestinationTextureHandle);
         if (pSourceTexture != nullptr && pDestinationTexture != nullptr) {
           hresult = pD3DDevice->UpdateTexture(IN pSourceTexture, IN pDestinationTexture);
           assert(SUCCEEDED(hresult));
@@ -1318,8 +1322,8 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_HND(pRenderTargetHandle);
         PULL_HND(pDestSurfaceHandle);
-        const auto& pRenderTarget = (IDirect3DSurface9*) gpD3DResources[pRenderTargetHandle];
-        const auto& pDestSurface = (IDirect3DSurface9*) gpD3DResources[pDestSurfaceHandle];
+        GET_RES_BY_HANDLE(pRenderTarget, gpD3DResources, pRenderTargetHandle);
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestSurfaceHandle);
         auto hresult = pD3DDevice->GetRenderTargetData(IN pRenderTarget, IN pDestSurface);
         hresult = ReturnSurfaceDataToClient(pDestSurface, hresult, currentUID);
         assert(SUCCEEDED(hresult));
@@ -1345,8 +1349,8 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pDestHandle);
         PULL_OBJ(RECT, pDestRect);
         PULL(D3DTEXTUREFILTERTYPE, Filter);
-        const auto& pSourceSurface = (IDirect3DSurface9*) gpD3DResources[pSourceHandle];
-        const auto& pDestSurface = (IDirect3DSurface9*) gpD3DResources[pDestHandle];
+        GET_RES_BY_HANDLE(pSourceSurface, gpD3DResources, pSourceHandle);
+        GET_RES_BY_HANDLE(pDestSurface, gpD3DResources, pDestHandle);
         const auto hresult = pD3DDevice->StretchRect(IN pSourceSurface, IN pSourceRect, IN pDestSurface, IN pDestRect, IN Filter);
         assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
@@ -1358,7 +1362,7 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pHandle);
         PULL_OBJ(RECT, pRect);
         PULL_OBJ(D3DCOLOR, color);
-        const auto& pSurface = (IDirect3DSurface9*) gpD3DResources[pHandle];
+        GET_RES_BY_HANDLE(pSurface, gpD3DResources, pHandle);
         const auto hresult = pD3DDevice->ColorFill(IN pSurface, IN pRect, IN * color);
         assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
@@ -1773,8 +1777,8 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pVertexDeclHandle);
         PULL(DWORD, Flags);
 
-        const auto& pVertexDecl = gpD3DVertexDeclarations[pVertexDeclHandle];
-        const auto& pDestBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pVertexBufferHandle];
+        GET_RES_BY_HANDLE(pVertexDecl, gpD3DVertexDeclarations, pVertexDeclHandle);
+        GET_RES_BY_HANDLE(pDestBuffer, gpD3DResources, pVertexBufferHandle);
 
         const auto hresult = pD3DDevice->ProcessVertices(SrcStartIndex, DestIndex, VertexCount, pDestBuffer, pVertexDecl, Flags);
         assert(SUCCEEDED(hresult));
@@ -2053,11 +2057,10 @@ void ProcessDeviceCommandQueue() {
         PULL(D3DCOMPOSERECTSOP, Operation);
         PULL(int, Xoffset);
         PULL(int, Yoffset);
-        const auto& srcSurface = (IDirect3DSurface9*) gpD3DResources[pSrcSurface];
-        const auto& destSurface = (IDirect3DSurface9*) gpD3DResources[pDestSurface];
-
-        const auto& srcVertexBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pSrcRect];
-        const auto& destVertexBuffer = (IDirect3DVertexBuffer9*) gpD3DResources[pDestRect];
+        GET_RES_BY_HANDLE(srcSurface, gpD3DResources, pSrcSurface);
+        GET_RES_BY_HANDLE(destSurface, gpD3DResources, pDestSurface);
+        GET_RES_BY_HANDLE(srcVertexBuffer, gpD3DResources, pSrcRect);
+        GET_RES_BY_HANDLE(destVertexBuffer, gpD3DResources, pDestRect);
 
         const auto hresult = ((IDirect3DDevice9Ex*) pD3DDevice)->ComposeRects(IN srcSurface, IN destSurface, IN srcVertexBuffer, IN NumRects, IN destVertexBuffer, IN Operation, IN Xoffset, IN Yoffset);
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
