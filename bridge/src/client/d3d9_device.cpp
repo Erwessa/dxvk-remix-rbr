@@ -205,9 +205,23 @@ template<bool EnableSync>
 HRESULT Direct3DDevice9Ex_LSS<EnableSync>::TestCooperativeLevel() {
   ZoneScoped;
   LogFunctionCall();
-  // This returns failure on uniqueness change - so ignore it for now, seems benign.
-  // TODO: Return device removed when server dies
-  return D3D_OK;
+
+  if (!gbBridgeRunning) {
+    return D3DERR_DEVICELOST;
+  }
+
+  DeviceBridge::ResponseTransaction responseTransaction;
+
+  UID currentUID = 0;
+  {
+    ClientMessage c(Commands::IDirect3DDevice9Ex_TestCooperativeLevel, getId());
+    currentUID = c.get_uid();
+  }
+
+  WAIT_FOR_SERVER_RESPONSE("TestCooperativeLevel()", D3DERR_DEVICELOST, currentUID);
+  const HRESULT hresult = (HRESULT) DeviceBridge::get_data();
+  DeviceBridge::pop_front();
+  return hresult;
 }
 
 template<bool EnableSync>
