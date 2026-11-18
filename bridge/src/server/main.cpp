@@ -900,7 +900,6 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         const auto hresult = pD3DDevice->TestCooperativeLevel();
-        assert(SUCCEEDED(hresult));
         break;
       }
       case IDirect3DDevice9Ex_GetAvailableTextureMem:
@@ -917,7 +916,6 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         auto const hresult = pD3DDevice->EvictManagedResources();
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -926,7 +924,6 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         IDirect3D9* pD3D = nullptr;
         const auto hresult = pD3DDevice->GetDirect3D(OUT & pD3D);
-        assert(SUCCEEDED(hresult));
         assert(gpD3D == pD3D); // The two pointers should be identical
         break;
       }
@@ -1022,7 +1019,6 @@ void ProcessDeviceCommandQueue() {
         PULL_U(iSwapChain);
         IDirect3DSwapChain9* pSwapChain = nullptr;
         const auto hresult = pD3DDevice->GetSwapChain(iSwapChain, &pSwapChain);
-        assert(SUCCEEDED(hresult));
         assert(pSwapChain != nullptr);
         if (SUCCEEDED(hresult) && pSwapChain != nullptr) {
           // This is a read-only validation request; do not leak the COM reference
@@ -1140,7 +1136,6 @@ void ProcessDeviceCommandQueue() {
         PULL_HND(pSurfaceHandle);
         IDirect3DSurface9* pBackbuffer = nullptr;
         const auto hresult = pD3DDevice->GetBackBuffer(iSwapChain, iBackBuffer, D3DBACKBUFFER_TYPE_MONO, &pBackbuffer);
-        assert(SUCCEEDED(hresult));
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pBackbuffer;
         }
@@ -1154,7 +1149,6 @@ void ProcessDeviceCommandQueue() {
         PULL(BOOL, bEnableDialogs);
         const auto hresult = pD3DDevice->SetDialogBoxMode(bEnableDialogs);
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
-        assert(SUCCEEDED(hresult));
         break;
       }
       case IDirect3DDevice9Ex_SetGammaRamp:
@@ -1419,7 +1413,6 @@ void ProcessDeviceCommandQueue() {
         }
         if (pHandle == NULL || pRenderTarget != nullptr) {
           hresult = pD3DDevice->SetRenderTarget(IN RenderTargetIndex, IN pRenderTarget);
-          assert(SUCCEEDED(hresult));
         }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
@@ -1435,7 +1428,6 @@ void ProcessDeviceCommandQueue() {
           gpD3DResources[pSurfaceHandle] = pRenderTarget;
         }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
-        assert(SUCCEEDED(hresult));
         break;
       }
       case IDirect3DDevice9Ex_SetDepthStencilSurface:
@@ -1449,7 +1441,6 @@ void ProcessDeviceCommandQueue() {
         }
         if (pHandle == NULL || pDepthStencil != nullptr) {
           hresult = pD3DDevice->SetDepthStencilSurface(IN pDepthStencil);
-          assert(SUCCEEDED(hresult));
         }
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
@@ -1463,7 +1454,6 @@ void ProcessDeviceCommandQueue() {
         if (SUCCEEDED(hresult)) {
           gpD3DResources[pSurfaceHandle] = pZStencilSurface;
         }
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1471,7 +1461,6 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         const auto hresult = pD3DDevice->BeginScene();
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1479,7 +1468,6 @@ void ProcessDeviceCommandQueue() {
       {
         GET_RES(pD3DDevice, gpD3DDevices);
         const auto hresult = pD3DDevice->EndScene();
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1495,7 +1483,6 @@ void ProcessDeviceCommandQueue() {
         D3DCOLOR* Color = nullptr;
         PULL_DATA(sizeof(D3DCOLOR), Color);
         const auto hresult = pD3DDevice->Clear(Count, pRects, Flags, *Color, *Z, Stencil);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1506,7 +1493,6 @@ void ProcessDeviceCommandQueue() {
         D3DMATRIX* pMatrix = nullptr;
         PULL_DATA(sizeof(D3DMATRIX), pMatrix);
         const auto hresult = pD3DDevice->SetTransform(State, pMatrix);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1519,7 +1505,6 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_OBJ(D3DVIEWPORT9, pViewport);
         const auto hresult = pD3DDevice->SetViewport(pViewport);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1531,7 +1516,6 @@ void ProcessDeviceCommandQueue() {
         D3DMATERIAL9* pMaterial = nullptr;
         PULL_DATA(sizeof(D3DMATERIAL9), pMaterial);
         const auto hresult = pD3DDevice->SetMaterial(IN pMaterial);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1544,7 +1528,6 @@ void ProcessDeviceCommandQueue() {
         D3DLIGHT9* pLight = nullptr;
         PULL_DATA(sizeof(D3DLIGHT9), pLight);
         const auto hresult = pD3DDevice->SetLight(IN Index, IN pLight);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1556,7 +1539,6 @@ void ProcessDeviceCommandQueue() {
         PULL_D(LightIndex);
         PULL_U(bEnable);
         const auto hresult = pD3DDevice->LightEnable(IN LightIndex, IN bEnable);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1569,7 +1551,6 @@ void ProcessDeviceCommandQueue() {
         float* pPlane = nullptr;
         PULL_DATA(sizeof(float) * 4, pPlane);
         const auto hresult = pD3DDevice->SetClipPlane(IN Index, IN pPlane);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1581,7 +1562,6 @@ void ProcessDeviceCommandQueue() {
         PULL(D3DRENDERSTATETYPE, State);
         PULL_D(Value);
         const auto hresult = pD3DDevice->SetRenderState(IN State, IN Value);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1666,7 +1646,6 @@ void ProcessDeviceCommandQueue() {
         PULL(D3DTEXTURESTAGESTATETYPE, Type);
         PULL_D(Value);
         const auto hresult = pD3DDevice->SetTextureStageState(IN Stage, IN Type, IN Value);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1679,7 +1658,6 @@ void ProcessDeviceCommandQueue() {
         PULL(D3DSAMPLERSTATETYPE, Type);
         PULL_D(Value);
         const auto hresult = pD3DDevice->SetSamplerState(IN Sampler, IN Type, IN Value);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1698,7 +1676,6 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_OBJ(RECT, pRect);
         const auto hresult = pD3DDevice->SetScissorRect(pRect);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1709,7 +1686,6 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL(BOOL, bSoftware);
         const auto hresult = pD3DDevice->SetSoftwareVertexProcessing(bSoftware);
-        assert(SUCCEEDED(hresult));
         {
           ServerMessage c(Commands::Bridge_Response, currentUID);
           c.send_data(hresult);
@@ -1723,7 +1699,6 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_OBJ(float, nSegments);
         const auto hresult = pD3DDevice->SetNPatchMode(*nSegments);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1736,7 +1711,6 @@ void ProcessDeviceCommandQueue() {
         PULL_U(StartVertex);
         PULL_U(PrimitiveCount);
         const auto hresult = pD3DDevice->DrawPrimitive(IN PrimitiveType, IN StartVertex, IN PrimitiveCount);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1750,7 +1724,6 @@ void ProcessDeviceCommandQueue() {
         PULL_U(startIndex);
         PULL_U(primCount);
         const auto hresult = pD3DDevice->DrawIndexedPrimitive(IN Type, IN BaseVertexIndex, IN MinVertexIndex, IN NumVertices, IN startIndex, IN primCount);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1763,7 +1736,6 @@ void ProcessDeviceCommandQueue() {
         DeviceBridge::get_data(&pVertexStreamZeroData);
         PULL_U(VertexStreamZeroStride);
         const auto hresult = pD3DDevice->DrawPrimitiveUP(IN PrimitiveType, IN PrimitiveCount, IN pVertexStreamZeroData, IN VertexStreamZeroStride);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1783,7 +1755,6 @@ void ProcessDeviceCommandQueue() {
         DeviceBridge::get_data(&pVertexStreamZeroData);
 
         const auto hresult = pD3DDevice->DrawIndexedPrimitiveUP(IN PrimitiveType, IN MinVertexIndex, IN NumVertices, IN PrimitiveCount, IN pIndexData, IN IndexDataFormat, IN pVertexStreamZeroData, IN VertexStreamZeroStride);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1803,7 +1774,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pVertexDecl != nullptr && pDestBuffer != nullptr
           ? pD3DDevice->ProcessVertices(SrcStartIndex, DestIndex, VertexCount, pDestBuffer, pVertexDecl, Flags)
           : E_FAIL;
-        if (pVertexDecl != nullptr && pDestBuffer != nullptr) assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1844,7 +1814,6 @@ void ProcessDeviceCommandQueue() {
         GET_RES(pD3DDevice, gpD3DDevices);
         PULL_D(FVF);
         const auto hresult = pD3DDevice->SetFVF(IN FVF);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1875,7 +1844,6 @@ void ProcessDeviceCommandQueue() {
           pShader = gpD3DVertexShaders[pHandle];
         }
         const auto hresult = pD3DDevice->SetVertexShader(IN pShader);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1889,7 +1857,6 @@ void ProcessDeviceCommandQueue() {
         float* pConstantData = nullptr;
         PULL_DATA(Count * sizeof(float) * 4, pConstantData);
         const auto hresult = pD3DDevice->SetVertexShaderConstantF(IN StartRegister, IN pConstantData, IN Count);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1903,7 +1870,6 @@ void ProcessDeviceCommandQueue() {
         int* pConstantData = nullptr;
         PULL_DATA(Count * sizeof(int) * 4, pConstantData);
         const auto hresult = pD3DDevice->SetVertexShaderConstantI(IN StartRegister, IN pConstantData, IN Count);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1917,7 +1883,6 @@ void ProcessDeviceCommandQueue() {
         BOOL* pConstantData = nullptr;
         PULL_DATA(Count * sizeof(BOOL), pConstantData);
         const auto hresult = pD3DDevice->SetVertexShaderConstantB(IN StartRegister, IN pConstantData, IN Count);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1948,7 +1913,6 @@ void ProcessDeviceCommandQueue() {
         PULL_U(StreamNumber);
         PULL_U(Divider);
         const auto hresult = pD3DDevice->SetStreamSourceFreq(StreamNumber, Divider);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -1995,7 +1959,6 @@ void ProcessDeviceCommandQueue() {
           pShader = gpD3DPixelShaders[pHandle];
         }
         const auto hresult = pD3DDevice->SetPixelShader(IN pShader);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -2009,7 +1972,6 @@ void ProcessDeviceCommandQueue() {
         float* pConstantData = nullptr;
         PULL_DATA(Count * sizeof(float) * 4, pConstantData);
         const auto hresult = pD3DDevice->SetPixelShaderConstantF(IN StartRegister, IN pConstantData, IN Count);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -2023,7 +1985,6 @@ void ProcessDeviceCommandQueue() {
         int* pConstantData = nullptr;
         PULL_DATA(Count * sizeof(int) * 4, pConstantData);
         const auto hresult = pD3DDevice->SetPixelShaderConstantI(IN StartRegister, IN pConstantData, IN Count);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -2037,7 +1998,6 @@ void ProcessDeviceCommandQueue() {
         BOOL* pConstantData = nullptr;
         PULL_DATA(Count * sizeof(BOOL), pConstantData);
         const auto hresult = pD3DDevice->SetPixelShaderConstantB(IN StartRegister, IN pConstantData, IN Count);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -2068,7 +2028,6 @@ void ProcessDeviceCommandQueue() {
         float* pColumns = nullptr;
         PULL_DATA(sizeof(float) * HEIGHT, pColumns);
         const auto hresult = ((IDirect3DDevice9Ex*) pD3DDevice)->SetConvolutionMonoKernel(IN WIDTH, IN HEIGHT, IN pRows, IN pColumns);
-        assert(SUCCEEDED(hresult));
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
@@ -2100,7 +2059,6 @@ void ProcessDeviceCommandQueue() {
         PULL(uint32_t, hDestinationWindow);
         HWND hwnd = TRUNCATE_HANDLE(HWND, hDestinationWindow);
         const auto hresult = ((IDirect3DDevice9Ex*) pD3DDevice)->CheckDeviceState(IN hwnd);
-        assert(SUCCEEDED(hresult));
         {
           ServerMessage c(Commands::Bridge_Response, currentUID);
           c.send_data(hresult);
@@ -2473,7 +2431,6 @@ void ProcessDeviceCommandQueue() {
         if (pTexture != nullptr) {
           D3DSURFACE_DESC pDesc;
           const auto hresult = pTexture->GetLevelDesc(Level, &pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2512,7 +2469,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pTexture != nullptr ? pTexture->AddDirtyRect(IN pDirtyRect) : E_FAIL;
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         if (pTexture != nullptr) {
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2580,7 +2536,6 @@ void ProcessDeviceCommandQueue() {
         if (pVolumeTexture != nullptr) {
           D3DVOLUME_DESC pDesc;
           const auto hresult = pVolumeTexture->GetLevelDesc(Level, &pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2618,12 +2573,10 @@ void ProcessDeviceCommandQueue() {
         HRESULT hresult = E_FAIL;
         if (pVolumeTexture != nullptr) {
           hresult = pVolumeTexture->LockBox(IN Level, IN & lockedVolume, IN pBox, IN Flags);
-          assert(S_OK == hresult);
         }
         readVolumeRows(SUCCEEDED(hresult) ? &lockedVolume : nullptr, currentUID);
         if (SUCCEEDED(hresult)) {
           hresult = pVolumeTexture->UnlockBox(Level);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2636,7 +2589,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pVolumeTexture != nullptr ? pVolumeTexture->AddDirtyBox(IN pBox) : E_FAIL;
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         if (pVolumeTexture != nullptr) {
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2704,7 +2656,6 @@ void ProcessDeviceCommandQueue() {
         if (pCubeTexture != nullptr) {
           D3DSURFACE_DESC pDesc;
           const auto hresult = pCubeTexture->GetLevelDesc(Level, &pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2745,7 +2696,6 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pCubeTexture != nullptr ? pCubeTexture->AddDirtyRect(IN FaceType, IN pDirtyRect) : E_FAIL;
         SEND_OPTIONAL_SERVER_RESPONSE(hresult, currentUID);
         if (pCubeTexture != nullptr) {
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2820,11 +2770,9 @@ void ProcessDeviceCommandQueue() {
         // Now lock the buffer and copy the data into it
         void* pbData = nullptr;
         auto hresult = pVertexBuffer->Lock(IN OffsetToLock, IN SizeToLock, IN & pbData, IN Flags);
-        assert(S_OK == hresult);
         if (SUCCEEDED(hresult) && pbData != nullptr) {
           memcpy(pbData, data, SizeToLock);
           hresult = pVertexBuffer->Unlock();
-          assert(SUCCEEDED(hresult));
           if (bridge_util::perf::enabled()) {
             bridge_util::perf::noteUpload(SizeToLock);
           }
@@ -2840,7 +2788,6 @@ void ProcessDeviceCommandQueue() {
         if (pVertexBuffer != nullptr) {
           D3DVERTEXBUFFER_DESC pDesc;
           const auto hresult = pVertexBuffer->GetDesc(OUT & pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2915,11 +2862,9 @@ void ProcessDeviceCommandQueue() {
         // Now lock the buffer and copy the data into it
         void* pbData = nullptr;
         auto hresult = pIndexBuffer->Lock(IN OffsetToLock, IN SizeToLock, IN & pbData, IN Flags);
-        assert(S_OK == hresult);
         if (SUCCEEDED(hresult) && pbData != nullptr) {
           memcpy(pbData, data, SizeToLock);
           hresult = pIndexBuffer->Unlock();
-          assert(SUCCEEDED(hresult));
           if (bridge_util::perf::enabled()) {
             bridge_util::perf::noteUpload(SizeToLock);
           }
@@ -2934,7 +2879,6 @@ void ProcessDeviceCommandQueue() {
         if (pIndexBuffer != nullptr) {
           D3DINDEXBUFFER_DESC pDesc;
           const auto hresult = pIndexBuffer->GetDesc(OUT & pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -2982,7 +2926,6 @@ void ProcessDeviceCommandQueue() {
         if (pSurface != nullptr) {
           D3DSURFACE_DESC pDesc;
           const auto hresult = pSurface->GetDesc(OUT & pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -3022,7 +2965,6 @@ void ProcessDeviceCommandQueue() {
         HRESULT hresult = E_FAIL;
         if (pSurface != nullptr) {
           hresult = pSurface->LockRect(OUT & lockedRect, IN pRect, IN Flags);
-          assert(S_OK == hresult);
         }
         const bool locked = SUCCEEDED(hresult);
 
@@ -3071,7 +3013,6 @@ void ProcessDeviceCommandQueue() {
 
         if (locked) {
           hresult = pSurface->UnlockRect();
-          assert(SUCCEEDED(hresult));
           if (bridge_util::perf::enabled()) {
             bridge_util::perf::noteUpload(uint64_t(rowSize) * numRows);
           }
@@ -3119,7 +3060,6 @@ void ProcessDeviceCommandQueue() {
         if (pVolume != nullptr) {
           D3DVOLUME_DESC pDesc;
           const auto hresult = pVolume->GetDesc(OUT & pDesc);
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
@@ -3139,12 +3079,10 @@ void ProcessDeviceCommandQueue() {
         HRESULT hresult = E_FAIL;
         if (pVolume != nullptr) {
           hresult = pVolume->LockBox(IN & lockedVolume, IN pBox, IN Flags);
-          assert(S_OK == hresult);
         }
         readVolumeRows(SUCCEEDED(hresult) ? &lockedVolume : nullptr, currentUID);
         if (SUCCEEDED(hresult)) {
           hresult = pVolume->UnlockBox();
-          assert(SUCCEEDED(hresult));
         }
         break;
       }
