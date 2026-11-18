@@ -4598,7 +4598,10 @@ void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects(bool preserveExpl
       m_state.renderTargets[0].reset(nullptr);
     }
     const auto rtRefCnt = m_pImplicitRenderTarget->Release();
-    assert(rtRefCnt == 0 && "Implicit RenderTarget has not been released!");
+    if (rtRefCnt != 0) {
+      Logger::warn(format_string("Reset: %u implicit render-target COM reference(s) remain; the server-side Reset will determine whether they prevent the reset.",
+                                 static_cast<unsigned>(rtRefCnt)));
+    }
     m_pImplicitRenderTarget = nullptr;
     --m_implicitRefCnt;
   }
@@ -4612,7 +4615,10 @@ void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects(bool preserveExpl
       m_state.depthStencil.reset(nullptr);
     }
     const auto dsRefCnt = m_pImplicitDepthStencil->Release();
-    assert(dsRefCnt == 0 && "Implicit DepthStencil has not been released!");
+    if (dsRefCnt != 0) {
+      Logger::warn(format_string("Reset: %u implicit depth-stencil COM reference(s) remain; the server-side Reset will determine whether they prevent the reset.",
+                                 static_cast<unsigned>(dsRefCnt)));
+    }
     m_pImplicitDepthStencil = nullptr;
     --m_implicitRefCnt;
   }
@@ -4625,7 +4631,10 @@ void Direct3DDevice9Ex_LSS<EnableSync>::destroyImplicitObjects(bool preserveExpl
     unregisterSwapChain(m_pSwapchain);
     m_pSwapchain->releaseBackBufferReferences();
     const auto scRefCnt = m_pSwapchain->Release();
-    assert(scRefCnt == 0 && "Implicit Swapchain has not been released!");
+    if (scRefCnt != 0) {
+      Logger::warn(format_string("Reset: %u implicit swapchain/backbuffer COM reference(s) remain; the server-side Reset will determine whether they prevent the reset.",
+                                 static_cast<unsigned>(scRefCnt)));
+    }
     m_pSwapchain = nullptr;
     --m_implicitRefCnt;
   }
