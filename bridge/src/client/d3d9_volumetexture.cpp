@@ -123,11 +123,15 @@ HRESULT Direct3DVolumeTexture9_LSS::GetVolumeLevel(UINT Level, IDirect3DVolume9*
 
     (*ppVolumeLevel) = pLssVolume;
 
+    DeviceBridge::ResponseTransaction responseTransaction;
+    UID currentUID = 0;
     {
       ClientMessage c(Commands::IDirect3DVolumeTexture9_GetVolumeLevel, getId());
+      currentUID = c.get_uid();
       c.send_data(Level);
       c.send_data((uint32_t) pLssVolume->getId());
     }
+    WAIT_FOR_OPTIONAL_CHILD_CREATE_FUNCTION_SERVER_RESPONSE("GetVolumeLevel()", D3DERR_INVALIDCALL, currentUID, Level, ppVolumeLevel);
   }
   return S_OK;
 }
