@@ -2833,11 +2833,22 @@ void ProcessDeviceCommandQueue() {
           break;
         }
 
+        D3DVERTEXBUFFER_DESC bufferDesc = {};
+        const HRESULT descResult = pVertexBuffer->GetDesc(OUT &bufferDesc);
+        if (FAILED(descResult) || OffsetToLock > bufferDesc.Size
+            || SizeToLock > bufferDesc.Size - OffsetToLock || (SizeToLock != 0 && data == nullptr)) {
+          Logger::err("[Bridge] Vertex buffer upload has an invalid destination range or source pointer; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
+
         // Now lock the buffer and copy the data into it
         void* pbData = nullptr;
         auto hresult = pVertexBuffer->Lock(IN OffsetToLock, IN SizeToLock, IN & pbData, IN Flags);
         if (SUCCEEDED(hresult) && pbData != nullptr) {
-          memcpy(pbData, data, SizeToLock);
+          if (SizeToLock != 0) {
+            memcpy(pbData, data, SizeToLock);
+          }
           hresult = pVertexBuffer->Unlock();
           if (bridge_util::perf::enabled()) {
             bridge_util::perf::noteUpload(SizeToLock);
@@ -2930,11 +2941,22 @@ void ProcessDeviceCommandQueue() {
           break;
         }
 
+        D3DINDEXBUFFER_DESC bufferDesc = {};
+        const HRESULT descResult = pIndexBuffer->GetDesc(OUT &bufferDesc);
+        if (FAILED(descResult) || OffsetToLock > bufferDesc.Size
+            || SizeToLock > bufferDesc.Size - OffsetToLock || (SizeToLock != 0 && data == nullptr)) {
+          Logger::err("[Bridge] Index buffer upload has an invalid destination range or source pointer; stopping the bridge.");
+          gbBridgeRunning = false;
+          break;
+        }
+
         // Now lock the buffer and copy the data into it
         void* pbData = nullptr;
         auto hresult = pIndexBuffer->Lock(IN OffsetToLock, IN SizeToLock, IN & pbData, IN Flags);
         if (SUCCEEDED(hresult) && pbData != nullptr) {
-          memcpy(pbData, data, SizeToLock);
+          if (SizeToLock != 0) {
+            memcpy(pbData, data, SizeToLock);
+          }
           hresult = pIndexBuffer->Unlock();
           if (bridge_util::perf::enabled()) {
             bridge_util::perf::noteUpload(SizeToLock);
