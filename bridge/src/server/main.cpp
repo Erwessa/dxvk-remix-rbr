@@ -821,7 +821,10 @@ void ProcessDeviceCommandQueue() {
         const auto hresult = pD3DDevice->GetSwapChain(0, &pSwapChain);
         if (SUCCEEDED(hresult)) {
           gpD3DSwapChains[pClientSwapchain] = pSwapChain;
+        } else {
+          bridge_util::Logger::err(format_string("LinkSwapchain failed: 0x%08x", hresult));
         }
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DDevice9Ex_LinkBackBuffer:
@@ -837,6 +840,7 @@ void ProcessDeviceCommandQueue() {
         if (FAILED(hresult)) {
           bridge_util::Logger::err(format_string("LinkBackBuffer failed: 0x%08x", hresult));
         }
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DDevice9Ex_LinkAutoDepthStencil:
@@ -851,6 +855,7 @@ void ProcessDeviceCommandQueue() {
         if (FAILED(hresult)) {
           bridge_util::Logger::err(format_string("LinkAutoDepthStencil failed: 0x%08x", hresult));
         }
+        SEND_OPTIONAL_CREATE_FUNCTION_SERVER_RESPONSE(hresult, currentUID);
         break;
       }
       case IDirect3DDevice9Ex_QueryInterface:
