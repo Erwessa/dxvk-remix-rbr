@@ -1848,7 +1848,7 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetPixelCaptureFlags(BaseDirec
   flags.renderStates[D3DRS_DESTBLENDALPHA] = true;
   flags.renderStates[D3DRS_BLENDOPALPHA] = true;
 
-  for (uint32_t i = 0; i < caps::MaxTexturesPS + 1; i++) {
+  for (uint32_t i = 0; i < caps::MaxTexturesPS; i++) {
     flags.samplerStates[i][D3DSAMP_ADDRESSU] = true;
     flags.samplerStates[i][D3DSAMP_ADDRESSV] = true;
     flags.samplerStates[i][D3DSAMP_ADDRESSW] = true;
@@ -1936,8 +1936,14 @@ void Direct3DDevice9Ex_LSS<EnableSync>::StateBlockSetVertexCaptureFlags(BaseDire
   for (const auto& enable : m_state.bLightEnables) {
     flags.bLightEnables[enable.first] = true;
   }
-  for (uint32_t i = caps::MaxTexturesPS + 1; i < BaseDirect3DDevice9Ex_LSS::kMaxStageSamplerStateTypes; i++) {
-    flags.samplerStates[i][D3DSAMP_DMAPOFFSET] = true;
+  // The displacement-map sampler is a single vertex-pipeline sampler at
+  // D3DDMAPSAMPLER, mapped immediately after the pixel samplers.
+  flags.samplerStates[caps::MaxTexturesPS][D3DSAMP_DMAPOFFSET] = true;
+
+  // These two texture-stage states are shared by the vertex and pixel pipelines.
+  for (uint32_t i = 0; i < caps::MaxSimultaneousTextures; i++) {
+    flags.textureStageStates[i][TextureStageStateType::TexCoordIdx] = true;
+    flags.textureStageStates[i][TextureStageStateType::TexXformFlags] = true;
   }
 
   for (auto& fConst : flags.vertexConstants.fConsts) {
