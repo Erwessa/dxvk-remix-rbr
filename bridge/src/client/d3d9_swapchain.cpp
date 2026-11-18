@@ -232,7 +232,7 @@ HRESULT Direct3DSwapChain9_LSS::GetBackBuffer(UINT iBackBuffer, D3DBACKBUFFER_TY
   ZoneScoped;
   LogFunctionCall();
 
-  if (ppBackBuffer == nullptr) {
+  if (ppBackBuffer == nullptr || iBackBuffer >= m_children.size()) {
     return D3DERR_INVALIDCALL;
   }
 
